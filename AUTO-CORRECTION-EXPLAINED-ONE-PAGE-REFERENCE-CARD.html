@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Polygon Correction - One-Page Reference</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 10px; }
+            .no-print { display: none; }
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1976d2;
+            margin: 0 0 8px 0;
+            font-size: 20px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 20px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .box {
+            border-left: 4px solid;
+            padding: 12px;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+        
+        .box.green { border-color: #2e7d32; background: #e8f5e9; }
+        .box.red { border-color: #d32f2f; background: #ffebee; }
+        .box.blue { border-color: #1976d2; background: #e3f2fd; }
+        .box.orange { border-color: #f57c00; background: #fff3e0; }
+        .box.purple { border-color: #7b1fa2; background: #f3e5f5; }
+        
+        .box h3 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        
+        .box.green h3 { color: #1b5e20; }
+        .box.red h3 { color: #b71c1c; }
+        .box.blue h3 { color: #0d47a1; }
+        .box.orange h3 { color: #e65100; }
+        .box.purple h3 { color: #4a148c; }
+        
+        .box ul {
+            margin: 0;
+            padding-left: 16px;
+        }
+        
+        .box li {
+            margin-bottom: 4px;
+            line-height: 1.5;
+        }
+        
+        .method-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .method-box {
+            border: 2px solid;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .method-box .icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+        
+        .method-box .label {
+            font-weight: 700;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        
+        .method-box .desc {
+            font-size: 10px;
+            color: #666;
+            line-height: 1.3;
+        }
+        
+        .method-box.auto { border-color: #00bcd4; background: #e0f7fa; }
+        .method-box.auto .label { color: #006064; }
+        
+        .method-box.manual { border-color: #9c27b0; background: #f3e5f5; }
+        .method-box.manual .label { color: #4a148c; }
+        
+        .method-box.reject { border-color: #f44336; background: #ffebee; }
+        .method-box.reject .label { color: #b71c1c; }
+        
+        .stats-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            border-radius: 6px;
+            border: 2px solid;
+        }
+        
+        .stat .number {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        
+        .stat .label {
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .stat.total { border-color: #757575; background: #fafafa; }
+        .stat.total .number { color: #424242; }
+        .stat.total .label { color: #757575; }
+        
+        .stat.auto { border-color: #00bcd4; background: #e0f7fa; }
+        .stat.auto .number { color: #006064; }
+        .stat.auto .label { color: #00838f; }
+        
+        .stat.manual { border-color: #9c27b0; background: #f3e5f5; }
+        .stat.manual .number { color: #4a148c; }
+        .stat.manual .label { color: #7b1fa2; }
+        
+        .print-button {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        .print-button button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .print-button button:hover {
+            background: #1565c0;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #e0e0e0;
+            font-size: 10px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-button no-print">
+        <button onclick="window.print()">🖨️ Print This Reference Card</button>
+    </div>
+    
+    <div class="card">
+        <h1>🔧 Field Polygon Correction Reference</h1>
+        <div class="subtitle">One-page guide for supervisor | Keep at your desk</div>
+        
+        <!-- STATISTICS BAR -->
+        <div class="stats-bar">
+            <div class="stat total">
+                <div class="number">26,090</div>
+                <div class="label">TOTAL FIELDS</div>
+            </div>
+            <div class="stat auto">
+                <div class="number">316</div>
+                <div class="label">AUTO-CORRECTED<br>(1%)</div>
+            </div>
+            <div class="stat manual">
+                <div class="number">855</div>
+                <div class="label">NEEDS MANUAL<br>(3%)</div>
+            </div>
+        </div>
+        
+        <!-- WHAT GETS AUTO-CORRECTED VS NOT -->
+        <div class="section">
+            <div class="section-title">⚡ What Auto-Correction Fixes vs Doesn't Fix</div>
+            
+            <div class="two-column">
+                <div class="box green">
+                    <h3>✅ AUTO-CORRECTION FIXES (Simple)</h3>
+                    <ul>
+                        <li><strong>Duplicate vertices</strong><br>Same point listed twice</li>
+                        <li><strong>Coordinate precision</strong><br>Too many decimal places</li>
+                        <li><strong>Small gaps (&lt;1m)</strong><br>Tiny unclosed polygons</li>
+                        <li><strong>Point order</strong><br>Clockwise vs counter-clockwise</li>
+                        <li><strong>Collinear points</strong><br>Extra points on straight lines</li>
+                    </ul>
+                    <div style="margin-top: 8px; padding: 6px; background: rgba(46,125,50,0.1); border-radius: 4px; font-size: 10px;">
+                        <strong>Why safe:</strong> Simple mechanical fixes. No judgment calls. No boundary changes. Average area change: 0.34m² (0.0008%)
+                    </div>
+                </div>
+                
+                <div class="box red">
+                    <h3>❌ AUTO-CORRECTION NEVER FIXES (Complex)</h3>
+                    <ul>
+                        <li><strong>Self-intersecting lines</strong><br>Boundaries that cross themselves</li>
+                        <li><strong>Bow-tie shapes</strong><br>Complex geometry errors</li>
+                        <li><strong>Overlapping fields</strong><br>Multiple fields sharing space</li>
+                        <li><strong>Large gaps (&gt;1m)</strong><br>Significant unclosed areas</li>
+                        <li><strong>Suspicious shapes</strong><br>Straight lines, unusual patterns</li>
+                    </ul>
+                    <div style="margin-top: 8px; padding: 6px; background: rgba(211,47,47,0.1); border-radius: 4px; font-size: 10px;">
+                        <strong>Why flagged:</strong> Requires human judgment. Multiple ways to fix. Business decisions needed. <strong>This is where YOU add value!</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CORRECTION METHODS -->
+        <div class="section">
+            <div class="section-title">🛠️ Correction Methods & Statuses</div>
+            
+            <div class="method-grid">
+                <div class="method-box auto">
+                    <div class="icon">🤖</div>
+                    <div class="label">AUTO-CORRECTED</div>
+                    <div class="desc">System fixed automatically<br><strong>Method:</strong> clean_only<br><strong>Status:</strong> Applied ✅</div>
+                </div>
+                
+                <div class="method-box manual">
+                    <div class="icon">✋</div>
+                    <div class="label">MANUALLY EDITED</div>
+                    <div class="desc">Human fixed in editor<br><strong>Method:</strong> manual_edit<br><strong>Status:</strong> Applied ✅</div>
+                </div>
+                
+                <div class="method-box reject">
+                    <div class="icon">🚫</div>
+                    <div class="label">CANNOT FIX</div>
+                    <div class="desc">Too complex or invalid<br><strong>Method:</strong> None<br><strong>Status:</strong> Rejected ❌</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- WORKFLOW GUIDE -->
+        <div class="section">
+            <div class="section-title">📋 Correction Workflow</div>
+            
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 6px; border-left: 4px solid #1976d2;">
+                    <div style="font-weight: 700; font-size: 11px; color: #0d47a1; margin-bottom: 4px;">1️⃣ IMPORT</div>
+                    <div style="font-size: 10px; color: #666;">Load CSV with field polygons</div>
+                </div>
+                
+                <div style="background: #e8f5e9; padding: 10px; border-radius: 6px; border-left: 4px solid #2e7d32;">
+                    <div style="font-weight: 700; font-size: 11px; color: #1b5e20; margin-bottom: 4px;">2️⃣ VALIDATE</div>
+                    <div style="font-size: 10px; color: #666;">Check against Verra requirements</div>
+                </div>
+                
+                <div style="background: #e0f7fa; padding: 10px; border-radius: 6px; border-left: 4px solid #00bcd4;">
+                    <div style="font-weight: 700; font-size: 11px; color: #006064; margin-bottom: 4px;">3️⃣ AUTO-FIX</div>
+                    <div style="font-size: 10px; color: #666;">System corrects simple issues</div>
+                </div>
+                
+                <div style="background: #f3e5f5; padding: 10px; border-radius: 6px; border-left: 4px solid #9c27b0;">
+                    <div style="font-weight: 700; font-size: 11px; color: #4a148c; margin-bottom: 4px;">4️⃣ MANUAL FIX</div>
+                    <div style="font-size: 10px; color: #666;">You fix complex issues</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CATALOG STATUS BUTTONS -->
+        <div class="section">
+            <div class="section-title">🔘 Catalog Filter Buttons</div>
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <div class="box blue">
+                    <h3>VERRA READY</h3>
+                    <div style="font-size: 10px;">Shows fields ready for submission<br><strong>Count:</strong> 25,235 (97%)</div>
+                </div>
+                
+                <div class="box green">
+                    <h3>AUTO-CORRECTED</h3>
+                    <div style="font-size: 10px;">Shows system-fixed fields<br><strong>Count:</strong> 316 (1%)</div>
+                </div>
+                
+                <div class="box red">
+                    <h3>NEEDS MANUAL</h3>
+                    <div style="font-size: 10px;">Your work queue<br><strong>Count:</strong> 855 (3%)</div>
+                </div>
+                
+                <div class="box orange">
+                    <h3>MANUALLY FLAGGED</h3>
+                    <div style="font-size: 10px;">Fields you bookmarked<br><strong>Count:</strong> 1,358 (5%)</div>
+                </div>
+                
+                <div class="box green">
+                    <h3>VALID</h3>
+                    <div style="font-size: 10px;">Originally perfect<br><strong>Count:</strong> 24,919 (96%)</div>
+                </div>
+                
+                <div class="box purple">
+                    <h3>MANUALLY EDITED</h3>
+                    <div style="font-size: 10px;">Fixed by you<br><strong>Count:</strong> 1,118 (4%)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- QUICK REFERENCE -->
+        <div class="section">
+            <div class="section-title">💡 Quick Reference</div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div style="background: #fff3e0; padding: 10px; border-radius: 6px; border-left: 4px solid #f57c00;">
+                    <strong style="font-size: 11px; color: #e65100;">🤔 "Are we ready for Verra?"</strong>
+                    <div style="font-size: 10px; margin-top: 4px; color: #666;">
+                        <strong style="color: #2e7d32;">YES!</strong> 97% ready (25,235 fields)<br>
+                        Only 3% (855 fields) need work
+                    </div>
+                </div>
+                
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 6px; border-left: 4px solid #1976d2;">
+                    <strong style="font-size: 11px; color: #0d47a1;">📊 "How do I see my work?"</strong>
+                    <div style="font-size: 10px; margin-top: 4px; color: #666;">
+                        Click <strong>Needs Manual Editing</strong><br>
+                        Shows your to-do list (855 fields)
+                    </div>
+                </div>
+                
+                <div style="background: #e8f5e9; padding: 10px; border-radius: 6px; border-left: 4px solid #2e7d32;">
+                    <strong style="font-size: 11px; color: #1b5e20;">✅ "Can I trust auto-correction?"</strong>
+                    <div style="font-size: 10px; margin-top: 4px; color: #666;">
+                        YES! Only fixes simple issues<br>
+                        Area change: 0.0008% average<br>
+                        100% pass Verra validation
+                    </div>
+                </div>
+                
+                <div style="background: #ffebee; padding: 10px; border-radius: 6px; border-left: 4px solid #d32f2f;">
+                    <strong style="font-size: 11px; color: #b71c1c;">⚠️ "What if I find a mistake?"</strong>
+                    <div style="font-size: 10px; margin-top: 4px; color: #666;">
+                        All changes are logged & reversible<br>
+                        Flag the field for review<br>
+                        Can revert any correction
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Updated: March 10, 2026 | CCS FieldForce Polygon Intelligence Corrector v2.0<br>
+            <strong>Keep this card at your desk for quick reference!</strong>
+        </div>
+    </div>
+    
+    <div class="print-button no-print" style="margin-top: 15px;">
+        <button onclick="window.print()">🖨️ Print This Reference Card</button>
+    </div>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Data Inspector</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4ec9b0;
+            margin: 0 0 20px 0;
+        }
+        .panel {
+            background: #252526;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #3e3e42;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        .info { color: #569cd6; }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #3e3e42;
+            text-align: left;
+        }
+        th {
+            background: #0e639c;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #2d2d30;
+        }
+        #map {
+            height: 400px;
+            border: 2px solid #3e3e42;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Field Data Inspector</h1>
+        <p class="info">This tool reads data directly from browser memory (no need for console commands)</p>
+        
+        <div class="panel">
+            <button onclick="loadData()">📊 Load Field Data</button>
+            <button onclick="checkCoordinates()">🔍 Check Coordinates</button>
+            <button onclick="testDrawPolygon()">🗺️ Test Draw on Map</button>
+            <button onclick="clearLog()">🧹 Clear Log</button>
+        </div>
+        
+        <div class="grid">
+            <div class="panel">
+                <h3>📋 Output Log</h3>
+                <div id="log" style="max-height: 500px; overflow-y: auto;">
+                    <p class="info">Click "Load Field Data" to start...</p>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>🗺️ Test Map</h3>
+                <div id="map"></div>
+                <p class="info" style="font-size: 12px;">Map will show test polygon when you click "Test Draw"</p>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h3>📊 Field Data Table</h3>
+            <div id="table"></div>
+        </div>
+    </div>
+
+    <script>
+        let fieldsData = [];
+        let map = null;
+        
+        // Initialize map
+        function initMap() {
+            if (!map) {
+                map = L.map('map').setView([0, 0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(map);
+                log('✅ Map initialized', 'success');
+            }
+        }
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('pre');
+            p.className = type;
+            p.textContent = message;
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<p class="info">Log cleared. Click a button to run tests.</p>';
+        }
+        
+        function loadData() {
+            clearLog();
+            log('=== LOADING FIELD DATA ===', 'success');
+            
+            try {
+                // Try to load from localStorage (memory-only mode)
+                const storedData = localStorage.getItem('fieldPolygonData');
+                
+                if (!storedData) {
+                    log('❌ No data found in browser storage!', 'error');
+                    log('', 'info');
+                    log('Please import your data in the main app first:', 'warning');
+                    log('1. Open index.html', 'info');
+                    log('2. Import your CSV file', 'info');
+                    log('3. Then come back to this page', 'info');
+                    log('4. Click "Load Field Data" again', 'info');
+                    return;
+                }
+                
+                fieldsData = JSON.parse(storedData);
+                log(`✅ Loaded ${fieldsData.length} fields from storage`, 'success');
+                
+                if (fieldsData.length === 0) {
+                    log('⚠️ Storage is empty. Import data in the main app first!', 'warning');
+                    return;
+                }
+                
+                // Show summary
+                log('', 'info');
+                log('📊 Data Summary:', 'info');
+                log(`   Total Fields: ${fieldsData.length}`, 'info');
+                log(`   First Field ID: ${fieldsData[0].ccsFieldId}`, 'info');
+                log(`   Vertices: ${fieldsData[0].originalCoordinates.length}`, 'info');
+                
+                checkCoordinates();
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log('Make sure you imported data in the main app (index.html) first!', 'warning');
+            }
+        }
+        
+        function checkCoordinates() {
+            if (fieldsData.length === 0) {
+                log('⚠️ No data loaded. Click "Load Field Data" first!', 'warning');
+                return;
+            }
+            
+            log('', 'info');
+            log('=== COORDINATE CHECK ===', 'success');
+            
+            // Build table
+            let html = '<table><tr>';
+            html += '<th>#</th><th>Field ID</th><th>Vertices</th>';
+            html += '<th>First Vertex</th><th>Lat</th><th>Lng</th><th>Valid?</th>';
+            html += '</tr>';
+            
+            let validCount = 0;
+            let invalidCount = 0;
+            
+            for (let i = 0; i < Math.min(10, fieldsData.length); i++) {
+                const field = fieldsData[i];
+                const coords = field.originalCoordinates;
+                
+                if (!coords || coords.length === 0) {
+                    html += `<tr><td>${i + 1}</td><td>${field.ccsFieldId}</td><td colspan="5" class="error">No coordinates</td></tr>`;
+                    continue;
+                }
+                
+                const firstCoord = coords[0];
+                const lat = firstCoord[0];
+                const lng = firstCoord[1];
+                
+                const latValid = Math.abs(lat) <= 90;
+                const lngValid = Math.abs(lng) <= 180;
+                const valid = latValid && lngValid;
+                
+                if (valid) validCount++;
+                else invalidCount++;
+                
+                const validSymbol = valid ? '✅' : '❌';
+                const rowClass = valid ? '' : ' style="background: #3d2020"';
+                
+                html += `<tr${rowClass}>`;
+                html += `<td>${i + 1}</td>`;
+                html += `<td>${field.ccsFieldId}</td>`;
+                html += `<td>${coords.length}</td>`;
+                html += `<td>[${lat.toFixed(6)}, ${lng.toFixed(6)}]</td>`;
+                html += `<td class="${latValid ? 'success' : 'error'}">${lat.toFixed(6)}</td>`;
+                html += `<td class="${lngValid ? 'success' : 'error'}">${lng.toFixed(6)}</td>`;
+                html += `<td>${validSymbol}</td>`;
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            document.getElementById('table').innerHTML = html;
+            
+            // Analysis
+            const field1 = fieldsData[0];
+            const lat = field1.originalCoordinates[0][0];
+            const lng = field1.originalCoordinates[0][1];
+            
+            log('', 'info');
+            log('📝 First Field Analysis:', 'info');
+            log(`   Latitude:  ${lat.toFixed(6)} (valid range: -90 to 90)`, Math.abs(lat) <= 90 ? 'success' : 'error');
+            log(`   Longitude: ${lng.toFixed(6)} (valid range: -180 to 180)`, Math.abs(lng) <= 180 ? 'success' : 'error');
+            log('', 'info');
+            log(`✅ Valid coordinates: ${validCount}`, 'success');
+            if (invalidCount > 0) {
+                log(`❌ Invalid coordinates: ${invalidCount}`, 'error');
+            }
+            
+            // Check if likely Africa
+            if (Math.abs(lat) <= 37 && Math.abs(lng) <= 52 && validCount > 0) {
+                log('', 'info');
+                log('✅ Coordinates appear to be in AFRICA range!', 'success');
+                log('   Expected Africa: Lat -35 to 37, Lng -18 to 52', 'info');
+            } else if (invalidCount > 0) {
+                log('', 'info');
+                log('❌ COORDINATES ARE INVALID!', 'error');
+                log('   They are outside valid geographic ranges.', 'error');
+            }
+        }
+        
+        function testDrawPolygon() {
+            if (fieldsData.length === 0) {
+                log('⚠️ No data loaded. Click "Load Field Data" first!', 'warning');
+                return;
+            }
+            
+            initMap();
+            
+            log('', 'info');
+            log('=== TESTING POLYGON DRAW ===', 'success');
+            
+            try {
+                const field = fieldsData[0];
+                log(`Drawing field: ${field.ccsFieldId}`, 'info');
+                log(`Vertices: ${field.originalCoordinates.length}`, 'info');
+                log(`First vertex: [${field.originalCoordinates[0][0].toFixed(6)}, ${field.originalCoordinates[0][1].toFixed(6)}]`, 'info');
+                
+                // Clear previous layers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Polygon) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                // Draw polygon
+                const polygon = L.polygon(field.originalCoordinates, {
+                    color: '#00ff00',
+                    weight: 5,
+                    opacity: 1.0,
+                    fillColor: '#00ff00',
+                    fillOpacity: 0.5
+                }).addTo(map);
+                
+                polygon.bindPopup(`
+                    <strong>Test Polygon</strong><br>
+                    Field: ${field.ccsFieldId}<br>
+                    Vertices: ${field.originalCoordinates.length}
+                `);
+                
+                // Fit map
+                map.fitBounds(polygon.getBounds());
+                
+                const bounds = polygon.getBounds();
+                const center = bounds.getCenter();
+                
+                log('', 'info');
+                log('✅ POLYGON DRAWN!', 'success');
+                log(`   SW Corner: [${bounds.getSouth().toFixed(6)}, ${bounds.getWest().toFixed(6)}]`, 'info');
+                log(`   NE Corner: [${bounds.getNorth().toFixed(6)}, ${bounds.getEast().toFixed(6)}]`, 'info');
+                log(`   Center: [${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}]`, 'info');
+                log(`   Zoom: ${map.getZoom()}`, 'info');
+                log('', 'info');
+                log('👀 Look at the map on the right - you should see a THICK GREEN polygon!', 'success');
+                
+            } catch (error) {
+                log(`❌ Error drawing polygon: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        // Auto-load on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('🔍 Field Data Inspector loaded', 'success');
+            log('Click "Load Field Data" to begin inspection', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Test - Diagnostic</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        .info { color: blue; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Import Diagnostic Test</h1>
+    
+    <div>
+        <h3>Step 1: Select CSV File</h3>
+        <input type="file" id="csvFile" accept=".csv">
+    </div>
+    
+    <div id="logContainer" class="log">
+        <div class="info">Waiting for file selection...</div>
+    </div>
+    
+    <div id="results" style="margin-top: 20px; display: none;">
+        <h3>Results:</h3>
+        <div id="resultsContent"></div>
+    </div>
+    
+    <script type="module">
+        const logContainer = document.getElementById('logContainer');
+        const resultsDiv = document.getElementById('results');
+        const resultsContent = document.getElementById('resultsContent');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+        
+        document.getElementById('csvFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            log(`File selected: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`, 'info');
+            logContainer.innerHTML = '';
+            resultsDiv.style.display = 'none';
+            
+            try {
+                // Read file
+                log('Reading file...', 'info');
+                const text = await file.text();
+                const lines = text.split('\n');
+                
+                log(`File has ${lines.length} lines`, 'info');
+                
+                // Get headers
+                const headerLine = lines[0];
+                log(`Header line: ${headerLine.substring(0, 100)}...`, 'info');
+                
+                const headers = headerLine.split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+                log(`Found ${headers.length} columns`, 'info');
+                log(`Headers: ${headers.join(', ')}`, 'info');
+                
+                // Check for Field GeoJSON column
+                const geoJsonIdx = headers.findIndex(h => h.includes('geojson'));
+                if (geoJsonIdx >= 0) {
+                    log(`✅ Found GeoJSON column: "${headers[geoJsonIdx]}" at index ${geoJsonIdx}`, 'success');
+                } else {
+                    log(`❌ No GeoJSON column found!`, 'error');
+                    log(`Available columns: ${headers.join(', ')}`, 'warning');
+                    return;
+                }
+                
+                // Check for Field ID column
+                const fieldIdIdx = headers.findIndex(h => h.includes('field') && h.includes('id'));
+                if (fieldIdIdx >= 0) {
+                    log(`✅ Found Field ID column: "${headers[fieldIdIdx]}" at index ${fieldIdIdx}`, 'success');
+                } else {
+                    log(`⚠️ No Field ID column found`, 'warning');
+                }
+                
+                // Parse first few data rows
+                log('Parsing first 3 data rows...', 'info');
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (let i = 1; i <= Math.min(4, lines.length - 1); i++) {
+                    if (!lines[i].trim()) continue;
+                    
+                    log(`\n--- Row ${i} ---`, 'info');
+                    
+                    try {
+                        // Simple CSV parse (doesn't handle quoted commas perfectly)
+                        const values = lines[i].split(',');
+                        
+                        const geoJsonStr = values[geoJsonIdx]?.trim();
+                        if (!geoJsonStr) {
+                            log(`  ⚠️ Empty GeoJSON`, 'warning');
+                            continue;
+                        }
+                        
+                        log(`  GeoJSON length: ${geoJsonStr.length} chars`, 'info');
+                        log(`  First 50 chars: ${geoJsonStr.substring(0, 50)}...`, 'info');
+                        
+                        // Try to parse JSON
+                        const cleaned = geoJsonStr.replace(/^"|"$/g, '');
+                        const geoData = JSON.parse(cleaned);
+                        
+                        log(`  GeoJSON type: ${geoData.type}`, 'info');
+                        
+                        let coordinates = null;
+                        if (geoData.type === 'Feature') {
+                            coordinates = geoData.geometry.coordinates[0];
+                        } else if (geoData.type === 'Polygon') {
+                            coordinates = geoData.coordinates[0];
+                        }
+                        
+                        if (coordinates && coordinates.length >= 3) {
+                            log(`  ✅ Found ${coordinates.length} vertices`, 'success');
+                            log(`  First vertex: [${coordinates[0][0]}, ${coordinates[0][1]}]`, 'info');
+                            successCount++;
+                        } else {
+                            log(`  ❌ Invalid coordinates`, 'error');
+                            errorCount++;
+                        }
+                        
+                    } catch (error) {
+                        log(`  ❌ Parse error: ${error.message}`, 'error');
+                        errorCount++;
+                    }
+                }
+                
+                // Summary
+                log(`\n=== SUMMARY ===`, 'info');
+                log(`Successful parses: ${successCount}`, successCount > 0 ? 'success' : 'error');
+                log(`Errors: ${errorCount}`, errorCount > 0 ? 'warning' : 'info');
+                
+                if (successCount > 0) {
+                    log(`\n✅ CSV FORMAT IS CORRECT! The import should work.`, 'success');
+                    log(`The app should be able to import this file.`, 'success');
+                } else {
+                    log(`\n❌ CSV FORMAT HAS ISSUES!`, 'error');
+                    log(`Check the errors above to see what's wrong.`, 'error');
+                }
+                
+                resultsDiv.style.display = 'block';
+                resultsContent.innerHTML = `
+                    <p><strong>Total Lines:</strong> ${lines.length}</p>
+                    <p><strong>Headers:</strong> ${headers.length}</p>
+                    <p><strong>GeoJSON Column:</strong> ${geoJsonIdx >= 0 ? `Found (${headers[geoJsonIdx]})` : 'NOT FOUND'}</p>
+                    <p><strong>Test Parses:</strong> ${successCount} success, ${errorCount} errors</p>
+                    <p><strong>Status:</strong> ${successCount > 0 ? '✅ Ready to import' : '❌ Fix issues first'}</p>
+                `;
+                
+            } catch (error) {
+                log(`❌ FATAL ERROR: ${error.message}`, 'error');
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Polygon Catalog - Before & After Comparison</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --primary-color: #2c5aa0;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .catalog-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1a3d6d 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .catalog-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .catalog-subtitle {
+            font-size: 13px;
+            opacity: 0.9;
+            margin: 5px 0 0 0;
+        }
+        
+        .catalog-toolbar {
+            background: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .view-toggle-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #666;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .view-toggle-btn:hover {
+            background: #f8f9fa;
+            border-color: var(--primary-color);
+        }
+        
+        .view-toggle-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .count-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .field-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .field-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .field-card-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .field-id {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .field-owner {
+            color: #666;
+            font-size: 12px;
+            margin: 3px 0 0 0;
+        }
+        
+        .polygon-comparison {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .polygon-preview {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .polygon-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .polygon-label.original {
+            color: #95a5a6;
+        }
+        
+        .polygon-label.corrected {
+            color: var(--success-color);
+        }
+        
+        .polygon-image {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        
+        .polygon-stats {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .field-card-footer {
+            font-size: 12px;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+        
+        .badge-valid {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .badge-invalid {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        
+        .badge-verra-ok {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .badge-verra-issue {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        
+        .list-view-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .list-view-table th {
+            background: #f8f9fa;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 12px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .list-view-table td {
+            font-size: 13px;
+            padding: 12px;
+            vertical-align: middle;
+        }
+        
+        .side-by-side-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .side-by-side-header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .side-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .comparison-section h6 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .polygon-image-large {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 30px;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .polygon-mini-map {
+            width: 100%;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        /* Grid view maps - account for container padding */
+        .polygon-image .polygon-mini-map {
+            height: 90px;  /* 120px container - 30px padding */
+        }
+        
+        /* Side-by-side view maps - account for container padding */
+        .polygon-image-large .polygon-mini-map {
+            height: 440px;  /* 500px container - 60px padding */
+        }
+        
+        /* Override Leaflet attribution for mini maps */
+        .polygon-mini-map .leaflet-control-attribution {
+            font-size: 8px;
+            background: rgba(255, 255, 255, 0.7);
+        }
+        
+        /* Style zoom controls for better visibility */
+        .polygon-mini-map .leaflet-control-zoom {
+            margin: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .polygon-mini-map .leaflet-control-zoom a {
+            background-color: white;
+            color: #333;
+            font-weight: bold;
+            border: 2px solid rgba(0,0,0,0.2);
+        }
+        
+        .polygon-mini-map .leaflet-control-zoom a:hover {
+            background-color: #f4f4f4;
+            border-color: var(--primary-color);
+        }
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 30px;
+        }
+        
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #666;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .pagination button.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        #gridView, #sideBySideView {
+            display: none;
+        }
+        
+        #gridView.active, #listView.active, #sideBySideView.active {
+            display: block;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+    
+    <!-- Header -->
+    <div class="catalog-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="catalog-title">
+                        <i class="bi bi-grid-3x3-gap"></i> Field Polygon Catalog
+                    </h1>
+                    <p class="catalog-subtitle">Before & After Comparison - Complete Dataset Overview (Memory Mode)</p>
+                </div>
+                <div>
+                    <button class="btn btn-light" onclick="backToCorrector()">
+                        <i class="bi bi-x-lg"></i> Back to Corrector
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toolbar -->
+    <div class="catalog-toolbar">
+        <div class="container-fluid">
+            <!-- Row 1: Search, View Modes, Actions -->
+            <div class="row align-items-center mb-3">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search Field ID or Owner...">
+                    </div>
+                </div>
+                
+                <div class="col-md-5 text-center">
+                    <div class="btn-group me-3" role="group">
+                        <button type="button" class="btn view-toggle-btn active" onclick="switchView('grid')">
+                            <i class="bi bi-grid-3x3-gap"></i> Grid
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" onclick="switchView('list')">
+                            <i class="bi bi-list-ul"></i> List
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" onclick="switchView('sideBySide')">
+                            <i class="bi bi-layout-split"></i> Side-by-Side
+                        </button>
+                    </div>
+                    
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn view-toggle-btn active" id="btnStandard" onclick="switchMapMode('standard')">
+                            <i class="bi bi-map"></i> Standard
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" id="btnSatellite" onclick="switchMapMode('satellite')">
+                            <i class="bi bi-globe"></i> Satellite
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" id="btnHybrid" onclick="switchMapMode('hybrid')">
+                            <i class="bi bi-layers"></i> Hybrid
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 text-end">
+                    <span class="count-badge" id="countBadge">Loading...</span>
+                    <button class="btn btn-success btn-sm ms-2" onclick="regenerateCatalog()">
+                        <i class="bi bi-arrow-clockwise"></i> Regenerate
+                    </button>
+                    <button class="btn btn-primary btn-sm ms-2" onclick="exportCatalogPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                    </button>
+                    <button class="btn btn-secondary btn-sm ms-2" onclick="toggleFullscreen()">
+                        <i class="bi bi-arrows-fullscreen"></i> Fullscreen
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Row 2: Filters (Matching Main App) -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex gap-3 align-items-center flex-wrap" style="font-size: 13px;">
+                        <div><strong>Status:</strong></div>
+                        
+                        <!-- Status Filter -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="all" checked onchange="applyFilters()">
+                            <label class="btn btn-outline-primary" for="filterAll">
+                                All <span class="badge bg-secondary" id="countAll">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterVerraReady" value="verraReady" onchange="applyFilters()">
+                            <label class="btn btn-outline-success" for="filterVerraReady">
+                                VERRA Ready <span class="badge bg-success" id="countVerraReady">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterValid" value="valid" onchange="applyFilters()">
+                            <label class="btn btn-outline-success" for="filterValid">
+                                Valid <span class="badge bg-success" id="countValid">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterAutoCorrected" value="autoCorrected" onchange="applyFilters()">
+                            <label class="btn btn-outline-info" for="filterAutoCorrected">
+                                Auto-Corrected <span class="badge bg-info" id="countAutoCorrected">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterManual" value="manual" onchange="applyFilters()">
+                            <label class="btn btn-outline-danger" for="filterManual">
+                                Needs Manual Editing <span class="badge bg-danger" id="countManual">0</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Size Filter -->
+                        <div>
+                            <label class="me-2"><strong>Size:</strong></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="checkbox" class="btn-check" id="sizeXS" value="xs" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="sizeXS">&lt;0.2ha</label>
+                                
+                                <input type="checkbox" class="btn-check" id="sizeOK" value="ok" onchange="applyFilters()">
+                                <label class="btn btn-outline-success" for="sizeOK">0.2-20ha</label>
+                                
+                                <input type="checkbox" class="btn-check" id="sizeXL" value="xl" onchange="applyFilters()">
+                                <label class="btn btn-outline-primary" for="sizeXL">&gt;20ha</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Issue Type Filter -->
+                        <div>
+                            <label class="me-2"><strong>Issues:</strong></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="checkbox" class="btn-check" id="issueSelfInt" value="selfIntersection" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="issueSelfInt">Self-Intersection</label>
+                                
+                                <input type="checkbox" class="btn-check" id="issueFewVert" value="tooFewVertices" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="issueFewVert">Few Vertices</label>
+                                
+                                <input type="checkbox" class="btn-check" id="issueZeroArea" value="zeroArea" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="issueZeroArea">Zero/Neg Area</label>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearAllFilters()">
+                            <i class="bi bi-x-circle"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Row 3: Date Filter (separate row for visibility) -->
+            <div class="row mt-2">
+                <div class="col-12">
+                    <div class="d-flex gap-3 align-items-center" style="font-size: 13px;">
+                        <div><strong>Date:</strong></div>
+                        <div class="d-flex gap-3 align-items-center">
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="dateFrom" style="font-size: 0.875rem;">From:</label>
+                                <input type="date" class="form-control form-control-sm" id="dateFrom" onchange="applyFilters()" style="width: 150px;">
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="dateTo" style="font-size: 0.875rem;">To:</label>
+                                <input type="date" class="form-control form-control-sm" id="dateTo" onchange="applyFilters()" style="width: 150px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Content Area -->
+    <div class="container-fluid">
+        <!-- Grid View -->
+        <div id="gridView" class="active">
+            <div class="row" id="gridContainer"></div>
+        </div>
+        
+        <!-- List View -->
+        <div id="listView">
+            <table class="table list-view-table">
+                <thead>
+                    <tr>
+                        <th>Field ID</th>
+                        <th>Owner</th>
+                        <th>Status</th>
+                        <th>Vertices</th>
+                        <th>Area (ha)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="listViewBody"></tbody>
+            </table>
+        </div>
+        
+        <!-- Side-by-Side View -->
+        <div id="sideBySideView"></div>
+        
+        <!-- Pagination -->
+        <div id="pagination" class="pagination"></div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        let allFields = [];
+        let filteredFields = [];
+        let currentView = 'grid';
+        let currentPage = 1;
+        const itemsPerPage = 12;
+        
+        // Filter state (matching main app FilterManager)
+        let filterState = {
+            status: 'all',  // all, verraReady, valid, autoCorrected, manual
+            sizeFilters: {
+                xs: false,  // < 0.2 ha
+                ok: false,  // 0.2 - 20 ha
+                xl: false   // > 20 ha
+            },
+            issueFilters: {
+                selfIntersection: false,
+                tooFewVertices: false,
+                zeroArea: false
+            },
+            dateFilters: {
+                fromDate: '',  // YYYY-MM-DD
+                toDate: ''     // YYYY-MM-DD
+            }
+        };
+        
+        let currentMapMode = 'standard'; // Track current map mode
+        let polygonMaps = {}; // Store all mini map instances
+        
+        // Helper function to create a mini Leaflet map for a polygon
+        function renderPolygonMap(coordinates, fieldId, isOriginal) {
+            if (!coordinates || coordinates.length < 3) {
+                return '<i class="bi bi-pentagon" style="font-size: 48px; color: #95a5a6;"></i>';
+            }
+            
+            // Create unique ID for this map
+            const mapId = `map-${fieldId}-${isOriginal ? 'orig' : 'corr'}`;
+            
+            // Return div that will be initialized as a map
+            // Use explicit height to ensure map renders properly
+            // Grid view: 90px (120px container - 30px padding)
+            // Side-by-side: 440px (500px container - 60px padding)
+            // We'll detect which one when initializing
+            return `<div id="${mapId}" class="polygon-mini-map" style="width: 100%; border-radius: 6px;"></div>`;
+        }
+        
+        // Initialize mini maps after rendering
+        function initializePolygonMaps(fields) {
+            // Clear all existing maps FIRST
+            Object.keys(polygonMaps).forEach(mapId => {
+                if (polygonMaps[mapId]) {
+                    try {
+                        polygonMaps[mapId].remove();
+                    } catch (e) {
+                        // Ignore errors - map might already be removed
+                    }
+                }
+            });
+            // Reset the object
+            polygonMaps = {};
+            
+            // Small delay to ensure DOM is ready
+            setTimeout(() => {
+                // Find all map divs in the DOM (works for both grid and side-by-side views)
+                const mapDivs = document.querySelectorAll('.polygon-mini-map');
+                
+                mapDivs.forEach(mapDiv => {
+                    const mapId = mapDiv.id;
+                    
+                    // Extract field ID and type from map ID
+                    // Format: map-FIELD_ID-orig or map-FIELD_ID-corr or map-FIELD_ID-sbs-orig, etc.
+                    const isOriginal = mapId.includes('-orig');
+                    
+                    // Find the corresponding field by looking for the field ID in the map ID
+                    let field = null;
+                    for (const f of fields) {
+                        if (f.ccsFieldId && mapId.includes(f.ccsFieldId)) {
+                            field = f;
+                            break;
+                        }
+                    }
+                    
+                    if (!field) {
+                        console.warn(`Could not find field for map ${mapId}`);
+                        return;
+                    }
+                    
+                    // Get coordinates
+                    const coords = isOriginal ? 
+                        field.originalCoordinates : 
+                        (field.correctedCoordinates || field.originalCoordinates);
+                    
+                    // Initialize the map
+                    if (coords && coords.length >= 3) {
+                        initializeSingleMap(mapId, coords, isOriginal);
+                    }
+                });
+            }, 100);
+        }
+        
+        // Initialize a single mini map
+        function initializeSingleMap(mapId, coordinates, isOriginal) {
+            try {
+                // Verify element exists
+                const element = document.getElementById(mapId);
+                if (!element) {
+                    return;
+                }
+                
+                // Check if element already has a map (Leaflet sets _leaflet_id)
+                if (element._leaflet_id) {
+                    // Remove the existing Leaflet instance
+                    if (element._leaflet) {
+                        element._leaflet.remove();
+                    }
+                    // Clear Leaflet internal ID
+                    delete element._leaflet_id;
+                    delete element._leaflet;
+                    // Clear innerHTML to reset
+                    element.innerHTML = '';
+                }
+                
+                // Get bounds of coordinates
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLng = Infinity, maxLng = -Infinity;
+                
+                coordinates.forEach(coord => {
+                    const lat = coord[0];
+                    const lng = coord[1];
+                    if (lat < minLat) minLat = lat;
+                    if (lat > maxLat) maxLat = lat;
+                    if (lng < minLng) minLng = lng;
+                    if (lng > maxLng) maxLng = lng;
+                });
+                
+                const centerLat = (minLat + maxLat) / 2;
+                const centerLng = (minLng + maxLng) / 2;
+                
+                // Create map with zoom controls enabled
+                const map = L.map(mapId, {
+                    center: [centerLat, centerLng],
+                    zoom: 15,
+                    zoomControl: true,
+                    scrollWheelZoom: true,
+                    dragging: true,
+                    doubleClickZoom: true
+                });
+                
+                // Add appropriate tile layer based on current mode
+                addTileLayer(map, currentMapMode);
+                
+                // Add polygon with different colors for original vs corrected
+                const color = isOriginal ? '#95a5a6' : '#27ae60';
+                const polygon = L.polygon(coordinates.map(c => [c[0], c[1]]), {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.2,
+                    weight: 2
+                }).addTo(map);
+                
+                // Fit bounds
+                map.fitBounds(polygon.getBounds(), { padding: [10, 10] });
+                
+                // Store map instance
+                polygonMaps[mapId] = map;
+                
+            } catch (error) {
+                console.error(`Error initializing map ${mapId}:`, error);
+            }
+        }
+        
+        // Add tile layer based on map mode
+        function addTileLayer(map, mode) {
+            if (mode === 'satellite') {
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Esri',
+                    maxZoom: 18
+                }).addTo(map);
+            } else if (mode === 'hybrid') {
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Esri',
+                    maxZoom: 18
+                }).addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'OSM',
+                    opacity: 0.3,
+                    maxZoom: 18
+                }).addTo(map);
+            } else {
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'OSM',
+                    maxZoom: 18
+                }).addTo(map);
+            }
+        }
+        
+        // Helper function to render polygon as SVG
+        function renderPolygonSVG(coordinates, isOriginal = true) {
+            if (!coordinates || coordinates.length < 3) {
+                return '<i class="bi bi-pentagon" style="font-size: 48px; color: #95a5a6;"></i>';
+            }
+            
+            // Get bounding box
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+            
+            coordinates.forEach(coord => {
+                const lat = coord[0];
+                const lng = coord[1];
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
+                if (lng < minLng) minLng = lng;
+                if (lng > maxLng) maxLng = lng;
+            });
+            
+            const latRange = maxLat - minLat;
+            const lngRange = maxLng - minLng;
+            const maxRange = Math.max(latRange, lngRange);
+            
+            if (maxRange === 0) {
+                return '<i class="bi bi-pentagon" style="font-size: 48px; color: #95a5a6;"></i>';
+            }
+            
+            // Scale coordinates to fit in SVG viewBox
+            const padding = 10;
+            const size = 100 - (padding * 2);
+            
+            const points = coordinates.map(coord => {
+                const lat = coord[0];
+                const lng = coord[1];
+                const x = ((lat - minLat) / maxRange) * size + padding;
+                const y = ((lng - minLng) / maxRange) * size + padding;
+                return `${x},${100 - y}`;
+            }).join(' ');
+            
+            const color = isOriginal ? '#95a5a6' : '#27ae60';
+            const fillColor = isOriginal ? '#ecf0f1' : '#d5f4e6';
+            
+            return `
+                <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                    <polygon points="${points}" 
+                             fill="${fillColor}" 
+                             stroke="${color}" 
+                             stroke-width="2" 
+                             stroke-linejoin="round"/>
+                </svg>
+            `;
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            loadFieldsFromStorage();
+            setupEventListeners();
+        });
+        
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', handleSearch);
+        }
+        
+        function loadFieldsFromStorage() {
+            console.log('📊 Loading data from parent window (memory mode)...');
+            
+            if (!window.opener || window.opener.closed) {
+                alert('Parent window not available. Please reopen the catalog from the main application.');
+                hideLoading();
+                return;
+            }
+            
+            try {
+                const parentData = window.opener.catalogData;
+                
+                if (!parentData || parentData.length === 0) {
+                    alert('No field data found in parent window. Please import data in the main application first.');
+                    hideLoading();
+                    return;
+                }
+                
+                // Copy the data
+                allFields = JSON.parse(JSON.stringify(parentData));
+                
+                console.log(`✅ Loaded ${allFields.length} fields from parent window (memory mode)`);
+                console.log(`   - Sample field:`, allFields[0]);
+                
+                // DIAGNOSTIC: Check if correctedCoordinates are present
+                const fieldsWithCorrections = allFields.filter(f => f.correctedCoordinates && f.correctedCoordinates.length > 0);
+                console.log(`   📊 Fields with correctedCoordinates: ${fieldsWithCorrections.length} (${(fieldsWithCorrections.length/allFields.length*100).toFixed(1)}%)`);
+                if (fieldsWithCorrections.length > 0) {
+                    console.log('   - Sample corrected field:', fieldsWithCorrections[0].ccsFieldId, 'has', fieldsWithCorrections[0].correctedCoordinates.length, 'vertices');
+                } else {
+                    console.warn('   ⚠️ NO fields have correctedCoordinates! All polygons will show original coordinates.');
+                    console.warn('   ⚠️ Make sure you ran "Process All Fields" in the main app before opening catalog.');
+                }
+                
+                // Initialize filters
+                updateFilterCounts();
+                applyFilters();
+                hideLoading();
+            } catch (error) {
+                console.error('❌ Error loading field data:', error);
+                alert('Error loading field data from parent window. Please try reopening the catalog.');
+                hideLoading();
+            }
+        }
+        
+        // Match status filter (EXACT LOGIC from FilterManager.js)
+        function matchesStatusFilter(field) {
+            if (filterState.status === 'all') return true;
+            
+            if (!field.validation || !field.validation.verra) {
+                return filterState.status === 'manual';
+            }
+            
+            // Use the validation overallStatus (matching main app)
+            const overallStatus = field.validation.verra.overallStatus;
+            
+            switch (filterState.status) {
+                case 'verraReady':
+                    // VERRA Ready = PASS or FIXABLE
+                    return overallStatus === 'PASS' || overallStatus === 'FIXABLE';
+                
+                case 'valid':
+                    return overallStatus === 'PASS';
+                
+                case 'autoCorrected':
+                    // "Auto-Corrected" means "Can be fixed" = FIXABLE status
+                    return overallStatus === 'FIXABLE';
+                
+                case 'manual':
+                    // Needs manual = NEEDS_MANUAL_FIX status
+                    return overallStatus === 'NEEDS_MANUAL_FIX';
+                
+                default:
+                    return true;
+            }
+        }
+        
+        // Match size filter (EXACT LOGIC from FilterManager.js)
+        function matchesSizeFilter(field) {
+            // If no size filters active, pass all
+            if (!filterState.sizeFilters.xs && !filterState.sizeFilters.ok && !filterState.sizeFilters.xl) {
+                return true;
+            }
+            
+            const area = field.validation?.metrics?.areaHa || 0;
+            
+            if (filterState.sizeFilters.xs && area < 0.2) return true;
+            if (filterState.sizeFilters.ok && area >= 0.2 && area <= 20) return true;
+            if (filterState.sizeFilters.xl && area > 20) return true;
+            
+            return false;
+        }
+        
+        // Match issue filter (EXACT LOGIC from FilterManager.js)
+        function matchesIssueFilter(field) {
+            // If no issue filters active, pass all
+            const anyIssueFilterActive = filterState.issueFilters.selfIntersection ||
+                                          filterState.issueFilters.tooFewVertices ||
+                                          filterState.issueFilters.zeroArea;
+            
+            if (!anyIssueFilterActive) return true;
+            
+            if (!field.validation || !field.validation.verra) return false;
+            
+            const verra = field.validation.verra;
+            const checks = verra.checks || {};
+            const errors = field.validation.errors || [];
+            
+            // Check for each issue type
+            const hasSelfIntersection = !checks.simple?.pass || 
+                errors.some(e => e.toLowerCase().includes('self-intersection')) ||
+                field.validation.metrics?.hasSelfIntersection;
+            
+            const tooFewVertices = !checks.minVertices?.pass ||
+                errors.some(e => e.toLowerCase().includes('distinct vertices'));
+            
+            const zeroArea = !checks.positiveArea?.pass ||
+                (field.validation.metrics?.areaM2 || 0) <= 1;
+            
+            // Match if any selected filter matches
+            if (filterState.issueFilters.selfIntersection && hasSelfIntersection) return true;
+            if (filterState.issueFilters.tooFewVertices && tooFewVertices) return true;
+            if (filterState.issueFilters.zeroArea && zeroArea) return true;
+            
+            return false;
+        }
+        
+        // Match date filter (matching main app FilterManager logic)
+        function matchesDateFilter(field) {
+            // If no date filters set, pass all
+            if (!filterState.dateFilters.fromDate && !filterState.dateFilters.toDate) {
+                return true;
+            }
+            
+            // Get field timestamp (use polygonCreatedOn or fall back to system dates)
+            const timestamp = field.polygonCreatedOn || field.updatedAt || field.createdAt;
+            
+            if (!timestamp) {
+                // No timestamp - exclude from date filter
+                return false;
+            }
+            
+            // Extract just the date part (YYYY-MM-DD)
+            const fieldDate = timestamp.split('T')[0];
+            
+            // Check from date
+            if (filterState.dateFilters.fromDate && fieldDate < filterState.dateFilters.fromDate) {
+                return false;
+            }
+            
+            // Check to date
+            if (filterState.dateFilters.toDate && fieldDate > filterState.dateFilters.toDate) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Combined filter check
+        function matchesFilters(field) {
+            if (!matchesStatusFilter(field)) return false;
+            if (!matchesSizeFilter(field)) return false;
+            if (!matchesIssueFilter(field)) return false;
+            if (!matchesDateFilter(field)) return false;
+            return true;
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            console.log('🔍 Applying filters (matching main app logic)...');
+            
+            // Get filter values
+            filterState.status = document.querySelector('input[name="statusFilter"]:checked')?.value || 'all';
+            
+            // Size filters
+            filterState.sizeFilters.xs = document.getElementById('sizeXS').checked;
+            filterState.sizeFilters.ok = document.getElementById('sizeOK').checked;
+            filterState.sizeFilters.xl = document.getElementById('sizeXL').checked;
+            
+            // Issue filters
+            filterState.issueFilters.selfIntersection = document.getElementById('issueSelfInt').checked;
+            filterState.issueFilters.tooFewVertices = document.getElementById('issueFewVert').checked;
+            filterState.issueFilters.zeroArea = document.getElementById('issueZeroArea').checked;
+            
+            // Date filters
+            filterState.dateFilters.fromDate = document.getElementById('dateFrom').value;
+            filterState.dateFilters.toDate = document.getElementById('dateTo').value;
+            
+            // Apply filters
+            filteredFields = allFields.filter(field => matchesFilters(field));
+            
+            console.log(`   - Filtered to ${filteredFields.length} of ${allFields.length} fields`);
+            currentPage = 1;
+            updateCountBadge();
+            renderCurrentView();
+        }
+        
+        // Clear all filters
+        function clearAllFilters() {
+            // Reset to show all
+            document.getElementById('filterAll').checked = true;
+            
+            // Uncheck all size filters
+            document.getElementById('sizeXS').checked = false;
+            document.getElementById('sizeOK').checked = false;
+            document.getElementById('sizeXL').checked = false;
+            
+            // Uncheck all issue filters
+            document.getElementById('issueSelfInt').checked = false;
+            document.getElementById('issueFewVert').checked = false;
+            document.getElementById('issueZeroArea').checked = false;
+            
+            // Clear date filters
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            
+            applyFilters();
+        }
+        
+        // Update filter count badges (MATCHING MAIN APP LOGIC EXACTLY)
+        function updateFilterCounts() {
+            let countAll = allFields.length;
+            let countVerraReady = 0;
+            let countValid = 0;
+            let countAutoCorrected = 0;  // Actually "can be fixed" in main app
+            let countManual = 0;
+            
+            // Debug: Check first field structure
+            if (allFields.length > 0) {
+                const firstField = allFields.find(f => f.validation?.verra) || allFields[0];
+                console.log('   - Sample field:', {
+                    fieldId: firstField.ccsFieldId,
+                    overallStatus: firstField.validation?.verra?.overallStatus,
+                    validationExists: !!firstField.validation?.verra
+                });
+            }
+            
+            allFields.forEach(field => {
+                if (!field.validation || !field.validation.verra) {
+                    countManual++;
+                    return;
+                }
+                
+                const overallStatus = field.validation.verra.overallStatus;
+                
+                // Match EXACT logic from StatisticsDashboard.calculateStatistics()
+                if (overallStatus === 'PASS') {
+                    countValid++;
+                } else if (overallStatus === 'FIXABLE') {
+                    countAutoCorrected++;  // "Can be fixed" = shown as "Auto-Corrected"
+                } else if (overallStatus === 'NEEDS_MANUAL_FIX') {
+                    countManual++;
+                } else {
+                    // Unknown status, treat as needs manual
+                    countManual++;
+                }
+            });
+            
+            // VERRA Ready = Valid + Can Be Fixed (matching main app line 160)
+            countVerraReady = countValid + countAutoCorrected;
+            
+            // Update badges
+            document.getElementById('countAll').textContent = countAll;
+            document.getElementById('countVerraReady').textContent = countVerraReady;
+            document.getElementById('countValid').textContent = countValid;
+            document.getElementById('countAutoCorrected').textContent = countAutoCorrected;
+            document.getElementById('countManual').textContent = countManual;
+            
+            console.log(`   - Counts: All=${countAll}, VERRA=${countVerraReady}, Valid=${countValid}, AutoCorrected=${countAutoCorrected}, Manual=${countManual}`);
+            
+            // Verify math (VERRA + Manual should equal Total)
+            const verraCheck = countVerraReady + countManual;
+            if (verraCheck !== countAll) {
+                console.warn(`   ⚠️ Math check: VERRA(${countVerraReady}) + Manual(${countManual}) = ${verraCheck}, expected ${countAll}`);
+            } else {
+                console.log(`   ✅ Math verified: VERRA + Manual = Total (${countAll})`);
+            }
+        }
+        
+        function handleSearch(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                filteredFields = allFields.filter(field => matchesFilters(field));
+            } else {
+                filteredFields = allFields.filter(field => {
+                    if (!matchesFilters(field)) return false;
+                    
+                    const matchesId = field.ccsFieldId && field.ccsFieldId.toLowerCase().includes(searchTerm);
+                    const matchesOwner = field.fieldOwner && field.fieldOwner.toLowerCase().includes(searchTerm);
+                    
+                    return matchesId || matchesOwner;
+                });
+            }
+            
+            currentPage = 1;
+            updateCountBadge();
+            renderCurrentView();
+        }
+        
+        function updateCountBadge() {
+            const badge = document.getElementById('countBadge');
+            badge.textContent = `${filteredFields.length} fields (${Math.min(itemsPerPage, filteredFields.length)} shown)`;
+        }
+        
+        function switchView(view) {
+            currentView = view;
+            
+            // Update button states
+            document.querySelectorAll('.view-toggle-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.closest('.view-toggle-btn').classList.add('active');
+            
+            // Update view visibility
+            document.getElementById('gridView').classList.remove('active');
+            document.getElementById('listView').classList.remove('active');
+            document.getElementById('sideBySideView').classList.remove('active');
+            
+            renderCurrentView();
+        }
+        
+        function renderCurrentView() {
+            const startIdx = (currentPage - 1) * itemsPerPage;
+            const endIdx = startIdx + itemsPerPage;
+            const pageFields = filteredFields.slice(startIdx, endIdx);
+            
+            if (currentView === 'grid') {
+                document.getElementById('gridView').classList.add('active');
+                renderGridView(pageFields);
+            } else if (currentView === 'list') {
+                document.getElementById('listView').classList.add('active');
+                renderListView(pageFields);
+            } else {
+                document.getElementById('sideBySideView').classList.add('active');
+                renderSideBySideView(pageFields);
+            }
+            
+            renderPagination();
+        }
+        
+        function renderGridView(fields) {
+            const container = document.getElementById('gridContainer');
+            
+            // Clear the container
+            container.innerHTML = '';
+            
+            container.innerHTML = fields.map(field => {
+                const area = (field.validation?.metrics?.areaHa || 0).toFixed(2);
+                const isValid = field.validation?.verra?.overallStatus === 'PASS' || 
+                               field.correctionValidation?.verra?.overallStatus === 'PASS';
+                
+                // Determine if field was actually auto-corrected
+                const wasAutoCorrected = field.correctedCoordinates && field.correctedCoordinates.length > 0;
+                const rightPanelLabel = wasAutoCorrected ? 'AUTO-CORRECTED' : 'ORIGINAL';
+                const rightPanelClass = wasAutoCorrected ? 'corrected' : 'original';
+                
+                return `
+                <div class="col-md-4 col-lg-3">
+                    <div class="field-card">
+                        <div class="field-card-header">
+                            <p class="field-id">${field.ccsFieldId}</p>
+                            <p class="field-owner">${field.fieldOwner || 'Unknown Owner'}</p>
+                        </div>
+                        
+                        <div class="polygon-comparison">
+                            <div class="polygon-preview">
+                                <div class="polygon-label original">ORIGINAL</div>
+                                <div class="polygon-image">
+                                    ${renderPolygonMap(field.originalCoordinates, field.ccsFieldId, true)}
+                                </div>
+                                <div class="polygon-stats">${field.originalCoordinates?.length || 0} vertices</div>
+                            </div>
+                            
+                            <div class="polygon-preview">
+                                <div class="polygon-label ${rightPanelClass}">${rightPanelLabel}</div>
+                                <div class="polygon-image">
+                                    ${renderPolygonMap(field.correctedCoordinates || field.originalCoordinates, field.ccsFieldId, false)}
+                                </div>
+                                <div class="polygon-stats">${field.correctedCoordinates?.length || field.originalCoordinates?.length || 0} vertices</div>
+                            </div>
+                        </div>
+                        
+                        <div class="field-card-footer">
+                            <div class="status-row">
+                                <div>
+                                    <span class="badge ${isValid ? 'badge-valid' : 'badge-invalid'}">
+                                        ${isValid ? 'Valid' : 'Invalid'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="badge ${isValid ? 'badge-verra-ok' : 'badge-verra-issue'}">
+                                        ${isValid ? 'VERRA OK' : 'VERRA ISSUE'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            ${wasAutoCorrected ? `
+                            <div class="mt-2">
+                                <span class="badge" style="background-color: #3498db; color: white; font-size: 10px;">
+                                    ✓ AUTO-CORRECTED
+                                </span>
+                            </div>
+                            ` : ''}
+                            
+                            <div class="d-flex justify-content-between mt-2" style="font-size: 11px;">
+                                <div>
+                                    <strong>AREA</strong><br>
+                                    ${area} ha
+                                </div>
+                                <div>
+                                    <strong>VERTICES</strong><br>
+                                    ${field.correctedCoordinates?.length || field.originalCoordinates?.length || 0}
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-sm btn-primary w-100 mt-2" onclick="viewDetails('${field.ccsFieldId}')">
+                                <i class="bi bi-eye"></i> Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('');
+            
+            // Initialize all the mini maps
+            initializePolygonMaps(fields);
+        }
+        
+        function renderListView(fields) {
+            const tbody = document.getElementById('listViewBody');
+            tbody.innerHTML = fields.map(field => {
+                const area = (field.validation?.metrics?.areaHa || 0).toFixed(2);
+                const isValid = field.validation?.verra?.overallStatus === 'PASS' || 
+                               field.correctionValidation?.verra?.overallStatus === 'PASS';
+                
+                return `
+                <tr>
+                    <td><strong>${field.ccsFieldId}</strong></td>
+                    <td>${field.fieldOwner || '-'}</td>
+                    <td>
+                        <span class="badge ${isValid ? 'badge-valid' : 'badge-invalid'}">
+                            ${isValid ? 'Valid' : 'Invalid'}
+                        </span>
+                        <span class="badge ${isValid ? 'badge-verra-ok' : 'badge-verra-issue'} ms-1">
+                            ${isValid ? 'VERRA OK' : 'ISSUE'}
+                        </span>
+                    </td>
+                    <td>
+                        ${field.originalCoordinates?.length || 0} → 
+                        ${field.correctedCoordinates?.length || field.originalCoordinates?.length || 0}
+                    </td>
+                    <td>${area}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewDetails('${field.ccsFieldId}')">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary ms-1">
+                            <i class="bi bi-download"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+        }
+        
+        function renderSideBySideView(fields) {
+            const container = document.getElementById('sideBySideView');
+            
+            // Clear the container
+            container.innerHTML = '';
+            
+            container.innerHTML = fields.map(field => {
+                const area = (field.validation?.metrics?.areaHa || 0).toFixed(2);
+                const isValid = field.validation?.verra?.overallStatus === 'PASS' || 
+                               field.correctionValidation?.verra?.overallStatus === 'PASS';
+                
+                // Determine if field was actually auto-corrected
+                const wasAutoCorrected = field.correctedCoordinates && field.correctedCoordinates.length > 0;
+                const rightPanelLabel = wasAutoCorrected ? 'Auto-Corrected' : 'Current';
+                
+                return `
+                <div class="side-by-side-card">
+                    <div class="side-by-side-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">${field.ccsFieldId} - ${field.fieldOwner || 'Unknown'}</h5>
+                                <small class="text-muted">${new Date(field.createdAt).toLocaleDateString()} | Zone: Unknown</small>
+                            </div>
+                            <div>
+                                <span class="badge ${isValid ? 'badge-valid' : 'badge-invalid'}">
+                                    ${isValid ? 'Valid' : 'Invalid'}
+                                </span>
+                                <span class="badge ${isValid ? 'badge-verra-ok' : 'badge-verra-issue'} ms-1">
+                                    ${isValid ? 'VERRA COMPLIANT' : 'VERRA ISSUE'}
+                                </span>
+                                ${wasAutoCorrected ? `
+                                <span class="badge ms-1" style="background-color: #3498db; color: white;">
+                                    ✓ AUTO-CORRECTED
+                                </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="side-comparison">
+                        <div class="comparison-section">
+                            <h6><i class="bi bi-geo-alt"></i> Original</h6>
+                            <div class="polygon-image-large" style="height: 500px;">
+                                ${renderPolygonMap(field.originalCoordinates, field.ccsFieldId + '-sbs', true)}
+                            </div>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">Vertices:</span>
+                                    <span class="stat-value">${field.originalCoordinates?.length || 0}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Area:</span>
+                                    <span class="stat-value">${area} ha</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Status:</span>
+                                    <span class="stat-value">${isValid ? 'Valid' : 'Invalid'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="comparison-section">
+                            <h6><i class="bi bi-geo-alt-fill"></i> ${rightPanelLabel}</h6>
+                            <div class="polygon-image-large" style="height: 500px;">
+                                ${renderPolygonMap(field.correctedCoordinates || field.originalCoordinates, field.ccsFieldId + '-sbs', false)}
+                            </div>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">Vertices:</span>
+                                    <span class="stat-value">${field.correctedCoordinates?.length || field.originalCoordinates?.length || 0}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Area:</span>
+                                    <span class="stat-value">${area} ha</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Status:</span>
+                                    <span class="stat-value">${isValid ? 'Valid' : 'Invalid'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <button class="btn btn-primary btn-sm" onclick="viewDetails('${field.ccsFieldId}')">
+                            <i class="bi bi-eye"></i> View Details
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm ms-2">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+            
+            // Initialize all the mini maps
+            initializePolygonMaps(fields);
+        }
+        
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredFields.length / itemsPerPage);
+            const pagination = document.getElementById('pagination');
+            
+            let html = '';
+            
+            // Previous button
+            html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>`;
+            
+            // Page numbers
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
+            
+            if (startPage > 1) {
+                html += `<button onclick="changePage(1)">1</button>`;
+                if (startPage > 2) html += '<button disabled>...</button>';
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button onclick="changePage(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += '<button disabled>...</button>';
+                html += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
+            }
+            
+            // Next button
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+            
+            pagination.innerHTML = html;
+        }
+        
+        function changePage(page) {
+            const totalPages = Math.ceil(filteredFields.length / itemsPerPage);
+            if (page < 1 || page > totalPages) return;
+            
+            currentPage = page;
+            renderCurrentView();
+        }
+        
+        function viewDetails(fieldId) {
+            // Store field ID and return to main app
+            localStorage.setItem('selectedFieldId', fieldId);
+            window.close();
+            window.opener?.focus();
+        }
+        
+        function regenerateCatalog() {
+            console.log('🔄 Regenerating catalog...');
+            
+            if (!window.opener || window.opener.closed) {
+                alert('Parent window is closed. Cannot refresh data.\n\nPlease reopen the catalog from the main application.');
+                return;
+            }
+            
+            try {
+                window.opener.document.dispatchEvent(
+                    new CustomEvent('requestFieldsForCatalog')
+                );
+                
+                console.log('   - Requested fresh data from parent window');
+                
+                setTimeout(() => {
+                    console.log('   - Reloading catalog...');
+                    location.reload();
+                }, 200);
+            } catch (error) {
+                console.error('❌ Error requesting data:', error);
+                alert('Error refreshing data. Please reopen the catalog.');
+            }
+        }
+        
+        function exportCatalogPDF() {
+            alert('PDF export functionality coming soon!');
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error('Error attempting to enable fullscreen:', err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+        
+        function switchMapMode(mode) {
+            console.log(`🗺️ Map mode: ${mode}`);
+            
+            // Update current mode
+            currentMapMode = mode;
+            
+            // Update button states
+            document.getElementById('btnStandard').classList.remove('active');
+            document.getElementById('btnSatellite').classList.remove('active');
+            document.getElementById('btnHybrid').classList.remove('active');
+            
+            if (mode === 'standard') {
+                document.getElementById('btnStandard').classList.add('active');
+            } else if (mode === 'satellite') {
+                document.getElementById('btnSatellite').classList.add('active');
+            } else if (mode === 'hybrid') {
+                document.getElementById('btnHybrid').classList.add('active');
+            }
+            
+            // Switch all existing mini maps
+            Object.keys(polygonMaps).forEach(mapId => {
+                const map = polygonMaps[mapId];
+                
+                // Remove all existing tile layers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                // Add new tile layer
+                addTileLayer(map, mode);
+            });
+        }
+        
+        function backToCorrector() {
+            if (window.opener && !window.opener.closed) {
+                window.opener.focus();
+            }
+            window.close();
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

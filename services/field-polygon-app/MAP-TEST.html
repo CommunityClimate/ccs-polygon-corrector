@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Test - CCS Field Polygon App</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            margin: 0 0 20px 0;
+        }
+        #map {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #333;
+        }
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🗺️ Map Display Test</h1>
+    
+    <div class="info">
+        <p><strong>Purpose:</strong> Verify that Leaflet map displays correctly</p>
+        <p id="status">Loading map...</p>
+    </div>
+    
+    <div id="map"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        try {
+            // Initialize map
+            const map = L.map('map').setView([0, 0], 2);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Add test marker
+            L.marker([0, 0]).addTo(map)
+                .bindPopup('Test marker at [0, 0]')
+                .openPopup();
+            
+            // Draw test polygon (square)
+            const testPolygon = L.polygon([
+                [10, -10],
+                [10, 10],
+                [-10, 10],
+                [-10, -10]
+            ], {
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.3
+            }).addTo(map);
+            
+            // Fit map to polygon
+            map.fitBounds(testPolygon.getBounds());
+            
+            document.getElementById('status').innerHTML = '<span class="success">✅ Map loaded successfully! You should see a red square polygon and a marker.</span>';
+            
+            console.log('Map test successful!');
+            
+        } catch (error) {
+            document.getElementById('status').innerHTML = '<span class="error">❌ Error loading map: ' + error.message + '</span>';
+            console.error('Map error:', error);
+        }
+    </script>
+</body>
+</html>

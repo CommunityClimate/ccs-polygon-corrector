@@ -1,0 +1,2309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Polygon Catalog - Before & After Comparison</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --primary-color: #2c5aa0;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .catalog-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1a3d6d 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .catalog-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .catalog-subtitle {
+            font-size: 13px;
+            opacity: 0.9;
+            margin: 5px 0 0 0;
+        }
+        
+        .catalog-toolbar {
+            background: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .view-toggle-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #666;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .view-toggle-btn:hover {
+            background: #f8f9fa;
+            border-color: var(--primary-color);
+        }
+        
+        .view-toggle-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .count-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .field-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .field-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .field-card-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .field-id {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .field-owner {
+            color: #666;
+            font-size: 12px;
+            margin: 3px 0 0 0;
+        }
+        
+        .polygon-comparison {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .polygon-preview {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .polygon-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .polygon-label.original {
+            color: #95a5a6;
+        }
+        
+        .polygon-label.corrected {
+            color: var(--success-color);
+        }
+        
+        .polygon-image {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 0px;  /* CHANGED: was 15px - removed to maximize polygon size */
+            height: 120px;
+            overflow: hidden;  /* ADDED: ensure map doesn't overflow */
+            /* REMOVED: display: flex; align-items: center; justify-content: center; */
+            /* Map now fills height with height: 100% */
+        }
+        
+        .polygon-stats {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .field-card-footer {
+            font-size: 12px;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+        
+        .badge-valid {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .badge-invalid {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        
+        .badge-verra-ok {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .badge-verra-issue {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        
+        .list-view-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .list-view-table th {
+            background: #f8f9fa;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 12px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .list-view-table td {
+            font-size: 13px;
+            padding: 12px;
+            vertical-align: middle;
+        }
+        
+        .side-by-side-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .side-by-side-header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .side-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .comparison-section h6 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .polygon-image-large {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 30px;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .polygon-mini-map {
+            width: 100%;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        /* Grid view maps - fill parent container completely */
+        .polygon-image .polygon-mini-map {
+            height: 100%;  /* CHANGED: Fill parent frame completely */
+        }
+        
+        /* Side-by-side view maps - account for container padding */
+        .polygon-image-large .polygon-mini-map {
+            height: 440px;  /* 500px container - 60px padding */
+        }
+        
+        /* Override Leaflet attribution for mini maps */
+        .polygon-mini-map .leaflet-control-attribution {
+            font-size: 8px;
+            background: rgba(255, 255, 255, 0.7);
+        }
+        
+        /* Compact zoom controls for grid view */
+        .polygon-image .polygon-mini-map .leaflet-control-zoom {
+            margin: 3px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        
+        .polygon-image .polygon-mini-map .leaflet-control-zoom a {
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            font-size: 14px;
+            background-color: white;
+            color: #333;
+            font-weight: bold;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+        
+        .polygon-image .polygon-mini-map .leaflet-control-zoom a:hover {
+            background-color: #f4f4f4;
+            border-color: var(--primary-color);
+        }
+        
+        /* Slightly larger zoom controls for side-by-side view */
+        .polygon-image-large .polygon-mini-map .leaflet-control-zoom {
+            margin: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        
+        .polygon-image-large .polygon-mini-map .leaflet-control-zoom a {
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            font-size: 16px;
+            background-color: white;
+            color: #333;
+            font-weight: bold;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+        
+        .polygon-image-large .polygon-mini-map .leaflet-control-zoom a:hover {
+            background-color: #f4f4f4;
+            border-color: var(--primary-color);
+        }
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 30px;
+        }
+        
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #666;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .pagination button.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        #gridView, #sideBySideView {
+            display: none;
+        }
+        
+        #gridView.active, #listView.active, #sideBySideView.active {
+            display: block;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+    
+    <!-- Header -->
+    <div class="catalog-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="catalog-title">
+                        <i class="bi bi-grid-3x3-gap"></i> Field Polygon Catalog
+                    </h1>
+                    <p class="catalog-subtitle">Before & After Comparison - Complete Dataset Overview (Memory Mode)</p>
+                </div>
+                <div>
+                    <button class="btn btn-light" onclick="backToCorrector()">
+                        <i class="bi bi-x-lg"></i> Back to Corrector
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toolbar -->
+    <div class="catalog-toolbar">
+        <div class="container-fluid">
+            <!-- Row 1: Search, View Modes, Actions -->
+            <div class="row align-items-center mb-3">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search Field ID or Owner...">
+                    </div>
+                </div>
+                
+                <div class="col-md-5 text-center">
+                    <div class="btn-group me-3" role="group">
+                        <button type="button" class="btn view-toggle-btn active" onclick="switchView('grid')">
+                            <i class="bi bi-grid-3x3-gap"></i> Grid
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" onclick="switchView('list')">
+                            <i class="bi bi-list-ul"></i> List
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" onclick="switchView('sideBySide')">
+                            <i class="bi bi-layout-split"></i> Side-by-Side
+                        </button>
+                    </div>
+                    
+                    <!-- NEW: Sort Dropdown -->
+                    <div class="btn-group me-3" role="group">
+                        <label class="btn view-toggle-btn" style="background: #e9ecef; cursor: default; font-size: 11px; padding: 6px 10px;">
+                            <i class="bi bi-sort-down"></i> Sort:
+                        </label>
+                        <select class="form-select form-select-sm" id="catalogSort" onchange="applySorting()" 
+                                style="font-size: 12px; max-width: 180px; border-radius: 0 4px 4px 0;">
+                            <option value="fieldId-asc" selected>Field ID (A-Z)</option>
+                            <option value="fieldId-desc">Field ID (Z-A)</option>
+                            <option value="owner-asc">Owner (A-Z)</option>
+                            <option value="owner-desc">Owner (Z-A)</option>
+                            <option value="area-asc">Area (Smallest First)</option>
+                            <option value="area-desc">Area (Largest First)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn view-toggle-btn active" id="btnStandard" onclick="switchMapMode('standard')">
+                            <i class="bi bi-map"></i> Standard
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" id="btnSatellite" onclick="switchMapMode('satellite')">
+                            <i class="bi bi-globe"></i> Satellite
+                        </button>
+                        <button type="button" class="btn view-toggle-btn" id="btnHybrid" onclick="switchMapMode('hybrid')">
+                            <i class="bi bi-layers"></i> Hybrid
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 text-end">
+                    <span class="count-badge" id="countBadge">Loading...</span>
+                    <button class="btn btn-success btn-sm ms-2" onclick="regenerateCatalog()">
+                        <i class="bi bi-arrow-clockwise"></i> Regenerate
+                    </button>
+                    <button class="btn btn-primary btn-sm ms-2" onclick="exportCatalogPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                    </button>
+                    <button class="btn btn-secondary btn-sm ms-2" onclick="toggleFullscreen()">
+                        <i class="bi bi-arrows-fullscreen"></i> Fullscreen
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Row 2: Filters (Matching Main App) -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex gap-3 align-items-center flex-wrap" style="font-size: 13px;">
+                        <div><strong>Status:</strong></div>
+                        
+                        <!-- Status Filter -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="all" checked onchange="applyFilters()">
+                            <label class="btn btn-outline-primary" for="filterAll">
+                                All <span class="badge bg-secondary" id="countAll">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterVerraReady" value="verraReady" onchange="applyFilters()">
+                            <label class="btn btn-outline-success" for="filterVerraReady">
+                                VERRA Ready <span class="badge bg-success" id="countVerraReady">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterValid" value="valid" onchange="applyFilters()">
+                            <label class="btn btn-outline-success" for="filterValid">
+                                Valid <span class="badge bg-success" id="countValid">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterAutoCorrected" value="autoCorrected" onchange="applyFilters()">
+                            <label class="btn btn-outline-info" for="filterAutoCorrected">
+                                Auto-Corrected <span class="badge bg-info" id="countAutoCorrected">0</span>
+                            </label>
+                            
+                            <!-- NEW: Corrected (Your Work) Filter -->
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterCorrectedWork" value="correctedWork" onchange="applyFilters()">
+                            <label class="btn btn-outline-success" for="filterCorrectedWork" style="border-color: #27ae60; background: #e8f5e9;">
+                                ✅ Corrected (Your Work) <span class="badge" style="background: #27ae60;" id="countCorrectedWork">0</span>
+                            </label>
+                            
+                            <!-- NEW: Remaining Work Filter -->
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterRemainingWork" value="remainingWork" onchange="applyFilters()">
+                            <label class="btn btn-outline-warning" for="filterRemainingWork" style="border-color: #f39c12; background: #fff3e0;">
+                                ⚠️ Remaining Work <span class="badge" style="background: #f39c12;" id="countRemainingWork">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterManual" value="manual" onchange="applyFilters()">
+                            <label class="btn btn-outline-danger" for="filterManual">
+                                Needs Manual Editing <span class="badge bg-danger" id="countManual">0</span>
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterManuallyFlagged" value="manuallyFlagged" onchange="applyFilters()">
+                            <label class="btn btn-outline-warning" for="filterManuallyFlagged" style="background: #fce4ec;">
+                                🚩 Manually Flagged <span class="badge bg-warning" id="countManuallyFlagged">0</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Manual Flag Type Filters -->
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+                            <label class="me-2"><strong>Flag Type:</strong></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="statusFilter" id="filterSelfIntersection" value="selfIntersection" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="filterSelfIntersection">
+                                    🔴 Self-Intersection <span class="badge bg-danger" id="countSelfIntersection">0</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="statusFilter" id="filterStraightLine" value="straightLine" onchange="applyFilters()">
+                                <label class="btn btn-outline-primary" for="filterStraightLine">
+                                    📏 Straight Line <span class="badge bg-primary" id="countStraightLine">0</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="statusFilter" id="filterBowTie" value="bowTie" onchange="applyFilters()">
+                                <label class="btn btn-outline-secondary" for="filterBowTie">
+                                    🎀 Bow-Tie <span class="badge bg-secondary" id="countBowTie">0</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="statusFilter" id="filterOverlapping" value="overlapping" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="filterOverlapping">
+                                    🔄 Overlapping <span class="badge bg-warning" id="countOverlapping">0</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="statusFilter" id="filterOtherIssue" value="otherIssue" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="filterOtherIssue">
+                                    ⚠️ Other Issue <span class="badge bg-warning" id="countOtherIssue">0</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Size Filter -->
+                        <div>
+                            <label class="me-2"><strong>Size:</strong></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="checkbox" class="btn-check" id="sizeXS" value="xs" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="sizeXS">&lt;0.2ha</label>
+                                
+                                <input type="checkbox" class="btn-check" id="sizeOK" value="ok" onchange="applyFilters()">
+                                <label class="btn btn-outline-success" for="sizeOK">0.2-20ha</label>
+                                
+                                <input type="checkbox" class="btn-check" id="sizeXL" value="xl" onchange="applyFilters()">
+                                <label class="btn btn-outline-primary" for="sizeXL">&gt;20ha</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Issue Type Filter -->
+                        <div>
+                            <label class="me-2"><strong>Issues:</strong></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="checkbox" class="btn-check" id="issueSelfInt" value="selfIntersection" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="issueSelfInt">Self-Intersection</label>
+                                
+                                <input type="checkbox" class="btn-check" id="issueFewVert" value="tooFewVertices" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="issueFewVert">Few Vertices</label>
+                                
+                                <input type="checkbox" class="btn-check" id="issueZeroArea" value="zeroArea" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="issueZeroArea">Zero/Neg Area</label>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearAllFilters()">
+                            <i class="bi bi-x-circle"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Row 3: Date Filter (separate row for visibility) -->
+            <div class="row mt-2">
+                <div class="col-12">
+                    <div class="d-flex gap-3 align-items-center" style="font-size: 13px;">
+                        <div><strong>Date:</strong></div>
+                        <div class="d-flex gap-3 align-items-center">
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="dateFrom" style="font-size: 0.875rem;">From:</label>
+                                <input type="date" class="form-control form-control-sm" id="dateFrom" onchange="applyFilters()" style="width: 150px;">
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="dateTo" style="font-size: 0.875rem;">To:</label>
+                                <input type="date" class="form-control form-control-sm" id="dateTo" onchange="applyFilters()" style="width: 150px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pagination Controls Toolbar -->
+    <div class="catalog-toolbar" style="background: #f8f9fa; border-top: 2px solid #dee2e6; padding: 12px 0;">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-md-2">
+                    <label style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">
+                        <i class="bi bi-grid-3x3"></i> Grid Size:
+                    </label>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <input type="radio" class="btn-check" name="thumbnailSize" id="sizeSmall" value="small" onchange="changeThumbnailSize('small')">
+                        <label class="btn btn-outline-secondary" for="sizeSmall" style="font-size: 10px;">Small<br>(150)</label>
+                        
+                        <input type="radio" class="btn-check" name="thumbnailSize" id="sizeMedium" value="medium" checked onchange="changeThumbnailSize('medium')">
+                        <label class="btn btn-outline-secondary" for="sizeMedium" style="font-size: 10px;">Medium<br>(120)</label>
+                        
+                        <input type="radio" class="btn-check" name="thumbnailSize" id="sizeLarge" value="large" onchange="changeThumbnailSize('large')">
+                        <label class="btn btn-outline-secondary" for="sizeLarge" style="font-size: 10px;">Large<br>(75)</label>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">
+                        <i class="bi bi-skip-forward-fill"></i> Jump to Page:
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control" id="jumpToPage" placeholder="Page #" min="1" style="font-size: 12px;">
+                        <button class="btn btn-primary" onclick="jumpToPage()" style="font-size: 11px;">
+                            <i class="bi bi-arrow-right-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <label style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">
+                        <i class="bi bi-search"></i> Jump to Field ID:
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="jumpToFieldId" placeholder="FLD-xxxxx-xxxxx-xxx" style="font-size: 12px;">
+                        <button class="btn btn-primary" onclick="jumpToFieldId()" style="font-size: 11px;">
+                            <i class="bi bi-arrow-right-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-2 text-center">
+                    <div style="font-size: 12px; color: #666; line-height: 1.4;">
+                        <strong id="paginationInfo" style="color: #333;">Page 1 of 1</strong><br>
+                        <span id="itemsInfo" style="font-size: 11px;">Showing 0-0 of 0</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-2 text-end">
+                    <button class="btn btn-sm btn-outline-primary" onclick="currentPage=1; displayFields();" title="First Page">
+                        <i class="bi bi-skip-start-fill"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="if(currentPage>1){currentPage--; displayFields();}" title="Previous">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="currentPage++; displayFields();" title="Next">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="currentPage=Math.ceil(filteredFields.length/currentItemsPerPage); displayFields();" title="Last Page">
+                        <i class="bi bi-skip-end-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Content Area -->
+    <div class="container-fluid">
+        <!-- Grid View -->
+        <div id="gridView" class="active">
+            <div id="gridContainer" style="font-size: 0;"></div> <!-- font-size: 0 removes inline-block gaps -->
+        </div>
+        
+        <!-- List View -->
+        <div id="listView">
+            <table class="table list-view-table">
+                <thead>
+                    <tr>
+                        <th>Field ID</th>
+                        <th>Owner</th>
+                        <th>Status</th>
+                        <th>Vertices</th>
+                        <th>Area (ha)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="listViewBody"></tbody>
+            </table>
+        </div>
+        
+        <!-- Side-by-Side View -->
+        <div id="sideBySideView"></div>
+        
+        <!-- Pagination -->
+        <div id="pagination" class="pagination"></div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        let allFields = [];
+        let filteredFields = [];
+        let currentView = 'grid';
+        let currentPage = 1;
+        
+        // Thumbnail size settings - MAXIMIZED polygon sizes with no internal padding
+        let thumbnailSize = 'medium'; // small, medium, large
+        let currentItemsPerPage = 120; // Default medium = 8x15 = 120
+        let currentGridColumns = 8; // 8 columns for medium
+        
+        const thumbnailSettings = {
+            small: { itemsPerPage: 150, columns: 10, size: '225px' },   // 10x15 grid, max size
+            medium: { itemsPerPage: 120, columns: 8, size: '285px' },   // 8x15 grid, max size
+            large: { itemsPerPage: 75, columns: 5, size: '375px' }      // 5x15 grid, max size
+        };
+        
+        // Legacy variable for compatibility
+        const itemsPerPage = 120;
+        
+        // Filter state (matching main app FilterManager)
+        let filterState = {
+            status: 'all',  // all, verraReady, valid, autoCorrected, manual
+            sizeFilters: {
+                xs: false,  // < 0.2 ha
+                ok: false,  // 0.2 - 20 ha
+                xl: false   // > 20 ha
+            },
+            issueFilters: {
+                selfIntersection: false,
+                tooFewVertices: false,
+                zeroArea: false
+            },
+            dateFilters: {
+                fromDate: '',  // YYYY-MM-DD
+                toDate: ''     // YYYY-MM-DD
+            }
+        };
+        
+        let currentMapMode = 'standard'; // Track current map mode
+        let polygonMaps = {}; // Store all mini map instances
+        
+        // Helper function to create a mini Leaflet map for a polygon
+        function renderPolygonMap(coordinates, fieldId, isOriginal) {
+            if (!coordinates || coordinates.length < 3) {
+                return '<i class="bi bi-pentagon" style="font-size: 48px; color: #95a5a6;"></i>';
+            }
+            
+            // Create unique ID for this map
+            const mapId = `map-${fieldId}-${isOriginal ? 'orig' : 'corr'}`;
+            
+            // Return div that will be initialized as a map
+            // Use explicit height to ensure map renders properly
+            // Grid view: 90px (120px container - 30px padding)
+            // Side-by-side: 440px (500px container - 60px padding)
+            // We'll detect which one when initializing
+            return `<div id="${mapId}" class="polygon-mini-map" style="width: 100%; border-radius: 6px;"></div>`;
+        }
+        
+        // Initialize mini maps after rendering
+        function initializePolygonMaps(fields) {
+            // Clear all existing maps FIRST
+            Object.keys(polygonMaps).forEach(mapId => {
+                if (polygonMaps[mapId]) {
+                    try {
+                        polygonMaps[mapId].remove();
+                    } catch (e) {
+                        // Ignore errors - map might already be removed
+                    }
+                }
+            });
+            // Reset the object
+            polygonMaps = {};
+            
+            // Longer delay to ensure DOM is ready (increased to 500ms for reliability)
+            setTimeout(() => {
+                // Find all map divs in the DOM (works for both grid and side-by-side views)
+                const mapDivs = document.querySelectorAll('.polygon-mini-map');
+                
+                console.log(`🗺️ Initializing ${mapDivs.length} maps...`);
+                
+                let initialized = 0;
+                let skipped = 0;
+                
+                mapDivs.forEach(mapDiv => {
+                    const mapId = mapDiv.id;
+                    
+                    // Verify element is visible and has dimensions
+                    if (mapDiv.offsetWidth === 0 || mapDiv.offsetHeight === 0) {
+                        console.warn(`⚠️ Map ${mapId} has no dimensions (${mapDiv.offsetWidth}x${mapDiv.offsetHeight}), skipping`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Extract field ID and type from map ID
+                    // Format: map-FIELD_ID-orig or map-FIELD_ID-corr or map-FIELD_ID-sbs-orig, etc.
+                    const isOriginal = mapId.includes('-orig');
+                    
+                    // Find the corresponding field by looking for the field ID in the map ID
+                    let field = null;
+                    for (const f of fields) {
+                        if (f.ccsFieldId && mapId.includes(f.ccsFieldId)) {
+                            field = f;
+                            break;
+                        }
+                    }
+                    
+                    if (!field) {
+                        console.warn(`⚠️ Could not find field for map ${mapId}`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Get coordinates
+                    const coords = isOriginal ? 
+                        field.originalCoordinates : 
+                        (field.correctedCoordinates || field.originalCoordinates);
+                    
+                    // Initialize the map
+                    if (coords && coords.length >= 3) {
+                        initializeSingleMap(mapId, coords, isOriginal);
+                        initialized++;
+                    } else {
+                        console.warn(`⚠️ Invalid coordinates for map ${mapId}: ${coords?.length || 0} points`);
+                        skipped++;
+                    }
+                });
+                
+                console.log(`✅ Initialized ${initialized} maps successfully (skipped ${skipped})`);
+                
+                // Retry failed maps after another delay
+                if (skipped > 0) {
+                    console.log(`🔄 Retrying ${skipped} failed maps in 500ms...`);
+                    setTimeout(() => {
+                        const failedMaps = document.querySelectorAll('.polygon-mini-map');
+                        let retried = 0;
+                        failedMaps.forEach(mapDiv => {
+                            const mapId = mapDiv.id;
+                            // Check if map was already initialized
+                            if (!polygonMaps[mapId] && mapDiv.offsetWidth > 0 && mapDiv.offsetHeight > 0) {
+                                const isOriginal = mapId.includes('-orig');
+                                let field = null;
+                                for (const f of fields) {
+                                    if (f.ccsFieldId && mapId.includes(f.ccsFieldId)) {
+                                        field = f;
+                                        break;
+                                    }
+                                }
+                                if (field) {
+                                    const coords = isOriginal ? field.originalCoordinates : (field.correctedCoordinates || field.originalCoordinates);
+                                    if (coords && coords.length >= 3) {
+                                        console.log(`🔄 Retrying map ${mapId}...`);
+                                        initializeSingleMap(mapId, coords, isOriginal);
+                                        retried++;
+                                    }
+                                }
+                            }
+                        });
+                        console.log(`✅ Retry complete: ${retried} maps initialized`);
+                    }, 500);
+                }
+            }, 500); // Increased from 300ms to 500ms
+        }
+        
+        // Initialize a single mini map
+        function initializeSingleMap(mapId, coordinates, isOriginal) {
+            try {
+                // Verify element exists
+                const element = document.getElementById(mapId);
+                if (!element) {
+                    console.error(`❌ Element not found for map ${mapId}`);
+                    return;
+                }
+                
+                // Validate coordinates
+                if (!coordinates || coordinates.length < 3) {
+                    console.error(`❌ Invalid coordinates for map ${mapId}:`, coordinates);
+                    return;
+                }
+                
+                // Check if element already has a map (Leaflet sets _leaflet_id)
+                if (element._leaflet_id) {
+                    // Remove the existing Leaflet instance
+                    if (element._leaflet) {
+                        element._leaflet.remove();
+                    }
+                    // Clear Leaflet internal ID
+                    delete element._leaflet_id;
+                    delete element._leaflet;
+                    // Clear innerHTML to reset
+                    element.innerHTML = '';
+                }
+                
+                // Get bounds of coordinates
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLng = Infinity, maxLng = -Infinity;
+                
+                coordinates.forEach(coord => {
+                    const lat = coord[0];
+                    const lng = coord[1];
+                    if (lat < minLat) minLat = lat;
+                    if (lat > maxLat) maxLat = lat;
+                    if (lng < minLng) minLng = lng;
+                    if (lng > maxLng) maxLng = lng;
+                });
+                
+                // Validate bounds
+                if (!isFinite(minLat) || !isFinite(maxLat) || !isFinite(minLng) || !isFinite(maxLng)) {
+                    console.error(`❌ Invalid bounds for map ${mapId}:`, {minLat, maxLat, minLng, maxLng});
+                    return;
+                }
+                
+                const centerLat = (minLat + maxLat) / 2;
+                const centerLng = (minLng + maxLng) / 2;
+                
+                // Create map with zoom controls enabled
+                const map = L.map(mapId, {
+                    center: [centerLat, centerLng],
+                    zoom: 15,
+                    zoomControl: true,
+                    scrollWheelZoom: true,
+                    dragging: true,
+                    doubleClickZoom: true,
+                    preferCanvas: true  // Better performance for many maps
+                });
+                
+                // Add appropriate tile layer based on current mode
+                addTileLayer(map, currentMapMode);
+                
+                // Add polygon with different colors for original vs corrected
+                const color = isOriginal ? '#95a5a6' : '#27ae60';
+                const polygon = L.polygon(coordinates.map(c => [c[0], c[1]]), {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.2,
+                    weight: 2
+                }).addTo(map);
+                
+                // Fit bounds
+                map.fitBounds(polygon.getBounds(), { padding: [10, 10] });
+                
+                // Store map instance FIRST
+                polygonMaps[mapId] = map;
+                
+                // CRITICAL: Multiple invalidateSize calls to ensure tiles load
+                // Some maps need this called multiple times with different timings
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 50);
+                
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 150);
+                
+                setTimeout(() => {
+                    map.invalidateSize();
+                    // Force tile layer to load if it hasn't
+                    map.eachLayer(layer => {
+                        if (layer instanceof L.TileLayer) {
+                            layer.redraw();
+                        }
+                    });
+                }, 300);
+                
+                console.log(`✅ Map initialized: ${mapId}`);
+                
+            } catch (error) {
+                console.error(`❌ Error initializing map ${mapId}:`, error);
+                console.error('Coordinates:', coordinates);
+            }
+        }
+        
+        // Add tile layer based on map mode
+        function addTileLayer(map, mode) {
+            let tileLayer;
+            
+            if (mode === 'satellite') {
+                tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Esri',
+                    maxZoom: 18,
+                    maxNativeZoom: 18,
+                    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                    updateWhenIdle: true,     // CHANGED: Only update when map stops moving
+                    updateWhenZooming: false,
+                    updateInterval: 300,       // NEW: Throttle updates to 300ms
+                    keepBuffer: 1              // REDUCED: Keep only 1 tile buffer (was 2)
+                });
+            } else if (mode === 'hybrid') {
+                tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Esri',
+                    maxZoom: 18,
+                    maxNativeZoom: 18,
+                    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                    updateWhenIdle: true,
+                    updateWhenZooming: false,
+                    updateInterval: 300,
+                    keepBuffer: 1
+                });
+                tileLayer.addTo(map);
+                
+                // Add road overlay - Use CartoDB
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+                    attribution: 'CARTO',
+                    subdomains: 'abcd',
+                    opacity: 0.7,
+                    maxZoom: 20,
+                    maxNativeZoom: 18,
+                    updateWhenIdle: true,
+                    updateWhenZooming: false,
+                    updateInterval: 300
+                }).addTo(map);
+                
+                return; // Already added both layers
+            } else {
+                // Standard map - Use CartoDB (more reliable than OSM)
+                tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 20,
+                    maxNativeZoom: 18,
+                    updateWhenIdle: true,
+                    updateWhenZooming: false,
+                    updateInterval: 300,
+                    keepBuffer: 1
+                });
+            }
+            
+            // Add tile load event listeners for debugging
+            tileLayer.on('loading', function() {
+                console.log(`🔄 Loading tiles for map...`);
+            });
+            
+            tileLayer.on('load', function() {
+                console.log(`✅ Tiles loaded successfully`);
+            });
+            
+            tileLayer.on('tileerror', function(error) {
+                console.warn(`⚠️ Tile error:`, error);
+            });
+            
+            tileLayer.addTo(map);
+        }
+        
+        // Helper function to render polygon as SVG
+        function renderPolygonSVG(coordinates, isOriginal = true) {
+            if (!coordinates || coordinates.length < 3) {
+                return '<i class="bi bi-pentagon" style="font-size: 48px; color: #95a5a6;"></i>';
+            }
+            
+            // Get bounding box
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+            
+            coordinates.forEach(coord => {
+                const lat = coord[0];
+                const lng = coord[1];
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
+                if (lng < minLng) minLng = lng;
+                if (lng > maxLng) maxLng = lng;
+            });
+            
+            const latRange = maxLat - minLat;
+            const lngRange = maxLng - minLng;
+            const maxRange = Math.max(latRange, lngRange);
+            
+            if (maxRange === 0) {
+                return '<i class="bi bi-pentagon" style="font-size: 48px; color: #95a5a6;"></i>';
+            }
+            
+            // Scale coordinates to fit in SVG viewBox
+            const padding = 10;
+            const size = 100 - (padding * 2);
+            
+            const points = coordinates.map(coord => {
+                const lat = coord[0];
+                const lng = coord[1];
+                const x = ((lat - minLat) / maxRange) * size + padding;
+                const y = ((lng - minLng) / maxRange) * size + padding;
+                return `${x},${100 - y}`;
+            }).join(' ');
+            
+            const color = isOriginal ? '#95a5a6' : '#27ae60';
+            const fillColor = isOriginal ? '#ecf0f1' : '#d5f4e6';
+            
+            return `
+                <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                    <polygon points="${points}" 
+                             fill="${fillColor}" 
+                             stroke="${color}" 
+                             stroke-width="2" 
+                             stroke-linejoin="round"/>
+                </svg>
+            `;
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            loadFieldsFromStorage();
+            setupEventListeners();
+        });
+        
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', handleSearch);
+            
+            // Add Enter key support for Jump to Page
+            document.getElementById('jumpToPage').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    jumpToPage();
+                }
+            });
+            
+            // Add Enter key support for Jump to Field ID
+            document.getElementById('jumpToFieldId').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    jumpToFieldId();
+                }
+            });
+        }
+        
+        function loadFieldsFromStorage() {
+            console.log('📊 Loading data from parent window (memory mode)...');
+            
+            if (!window.opener || window.opener.closed) {
+                alert('Parent window not available. Please reopen the catalog from the main application.');
+                hideLoading();
+                return;
+            }
+            
+            try {
+                const parentData = window.opener.catalogData;
+                
+                if (!parentData || parentData.length === 0) {
+                    alert('No field data found in parent window. Please import data in the main application first.');
+                    hideLoading();
+                    return;
+                }
+                
+                // Copy the data
+                allFields = JSON.parse(JSON.stringify(parentData));
+                
+                console.log(`✅ Loaded ${allFields.length} fields from parent window (memory mode)`);
+                console.log(`   - Sample field:`, allFields[0]);
+                
+                // DIAGNOSTIC: Check if correctedCoordinates are present
+                const fieldsWithCorrections = allFields.filter(f => f.correctedCoordinates && f.correctedCoordinates.length > 0);
+                console.log(`   📊 Fields with correctedCoordinates: ${fieldsWithCorrections.length} (${(fieldsWithCorrections.length/allFields.length*100).toFixed(1)}%)`);
+                if (fieldsWithCorrections.length > 0) {
+                    console.log('   - Sample corrected field:', fieldsWithCorrections[0].ccsFieldId, 'has', fieldsWithCorrections[0].correctedCoordinates.length, 'vertices');
+                } else {
+                    console.warn('   ⚠️ NO fields have correctedCoordinates! All polygons will show original coordinates.');
+                    console.warn('   ⚠️ Make sure you ran "Process All Fields" in the main app before opening catalog.');
+                }
+                
+                // Initialize filters
+                updateFilterCounts();
+                applyFilters();
+                hideLoading();
+            } catch (error) {
+                console.error('❌ Error loading field data:', error);
+                alert('Error loading field data from parent window. Please try reopening the catalog.');
+                hideLoading();
+            }
+        }
+        
+        // Match status filter (EXACT LOGIC from FilterManager.js)
+        function matchesStatusFilter(field) {
+            if (filterState.status === 'all') return true;
+            
+            // Manual Flags filter - NEW
+            if (filterState.status === 'manuallyFlagged') {
+                return !!(field.manualFlags?.selfIntersection || 
+                         field.manualFlags?.straightLine || 
+                         field.manualFlags?.bowTie || 
+                         field.manualFlags?.otherIssue);
+            }
+            
+            if (!field.validation || !field.validation.verra) {
+                return filterState.status === 'manual';
+            }
+            
+            // Use the validation overallStatus (matching main app)
+            const overallStatus = field.validation.verra.overallStatus;
+            
+            switch (filterState.status) {
+                case 'verraReady':
+                    // VERRA Ready = PASS or FIXABLE
+                    return overallStatus === 'PASS' || overallStatus === 'FIXABLE';
+                
+                case 'valid':
+                    return overallStatus === 'PASS';
+                
+                case 'autoCorrected':
+                    // "Auto-Corrected" means "Can be fixed" = FIXABLE status
+                    return overallStatus === 'FIXABLE';
+                
+                // NEW: Corrected (Your Work) - shows fields with corrections applied
+                case 'correctedWork':
+                    return field.correction?.applied === true;
+                
+                // NEW: Remaining Work - shows manually flagged fields that are NOT yet corrected
+                case 'remainingWork':
+                    const hasManualFlag = !!(field.manualFlags?.selfIntersection || 
+                                         field.manualFlags?.straightLine || 
+                                         field.manualFlags?.bowTie || 
+                                         field.manualFlags?.otherIssue);
+                    const isCorrected = field.correction?.applied === true;
+                    return hasManualFlag && !isCorrected;
+                
+                case 'manual':
+                    // Needs manual = NEEDS_MANUAL_FIX status
+                    return overallStatus === 'NEEDS_MANUAL_FIX';
+                
+                // NEW: Individual manual flag type filters
+                case 'selfIntersection':
+                    return field.manualFlags?.selfIntersection === true;
+                
+                case 'straightLine':
+                    return field.manualFlags?.straightLine === true;
+                
+                case 'bowTie':
+                    return field.manualFlags?.bowTie === true;
+                
+                case 'overlapping':
+                    return field.hasOverlaps === true && field.overlaps && field.overlaps.length > 0;
+                
+                case 'otherIssue':
+                    return field.manualFlags?.otherIssue === true;
+                
+                default:
+                    return true;
+            }
+        }
+        
+        // Match size filter (EXACT LOGIC from FilterManager.js)
+        function matchesSizeFilter(field) {
+            // If no size filters active, pass all
+            if (!filterState.sizeFilters.xs && !filterState.sizeFilters.ok && !filterState.sizeFilters.xl) {
+                return true;
+            }
+            
+            const area = field.validation?.metrics?.areaHa || 0;
+            
+            if (filterState.sizeFilters.xs && area < 0.2) return true;
+            if (filterState.sizeFilters.ok && area >= 0.2 && area <= 20) return true;
+            if (filterState.sizeFilters.xl && area > 20) return true;
+            
+            return false;
+        }
+        
+        // Match issue filter (EXACT LOGIC from FilterManager.js)
+        function matchesIssueFilter(field) {
+            // If no issue filters active, pass all
+            const anyIssueFilterActive = filterState.issueFilters.selfIntersection ||
+                                          filterState.issueFilters.tooFewVertices ||
+                                          filterState.issueFilters.zeroArea;
+            
+            if (!anyIssueFilterActive) return true;
+            
+            if (!field.validation || !field.validation.verra) return false;
+            
+            const verra = field.validation.verra;
+            const checks = verra.checks || {};
+            const errors = field.validation.errors || [];
+            
+            // Check for each issue type
+            const hasSelfIntersection = !checks.simple?.pass || 
+                errors.some(e => e.toLowerCase().includes('self-intersection')) ||
+                field.validation.metrics?.hasSelfIntersection;
+            
+            const tooFewVertices = !checks.minVertices?.pass ||
+                errors.some(e => e.toLowerCase().includes('distinct vertices'));
+            
+            const zeroArea = !checks.positiveArea?.pass ||
+                (field.validation.metrics?.areaM2 || 0) <= 1;
+            
+            // Match if any selected filter matches
+            if (filterState.issueFilters.selfIntersection && hasSelfIntersection) return true;
+            if (filterState.issueFilters.tooFewVertices && tooFewVertices) return true;
+            if (filterState.issueFilters.zeroArea && zeroArea) return true;
+            
+            return false;
+        }
+        
+        // Match date filter (matching main app FilterManager logic)
+        function matchesDateFilter(field) {
+            // If no date filters set, pass all
+            if (!filterState.dateFilters.fromDate && !filterState.dateFilters.toDate) {
+                return true;
+            }
+            
+            // Get field timestamp (use polygonCreatedOn or fall back to system dates)
+            const timestamp = field.polygonCreatedOn || field.updatedAt || field.createdAt;
+            
+            if (!timestamp) {
+                // No timestamp - exclude from date filter
+                return false;
+            }
+            
+            // Extract just the date part (YYYY-MM-DD)
+            const fieldDate = timestamp.split('T')[0];
+            
+            // Check from date
+            if (filterState.dateFilters.fromDate && fieldDate < filterState.dateFilters.fromDate) {
+                return false;
+            }
+            
+            // Check to date
+            if (filterState.dateFilters.toDate && fieldDate > filterState.dateFilters.toDate) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Combined filter check
+        function matchesFilters(field) {
+            if (!matchesStatusFilter(field)) return false;
+            if (!matchesSizeFilter(field)) return false;
+            if (!matchesIssueFilter(field)) return false;
+            if (!matchesDateFilter(field)) return false;
+            return true;
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            console.log('🔍 Applying filters (matching main app logic)...');
+            
+            // Get filter values
+            filterState.status = document.querySelector('input[name="statusFilter"]:checked')?.value || 'all';
+            
+            // Size filters
+            filterState.sizeFilters.xs = document.getElementById('sizeXS').checked;
+            filterState.sizeFilters.ok = document.getElementById('sizeOK').checked;
+            filterState.sizeFilters.xl = document.getElementById('sizeXL').checked;
+            
+            // Issue filters
+            filterState.issueFilters.selfIntersection = document.getElementById('issueSelfInt').checked;
+            filterState.issueFilters.tooFewVertices = document.getElementById('issueFewVert').checked;
+            filterState.issueFilters.zeroArea = document.getElementById('issueZeroArea').checked;
+            
+            // Date filters
+            filterState.dateFilters.fromDate = document.getElementById('dateFrom').value;
+            filterState.dateFilters.toDate = document.getElementById('dateTo').value;
+            
+            // Apply filters
+            filteredFields = allFields.filter(field => matchesFilters(field));
+            
+            // Apply sorting
+            applySorting();
+            
+            console.log(`   - Filtered to ${filteredFields.length} of ${allFields.length} fields`);
+            currentPage = 1;
+            updateCountBadge();
+            renderCurrentView();
+        }
+        
+        /**
+         * Apply sorting to filtered fields
+         */
+        function applySorting() {
+            const sortBy = document.getElementById('catalogSort')?.value || 'fieldId-asc';
+            
+            console.log(`🔀 Sorting fields by: ${sortBy}`);
+            
+            switch(sortBy) {
+                case 'fieldId-asc':
+                    filteredFields.sort((a, b) => {
+                        const idA = a.ccsFieldId || '';
+                        const idB = b.ccsFieldId || '';
+                        return idA.localeCompare(idB);
+                    });
+                    break;
+                    
+                case 'fieldId-desc':
+                    filteredFields.sort((a, b) => {
+                        const idA = a.ccsFieldId || '';
+                        const idB = b.ccsFieldId || '';
+                        return idB.localeCompare(idA);
+                    });
+                    break;
+                    
+                case 'owner-asc':
+                    filteredFields.sort((a, b) => {
+                        const ownerA = a.fieldOwner || '';
+                        const ownerB = b.fieldOwner || '';
+                        return ownerA.localeCompare(ownerB);
+                    });
+                    break;
+                    
+                case 'owner-desc':
+                    filteredFields.sort((a, b) => {
+                        const ownerA = a.fieldOwner || '';
+                        const ownerB = b.fieldOwner || '';
+                        return ownerB.localeCompare(ownerA);
+                    });
+                    break;
+                    
+                case 'area-asc':
+                    filteredFields.sort((a, b) => {
+                        const areaA = a.validation?.metrics?.areaHa || 0;
+                        const areaB = b.validation?.metrics?.areaHa || 0;
+                        return areaA - areaB;
+                    });
+                    break;
+                    
+                case 'area-desc':
+                    filteredFields.sort((a, b) => {
+                        const areaA = a.validation?.metrics?.areaHa || 0;
+                        const areaB = b.validation?.metrics?.areaHa || 0;
+                        return areaB - areaA;
+                    });
+                    break;
+                    
+                default:
+                    // No sorting (import order)
+                    break;
+            }
+            
+            console.log(`   ✅ Sorted ${filteredFields.length} fields`);
+            
+            // Reset to page 1 after sorting
+            currentPage = 1;
+            renderCurrentView();
+        }
+        
+        // Clear all filters
+        function clearAllFilters() {
+            // Reset to show all
+            document.getElementById('filterAll').checked = true;
+            
+            // Uncheck all size filters
+            document.getElementById('sizeXS').checked = false;
+            document.getElementById('sizeOK').checked = false;
+            document.getElementById('sizeXL').checked = false;
+            
+            // Uncheck all issue filters
+            document.getElementById('issueSelfInt').checked = false;
+            document.getElementById('issueFewVert').checked = false;
+            document.getElementById('issueZeroArea').checked = false;
+            
+            // Clear date filters
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            
+            applyFilters();
+        }
+        
+        // Update filter count badges (MATCHING MAIN APP LOGIC EXACTLY)
+        function updateFilterCounts() {
+            let countAll = allFields.length;
+            let countVerraReady = 0;
+            let countValid = 0;
+            let countAutoCorrected = 0;  // Actually "can be fixed" in main app
+            let countManual = 0;
+            let countManuallyFlagged = 0;  // NEW
+            let countSelfIntersection = 0;  // NEW
+            let countStraightLine = 0;  // NEW
+            let countBowTie = 0;  // NEW
+            let countOverlapping = 0;  // NEW
+            let countOtherIssue = 0;  // NEW
+            let countCorrectedWork = 0;  // NEW: Count of corrected fields
+            let countRemainingWork = 0;  // NEW: Count of flagged but not corrected
+            
+            // Debug: Check first field structure
+            if (allFields.length > 0) {
+                const firstField = allFields.find(f => f.validation?.verra) || allFields[0];
+                console.log('   - Sample field:', {
+                    fieldId: firstField.ccsFieldId,
+                    overallStatus: firstField.validation?.verra?.overallStatus,
+                    validationExists: !!firstField.validation?.verra
+                });
+            }
+            
+            allFields.forEach(field => {
+                // NEW: Count corrected fields (all corrections, auto + manual)
+                if (field.correction?.applied === true) {
+                    countCorrectedWork++;
+                }
+                
+                // NEW: Count remaining work (flagged but not corrected)
+                const hasManualFlag = !!(field.manualFlags?.selfIntersection || 
+                                     field.manualFlags?.straightLine || 
+                                     field.manualFlags?.bowTie || 
+                                     field.manualFlags?.otherIssue);
+                const isCorrected = field.correction?.applied === true;
+                if (hasManualFlag && !isCorrected) {
+                    countRemainingWork++;
+                }
+                
+                // Count manually flagged fields - NEW
+                if (field.manualFlags?.selfIntersection || 
+                    field.manualFlags?.straightLine || 
+                    field.manualFlags?.bowTie || 
+                    field.manualFlags?.otherIssue) {
+                    countManuallyFlagged++;
+                    
+                    // Count each flag type individually
+                    if (field.manualFlags.selfIntersection) countSelfIntersection++;
+                    if (field.manualFlags.straightLine) countStraightLine++;
+                    if (field.manualFlags.bowTie) countBowTie++;
+                    if (field.manualFlags.otherIssue) countOtherIssue++;
+                }
+                
+                // Count overlapping fields - NEW
+                if (field.hasOverlaps && field.overlaps && field.overlaps.length > 0) {
+                    countOverlapping++;
+                }
+                
+                if (!field.validation || !field.validation.verra) {
+                    countManual++;
+                    return;
+                }
+                
+                const overallStatus = field.validation.verra.overallStatus;
+                
+                // Match EXACT logic from StatisticsDashboard.calculateStatistics()
+                if (overallStatus === 'PASS') {
+                    countValid++;
+                } else if (overallStatus === 'FIXABLE') {
+                    countAutoCorrected++;  // "Can be fixed" = shown as "Auto-Corrected"
+                } else if (overallStatus === 'NEEDS_MANUAL_FIX') {
+                    countManual++;
+                } else {
+                    // Unknown status, treat as needs manual
+                    countManual++;
+                }
+            });
+            
+            // VERRA Ready = Valid + Can Be Fixed (matching main app line 160)
+            countVerraReady = countValid + countAutoCorrected;
+            
+            // Update badges
+            document.getElementById('countAll').textContent = countAll;
+            document.getElementById('countVerraReady').textContent = countVerraReady;
+            document.getElementById('countValid').textContent = countValid;
+            document.getElementById('countAutoCorrected').textContent = countAutoCorrected;
+            document.getElementById('countCorrectedWork').textContent = countCorrectedWork;  // NEW
+            document.getElementById('countRemainingWork').textContent = countRemainingWork;  // NEW
+            document.getElementById('countManual').textContent = countManual;
+            document.getElementById('countManuallyFlagged').textContent = countManuallyFlagged;  // NEW
+            document.getElementById('countSelfIntersection').textContent = countSelfIntersection;  // NEW
+            document.getElementById('countStraightLine').textContent = countStraightLine;  // NEW
+            document.getElementById('countBowTie').textContent = countBowTie;  // NEW
+            document.getElementById('countOverlapping').textContent = countOverlapping;  // NEW
+            document.getElementById('countOtherIssue').textContent = countOtherIssue;  // NEW
+            
+            console.log(`   - Counts: All=${countAll}, VERRA=${countVerraReady}, Valid=${countValid}, AutoCorrected=${countAutoCorrected}, CorrectedWork=${countCorrectedWork}, RemainingWork=${countRemainingWork}, Manual=${countManual}, ManuallyFlagged=${countManuallyFlagged}`);
+            
+            // Verify math (VERRA + Manual should equal Total)
+            const verraCheck = countVerraReady + countManual;
+            if (verraCheck !== countAll) {
+                console.warn(`   ⚠️ Math check: VERRA(${countVerraReady}) + Manual(${countManual}) = ${verraCheck}, expected ${countAll}`);
+            } else {
+                console.log(`   ✅ Math verified: VERRA + Manual = Total (${countAll})`);
+            }
+        }
+        
+        function handleSearch(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                filteredFields = allFields.filter(field => matchesFilters(field));
+            } else {
+                filteredFields = allFields.filter(field => {
+                    if (!matchesFilters(field)) return false;
+                    
+                    const matchesId = field.ccsFieldId && field.ccsFieldId.toLowerCase().includes(searchTerm);
+                    const matchesOwner = field.fieldOwner && field.fieldOwner.toLowerCase().includes(searchTerm);
+                    
+                    return matchesId || matchesOwner;
+                });
+            }
+            
+            currentPage = 1;
+            updateCountBadge();
+            renderCurrentView();
+        }
+        
+        function updateCountBadge() {
+            const badge = document.getElementById('countBadge');
+            badge.textContent = `${filteredFields.length} fields (${Math.min(currentItemsPerPage, filteredFields.length)} shown per page)`;
+        }
+        
+        function switchView(view) {
+            currentView = view;
+            
+            // Update button states
+            document.querySelectorAll('.view-toggle-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.closest('.view-toggle-btn').classList.add('active');
+            
+            // Update view visibility
+            document.getElementById('gridView').classList.remove('active');
+            document.getElementById('listView').classList.remove('active');
+            document.getElementById('sideBySideView').classList.remove('active');
+            
+            renderCurrentView();
+        }
+        
+        function renderCurrentView() {
+            const startIdx = (currentPage - 1) * currentItemsPerPage;
+            const endIdx = startIdx + currentItemsPerPage;
+            const pageFields = filteredFields.slice(startIdx, endIdx);
+            
+            // Update pagination info
+            const totalPages = Math.ceil(filteredFields.length / currentItemsPerPage);
+            const actualEndIdx = Math.min(endIdx, filteredFields.length);
+            
+            document.getElementById('paginationInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('itemsInfo').textContent = `Showing ${startIdx + 1}-${actualEndIdx} of ${filteredFields.length}`;
+            
+            if (currentView === 'grid') {
+                document.getElementById('gridView').classList.add('active');
+                renderGridView(pageFields);
+            } else if (currentView === 'list') {
+                document.getElementById('listView').classList.add('active');
+                renderListView(pageFields);
+            } else {
+                document.getElementById('sideBySideView').classList.add('active');
+                renderSideBySideView(pageFields);
+            }
+            
+            renderPagination();
+        }
+        
+        function renderGridView(fields) {
+            const container = document.getElementById('gridContainer');
+            
+            // Clear the container
+            container.innerHTML = '';
+            
+            // Calculate column width based on thumbnail size
+            const settings = thumbnailSettings[thumbnailSize];
+            const columnWidth = `${100 / settings.columns}%`;
+            const thumbnailSizeCSS = settings.size;
+            
+            container.innerHTML = fields.map(field => {
+                const area = (field.validation?.metrics?.areaHa || 0).toFixed(2);
+                const isValid = field.validation?.verra?.overallStatus === 'PASS' || 
+                               field.correctionValidation?.verra?.overallStatus === 'PASS';
+                
+                // Determine which polygon to show (corrected if available, otherwise original)
+                const wasAutoCorrected = field.correctedCoordinates && field.correctedCoordinates.length > 0;
+                const displayCoordinates = wasAutoCorrected ? field.correctedCoordinates : field.originalCoordinates;
+                const polygonLabel = wasAutoCorrected ? 'CORRECTED' : 'ORIGINAL';
+                const polygonLabelClass = wasAutoCorrected ? 'corrected' : 'original';
+                const vertexCount = displayCoordinates?.length || 0;
+                
+                return `
+                <div style="width: ${columnWidth}; padding: 3px; display: inline-block; vertical-align: top; box-sizing: border-box; font-size: initial;">
+                    <div class="field-card" style="height: auto;">
+                        <!-- Minimal Header -->
+                        <div class="field-card-header" style="padding: 2px 4px; line-height: 1.1;">
+                            <p class="field-id" style="font-size: ${thumbnailSize === 'small' ? '9px' : thumbnailSize === 'medium' ? '10px' : '11px'}; margin: 0; font-weight: 600;">${field.ccsFieldId}</p>
+                            ${thumbnailSize !== 'small' ? `<p class="field-owner" style="font-size: ${thumbnailSize === 'medium' ? '8px' : '9px'}; margin: 0; color: #666; line-height: 1.2;">${field.fieldOwner || 'Unknown'}</p>` : ''}
+                        </div>
+                        
+                        <!-- MAXIMIZED Polygon Display -->
+                        <div class="polygon-single-view" style="position: relative; margin: 1px 0;">
+                            <div class="polygon-label ${polygonLabelClass}" style="font-size: 7px; padding: 1px 3px; position: absolute; top: 2px; left: 2px; z-index: 1000; border-radius: 2px;">${polygonLabel}</div>
+                            <div class="polygon-image" style="height: ${thumbnailSizeCSS}; width: 100%; background: #f8f9fa; border-radius: 2px; overflow: hidden;">
+                                ${renderPolygonMap(displayCoordinates, field.ccsFieldId, false)}
+                            </div>
+                        </div>
+                        
+                        <!-- Minimal Footer -->
+                        <div class="field-card-footer" style="padding: 2px 3px; line-height: 1;">
+                            <div style="display: flex; gap: 2px; justify-content: center; margin-bottom: 1px;">
+                                <span class="badge ${isValid ? 'badge-valid' : 'badge-invalid'}" style="font-size: 7px; padding: 1px 3px; line-height: 1.2;">
+                                    ${isValid ? '✓' : '✗'}
+                                </span>
+                                <span class="badge ${isValid ? 'badge-verra-ok' : 'badge-verra-issue'}" style="font-size: 7px; padding: 1px 3px; line-height: 1.2;">
+                                    ${isValid ? 'OK' : 'X'}
+                                </span>
+                                ${wasAutoCorrected ? `<span class="badge" style="background-color: #3498db; color: white; font-size: 7px; padding: 1px 3px; line-height: 1.2;">✓</span>` : ''}
+                            </div>
+                            
+                            ${thumbnailSize !== 'small' ? `
+                            <div style="display: flex; justify-content: space-around; font-size: 7px; line-height: 1.3; color: #666;">
+                                <span>${area}ha</span>
+                                <span>${vertexCount}v</span>
+                            </div>
+                            ` : ''}
+                            
+                            ${thumbnailSize === 'large' ? `
+                            <!-- Manual Flags Section - Large View Only -->
+                            <div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #eee;">
+                                <div style="font-size: 8px; font-weight: 600; margin-bottom: 2px; color: #666;">🚩 Manual Flags:</div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; font-size: 7px;">
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="checkbox" 
+                                               ${field.manualFlags?.selfIntersection ? 'checked' : ''}
+                                               onchange="toggleManualFlag('${field.ccsFieldId}', 'selfIntersection', this.checked)"
+                                               style="margin-right: 2px; width: 10px; height: 10px;">
+                                        Self-Int
+                                    </label>
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="checkbox" 
+                                               ${field.manualFlags?.straightLine ? 'checked' : ''}
+                                               onchange="toggleManualFlag('${field.ccsFieldId}', 'straightLine', this.checked)"
+                                               style="margin-right: 2px; width: 10px; height: 10px;">
+                                        Line
+                                    </label>
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="checkbox" 
+                                               ${field.manualFlags?.bowTie ? 'checked' : ''}
+                                               onchange="toggleManualFlag('${field.ccsFieldId}', 'bowTie', this.checked)"
+                                               style="margin-right: 2px; width: 10px; height: 10px;">
+                                        Bow Tie
+                                    </label>
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="checkbox" 
+                                               ${field.manualFlags?.otherIssue ? 'checked' : ''}
+                                               onchange="toggleManualFlag('${field.ccsFieldId}', 'otherIssue', this.checked)"
+                                               style="margin-right: 2px; width: 10px; height: 10px;">
+                                        Other
+                                    </label>
+                                </div>
+                            </div>
+                            ` : (field.manualFlags && (field.manualFlags.selfIntersection || field.manualFlags.straightLine || field.manualFlags.bowTie || field.manualFlags.otherIssue)) ? `
+                            <!-- Manual Flags Indicator - Small/Medium View -->
+                            <div style="text-align: center; margin-top: 2px;">
+                                <span style="font-size: 7px; color: #e74c3c;">
+                                    🚩 ${[
+                                        field.manualFlags.selfIntersection ? 'SI' : '',
+                                        field.manualFlags.straightLine ? 'L' : '',
+                                        field.manualFlags.bowTie ? 'BT' : '',
+                                        field.manualFlags.otherIssue ? 'O' : ''
+                                    ].filter(Boolean).join(' ')}
+                                </span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('');
+            
+            // Initialize all the mini maps
+            initializePolygonMaps(fields);
+        }
+        
+        function renderListView(fields) {
+            const tbody = document.getElementById('listViewBody');
+            tbody.innerHTML = fields.map(field => {
+                const area = (field.validation?.metrics?.areaHa || 0).toFixed(2);
+                const isValid = field.validation?.verra?.overallStatus === 'PASS' || 
+                               field.correctionValidation?.verra?.overallStatus === 'PASS';
+                
+                return `
+                <tr>
+                    <td><strong>${field.ccsFieldId}</strong></td>
+                    <td>${field.fieldOwner || '-'}</td>
+                    <td>
+                        <span class="badge ${isValid ? 'badge-valid' : 'badge-invalid'}">
+                            ${isValid ? 'Valid' : 'Invalid'}
+                        </span>
+                        <span class="badge ${isValid ? 'badge-verra-ok' : 'badge-verra-issue'} ms-1">
+                            ${isValid ? 'VERRA OK' : 'ISSUE'}
+                        </span>
+                    </td>
+                    <td>
+                        ${field.originalCoordinates?.length || 0} → 
+                        ${field.correctedCoordinates?.length || field.originalCoordinates?.length || 0}
+                    </td>
+                    <td>${area}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewDetails('${field.ccsFieldId}')">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary ms-1">
+                            <i class="bi bi-download"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+        }
+        
+        function renderSideBySideView(fields) {
+            const container = document.getElementById('sideBySideView');
+            
+            // Clear the container
+            container.innerHTML = '';
+            
+            container.innerHTML = fields.map(field => {
+                const area = (field.validation?.metrics?.areaHa || 0).toFixed(2);
+                const isValid = field.validation?.verra?.overallStatus === 'PASS' || 
+                               field.correctionValidation?.verra?.overallStatus === 'PASS';
+                
+                // Determine if field was actually auto-corrected
+                const wasAutoCorrected = field.correctedCoordinates && field.correctedCoordinates.length > 0;
+                const rightPanelLabel = wasAutoCorrected ? 'Auto-Corrected' : 'Current';
+                
+                return `
+                <div class="side-by-side-card">
+                    <div class="side-by-side-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">${field.ccsFieldId} - ${field.fieldOwner || 'Unknown'}</h5>
+                                <small class="text-muted">${new Date(field.createdAt).toLocaleDateString()} | Zone: Unknown</small>
+                            </div>
+                            <div>
+                                <span class="badge ${isValid ? 'badge-valid' : 'badge-invalid'}">
+                                    ${isValid ? 'Valid' : 'Invalid'}
+                                </span>
+                                <span class="badge ${isValid ? 'badge-verra-ok' : 'badge-verra-issue'} ms-1">
+                                    ${isValid ? 'VERRA COMPLIANT' : 'VERRA ISSUE'}
+                                </span>
+                                ${wasAutoCorrected ? `
+                                <span class="badge ms-1" style="background-color: #3498db; color: white;">
+                                    ✓ AUTO-CORRECTED
+                                </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="side-comparison">
+                        <div class="comparison-section">
+                            <h6><i class="bi bi-geo-alt"></i> Original</h6>
+                            <div class="polygon-image-large" style="height: 500px;">
+                                ${renderPolygonMap(field.originalCoordinates, field.ccsFieldId + '-sbs', true)}
+                            </div>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">Vertices:</span>
+                                    <span class="stat-value">${field.originalCoordinates?.length || 0}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Area:</span>
+                                    <span class="stat-value">${area} ha</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Status:</span>
+                                    <span class="stat-value">${isValid ? 'Valid' : 'Invalid'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="comparison-section">
+                            <h6><i class="bi bi-geo-alt-fill"></i> ${rightPanelLabel}</h6>
+                            <div class="polygon-image-large" style="height: 500px;">
+                                ${renderPolygonMap(field.correctedCoordinates || field.originalCoordinates, field.ccsFieldId + '-sbs', false)}
+                            </div>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">Vertices:</span>
+                                    <span class="stat-value">${field.correctedCoordinates?.length || field.originalCoordinates?.length || 0}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Area:</span>
+                                    <span class="stat-value">${area} ha</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Status:</span>
+                                    <span class="stat-value">${isValid ? 'Valid' : 'Invalid'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Manual Flags Section -->
+                    <div class="mt-3" style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <h6 style="margin-bottom: 10px; font-size: 14px; color: #555;">
+                            <i class="bi bi-flag-fill" style="color: #e74c3c;"></i> Manual Issue Flags
+                        </h6>
+                        <p style="font-size: 11px; color: #666; margin-bottom: 10px;">
+                            Check any visual issues not caught by digital detection:
+                        </p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                            <label style="display: flex; align-items: center; cursor: pointer; font-size: 12px;">
+                                <input type="checkbox" 
+                                       ${field.manualFlags?.selfIntersection ? 'checked' : ''}
+                                       onchange="toggleManualFlag('${field.ccsFieldId}', 'selfIntersection', this.checked)"
+                                       style="margin-right: 6px; width: 16px; height: 16px;">
+                                <span>Self-Intersection</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer; font-size: 12px;">
+                                <input type="checkbox" 
+                                       ${field.manualFlags?.straightLine ? 'checked' : ''}
+                                       onchange="toggleManualFlag('${field.ccsFieldId}', 'straightLine', this.checked)"
+                                       style="margin-right: 6px; width: 16px; height: 16px;">
+                                <span>Straight Line Polygon</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer; font-size: 12px;">
+                                <input type="checkbox" 
+                                       ${field.manualFlags?.bowTie ? 'checked' : ''}
+                                       onchange="toggleManualFlag('${field.ccsFieldId}', 'bowTie', this.checked)"
+                                       style="margin-right: 6px; width: 16px; height: 16px;">
+                                <span>Bow Tie Shape</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer; font-size: 12px;">
+                                <input type="checkbox" 
+                                       ${field.manualFlags?.otherIssue ? 'checked' : ''}
+                                       onchange="toggleManualFlag('${field.ccsFieldId}', 'otherIssue', this.checked)"
+                                       style="margin-right: 6px; width: 16px; height: 16px;">
+                                <span>Other Issue</span>
+                            </label>
+                        </div>
+                        <textarea 
+                            placeholder="Optional notes about the issue..." 
+                            onchange="updateManualNotes('${field.ccsFieldId}', this.value)"
+                            style="width: 100%; padding: 8px; font-size: 11px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; min-height: 50px;"
+                        >${field.manualFlags?.notes || ''}</textarea>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <button class="btn btn-primary btn-sm" onclick="viewDetails('${field.ccsFieldId}')">
+                            <i class="bi bi-eye"></i> View Details
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm ms-2">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+            
+            // Initialize all the mini maps
+            initializePolygonMaps(fields);
+        }
+        
+        // NEW FUNCTIONS FOR GRID OPTIMIZATION
+        
+        function changeThumbnailSize(size) {
+            console.log(`📐 Changing thumbnail size to: ${size}`);
+            thumbnailSize = size;
+            const settings = thumbnailSettings[size];
+            currentItemsPerPage = settings.itemsPerPage;
+            currentGridColumns = settings.columns;
+            
+            // Reset to page 1 when changing size
+            currentPage = 1;
+            
+            // Re-render current view
+            renderCurrentView();
+        }
+        
+        function jumpToPage() {
+            const input = document.getElementById('jumpToPage');
+            const pageNum = parseInt(input.value);
+            const totalPages = Math.ceil(filteredFields.length / currentItemsPerPage);
+            
+            if (pageNum && pageNum >= 1 && pageNum <= totalPages) {
+                currentPage = pageNum;
+                renderCurrentView();
+                input.value = ''; // Clear input
+            } else {
+                alert(`Please enter a page number between 1 and ${totalPages}`);
+            }
+        }
+        
+        function jumpToFieldId() {
+            const input = document.getElementById('jumpToFieldId');
+            const fieldId = input.value.trim().toUpperCase();
+            
+            if (!fieldId) {
+                alert('Please enter a Field ID');
+                return;
+            }
+            
+            // Find the field in filtered results
+            const fieldIndex = filteredFields.findIndex(f => 
+                f.ccsFieldId && f.ccsFieldId.toUpperCase().includes(fieldId)
+            );
+            
+            if (fieldIndex >= 0) {
+                // Calculate which page this field is on
+                const pageNum = Math.floor(fieldIndex / currentItemsPerPage) + 1;
+                currentPage = pageNum;
+                renderCurrentView();
+                
+                // Scroll to the field card after a short delay
+                setTimeout(() => {
+                    const fieldCard = document.querySelector(`[onclick*="${filteredFields[fieldIndex].ccsFieldId}"]`);
+                    if (fieldCard) {
+                        const cardContainer = fieldCard.closest('.field-card');
+                        cardContainer?.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center' 
+                        });
+                        cardContainer?.style.setProperty('box-shadow', '0 0 20px rgba(52, 152, 219, 0.8)', 'important');
+                        setTimeout(() => {
+                            cardContainer?.style.removeProperty('box-shadow');
+                        }, 2000);
+                    }
+                }, 300);
+                
+                input.value = ''; // Clear input
+            } else {
+                alert(`Field ID "${fieldId}" not found in current filtered results`);
+            }
+        }
+        
+        function displayFields() {
+            // Compatibility function for button clicks
+            renderCurrentView();
+        }
+        
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredFields.length / currentItemsPerPage);
+            const pagination = document.getElementById('pagination');
+            
+            let html = '';
+            
+            // Previous button
+            html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>`;
+            
+            // Page numbers
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
+            
+            if (startPage > 1) {
+                html += `<button onclick="changePage(1)">1</button>`;
+                if (startPage > 2) html += '<button disabled>...</button>';
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button onclick="changePage(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += '<button disabled>...</button>';
+                html += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
+            }
+            
+            // Next button
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+            
+            pagination.innerHTML = html;
+        }
+        
+        function changePage(page) {
+            const totalPages = Math.ceil(filteredFields.length / currentItemsPerPage);
+            if (page < 1 || page > totalPages) return;
+            
+            currentPage = page;
+            renderCurrentView();
+        }
+        
+        function viewDetails(fieldId) {
+            // Store field ID and return to main app
+            localStorage.setItem('selectedFieldId', fieldId);
+            window.close();
+            window.opener?.focus();
+        }
+        
+        function regenerateCatalog() {
+            console.log('🔄 Regenerating catalog...');
+            
+            if (!window.opener || window.opener.closed) {
+                alert('Parent window is closed. Cannot refresh data.\n\nPlease reopen the catalog from the main application.');
+                return;
+            }
+            
+            try {
+                window.opener.document.dispatchEvent(
+                    new CustomEvent('requestFieldsForCatalog')
+                );
+                
+                console.log('   - Requested fresh data from parent window');
+                
+                setTimeout(() => {
+                    console.log('   - Reloading catalog...');
+                    location.reload();
+                }, 200);
+            } catch (error) {
+                console.error('❌ Error requesting data:', error);
+                alert('Error refreshing data. Please reopen the catalog.');
+            }
+        }
+        
+        function exportCatalogPDF() {
+            alert('PDF export functionality coming soon!');
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error('Error attempting to enable fullscreen:', err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+        
+        function switchMapMode(mode) {
+            console.log(`🗺️ Map mode: ${mode}`);
+            
+            // Update current mode
+            currentMapMode = mode;
+            
+            // Update button states
+            document.getElementById('btnStandard').classList.remove('active');
+            document.getElementById('btnSatellite').classList.remove('active');
+            document.getElementById('btnHybrid').classList.remove('active');
+            
+            if (mode === 'standard') {
+                document.getElementById('btnStandard').classList.add('active');
+            } else if (mode === 'satellite') {
+                document.getElementById('btnSatellite').classList.add('active');
+            } else if (mode === 'hybrid') {
+                document.getElementById('btnHybrid').classList.add('active');
+            }
+            
+            // Switch all existing mini maps
+            Object.keys(polygonMaps).forEach(mapId => {
+                const map = polygonMaps[mapId];
+                
+                // Remove all existing tile layers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                // Add new tile layer
+                addTileLayer(map, mode);
+                
+                // CRITICAL: Force map to recalculate size and load new tiles
+                // Without this, tiles don't load until user clicks zoom buttons
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 50);
+            });
+            
+            console.log(`✅ Switched ${Object.keys(polygonMaps).length} maps to ${mode} mode`);
+        }
+        
+        
+        // Manual flag management
+        function toggleManualFlag(fieldId, flagType, isChecked) {
+            console.log(`🚩 Manual flag: ${fieldId} - ${flagType} = ${isChecked}`);
+            
+            // Find field in allFields
+            const field = allFields.find(f => f.ccsFieldId === fieldId);
+            if (!field) {
+                console.error(`Field not found: ${fieldId}`);
+                return;
+            }
+            
+            // Initialize manualFlags if doesn't exist
+            if (!field.manualFlags) {
+                field.manualFlags = {
+                    selfIntersection: false,
+                    straightLine: false,
+                    bowTie: false,
+                    otherIssue: false,
+                    notes: '',
+                    flaggedAt: null,
+                    flaggedBy: 'user'
+                };
+            }
+            
+            // Update the specific flag
+            field.manualFlags[flagType] = isChecked;
+            
+            // Update timestamp if any flag is checked
+            const anyFlagged = field.manualFlags.selfIntersection || 
+                             field.manualFlags.straightLine || 
+                             field.manualFlags.bowTie || 
+                             field.manualFlags.otherIssue;
+            
+            if (anyFlagged && !field.manualFlags.flaggedAt) {
+                field.manualFlags.flaggedAt = new Date().toISOString();
+            } else if (!anyFlagged) {
+                field.manualFlags.flaggedAt = null;
+            }
+            
+            // Update parent window data
+            if (window.opener && !window.opener.closed) {
+                try {
+                    const parentField = window.opener.catalogData.find(f => f.ccsFieldId === fieldId);
+                    if (parentField) {
+                        parentField.manualFlags = field.manualFlags;
+                        
+                        // Trigger save to IndexedDB in parent
+                        window.opener.document.dispatchEvent(new CustomEvent('fieldManualFlagUpdated', {
+                            detail: { fieldId: fieldId, manualFlags: field.manualFlags }
+                        }));
+                        
+                        console.log(`✅ Updated manual flags for ${fieldId} in parent window`);
+                    }
+                } catch (error) {
+                    console.error('Error updating parent window:', error);
+                }
+            }
+            
+            // Re-render current view to show updated flag
+            renderCurrentView();
+        }
+        
+        function updateManualNotes(fieldId, notes) {
+            console.log(`📝 Manual notes: ${fieldId} - "${notes}"`);
+            
+            // Find field in allFields
+            const field = allFields.find(f => f.ccsFieldId === fieldId);
+            if (!field) {
+                console.error(`Field not found: ${fieldId}`);
+                return;
+            }
+            
+            // Initialize manualFlags if doesn't exist
+            if (!field.manualFlags) {
+                field.manualFlags = {
+                    selfIntersection: false,
+                    straightLine: false,
+                    bowTie: false,
+                    otherIssue: false,
+                    notes: '',
+                    flaggedAt: null,
+                    flaggedBy: 'user'
+                };
+            }
+            
+            // Update notes
+            field.manualFlags.notes = notes;
+            
+            // Update parent window data
+            if (window.opener && !window.opener.closed) {
+                try {
+                    const parentField = window.opener.catalogData.find(f => f.ccsFieldId === fieldId);
+                    if (parentField) {
+                        if (!parentField.manualFlags) {
+                            parentField.manualFlags = field.manualFlags;
+                        } else {
+                            parentField.manualFlags.notes = notes;
+                        }
+                        
+                        // Trigger save to IndexedDB in parent
+                        window.opener.document.dispatchEvent(new CustomEvent('fieldManualFlagUpdated', {
+                            detail: { fieldId: fieldId, manualFlags: parentField.manualFlags }
+                        }));
+                        
+                        console.log(`✅ Updated manual notes for ${fieldId} in parent window`);
+                    }
+                } catch (error) {
+                    console.error('Error updating parent window:', error);
+                }
+            }
+        }
+        
+        function backToCorrector() {
+            if (window.opener && !window.opener.closed) {
+                window.opener.focus();
+            }
+            window.close();
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

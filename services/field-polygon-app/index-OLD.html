@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCS FieldForce Polygon Intelligence Corrector</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🌍</text></svg>">
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <!-- Application CSS -->
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <!-- Memory-Only Mode Warning Banner -->
+    <div class="alert alert-warning m-3 mb-2" role="alert" style="border-left: 4px solid #ff9800;">
+        <strong>⚠️ Memory-Only Mode Active:</strong> Data stored in browser memory only. 
+        <strong>Export regularly!</strong> All data will be lost when you close or refresh this page.
+    </div>
+    
+    <!-- Header -->
+    <div class="header">
+        <h1><i class="bi bi-geo-alt-fill"></i> CCS FieldForce Polygon Intelligence Corrector</h1>
+        <p>Advanced Polygon Validation & Correction for Carbon Credit Compliance</p>
+    </div>
+    
+    <!-- Main Container -->
+    <div class="main-container" id="mainContainer">
+        <!-- Left Panel: Input & Controls -->
+        <div class="panel">
+            <h5><i class="bi bi-upload"></i> Input & Controls</h5>
+            
+            <!-- File Upload -->
+            <div class="mb-3">
+                <label class="form-label">Import Data</label>
+                <input type="file" class="form-control" id="fileInput" accept=".json,.geojson,.csv">
+                <small class="text-muted">GeoJSON, JSON, or CSV files</small>
+            </div>
+            
+            <!-- Filter Controls (Manager-Friendly) -->
+            <div class="filter-section" id="filterControls">
+                <!-- Filters will be injected here by FilterManager -->
+            </div>
+            
+            <!-- Field Selection -->
+            <div class="mb-3">
+                <label class="form-label">Select Field</label>
+                <select class="form-select" id="fieldSelect">
+                    <option value="">Choose a field...</option>
+                </select>
+                <button class="btn btn-primary w-100 mt-2" id="loadFieldBtn">
+                    <i class="bi bi-box-arrow-in-down"></i> Load Field
+                </button>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2">
+                <button class="btn btn-success" id="validateBtn">
+                    <i class="bi bi-check-circle"></i> Validate Polygon
+                </button>
+                <button class="btn btn-warning" id="correctBtn">
+                    <i class="bi bi-tools"></i> Auto-Correct
+                </button>
+                
+                <!-- BATCH PROCESSING -->
+                <button class="btn btn-primary" id="processAllBtn">
+                    <i class="bi bi-gear"></i> Process All Fields
+                </button>
+                
+                <button class="btn btn-outline-danger" id="clearBtn">
+                    <i class="bi bi-trash"></i> Clear Map
+                </button>
+            </div>
+            
+            <!-- Batch Progress -->
+            <div id="batchProgressSection" class="mt-3" style="display: none;">
+                <h6 style="font-size: 13px;">Batch Processing Progress:</h6>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         id="batchProgressBar" 
+                         role="progressbar" 
+                         style="width: 0%">
+                         0%
+                    </div>
+                </div>
+                <div id="batchStatusText" style="font-size: 12px;"></div>
+            </div>
+            
+            <!-- Manual Editing Section -->
+            <div class="mt-4" id="manualEditingSection">
+                <h6><i class="bi bi-cursor"></i> Manual Editing</h6>
+                <div class="alert alert-info" style="font-size: 12px; padding: 8px;">
+                    <strong>How it works:</strong><br>
+                    1. Click "Enable Edit Mode"<br>
+                    2. Drag numbered dots OR<br>
+                    3. Add/Remove vertices<br>
+                    4. Click "Save Changes"
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" id="enableEditModeBtn">
+                        <i class="bi bi-pencil"></i> Enable Edit Mode
+                    </button>
+                    
+                    <div id="editModeControls" style="display: none;">
+                        <!-- Add/Remove Vertex Buttons -->
+                        <div class="btn-group w-100 mb-2" role="group">
+                            <button class="btn btn-outline-success btn-sm" id="addVertexBtn">
+                                <i class="bi bi-plus-circle"></i> Add Vertex
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" id="removeVertexBtn">
+                                <i class="bi bi-dash-circle"></i> Remove Vertex
+                            </button>
+                        </div>
+                        
+                        <!-- Mode indicator -->
+                        <div id="editModeIndicator" class="alert alert-secondary" style="display: none; padding: 6px; font-size: 11px; margin-bottom: 8px;">
+                            <strong id="modeText">Normal drag mode</strong>
+                        </div>
+                        
+                        <!-- Save/Reset/Cancel -->
+                        <button class="btn btn-success btn-sm w-100 mb-2" id="saveEditsBtn">
+                            <i class="bi bi-save"></i> Save Changes
+                        </button>
+                        <button class="btn btn-warning btn-sm w-100 mb-2" id="resetEditsBtn">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset to Original
+                        </button>
+                        <button class="btn btn-danger btn-sm w-100" id="cancelEditModeBtn">
+                            <i class="bi bi-x-circle"></i> Cancel Editing
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Change Log -->
+                <div id="changeLogSection" class="mt-3" style="display: none;">
+                    <h6 style="font-size: 13px;">Change Log:</h6>
+                    <div id="changeLogList" class="change-log-list">
+                        <!-- Changes will appear here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Export Section -->
+            <div class="mt-4">
+                <h6>Export Data</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-primary" id="exportGeoJSON">
+                        <i class="bi bi-file-earmark-code"></i> GeoJSON
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="exportKML">
+                        <i class="bi bi-file-earmark-text"></i> KML
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="exportCSV">
+                        <i class="bi bi-filetype-csv"></i> CSV
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="exportExcel">
+                        <i class="bi bi-file-earmark-excel"></i> Excel
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Statistics -->
+            <div class="mt-4">
+                <h6>Storage Statistics</h6>
+                <div class="stats-card">
+                    <h6>Total Fields</h6>
+                    <div class="value" id="totalFieldsCount">0</div>
+                </div>
+                <div class="stats-card" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);">
+                    <h6>Valid Fields</h6>
+                    <div class="value" id="validFieldsCount">0</div>
+                </div>
+                <div class="stats-card" style="background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);">
+                    <h6>Corrected Fields</h6>
+                    <div class="value" id="correctedFieldsCount">0</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel: Map -->
+        <div class="panel">
+            <h5><i class="bi bi-map"></i> Interactive Map</h5>
+            
+            <!-- Map Status Message -->
+            <div id="mapStatusMessage" class="alert alert-info" style="margin-bottom: 10px; font-size: 13px;">
+                <strong>📍 No field loaded yet</strong><br>
+                Import data and select a field to see it on the map
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+        </div>
+        
+        <!-- Right Panel: Results & Analysis -->
+        <div class="panel">
+            <!-- Statistics Dashboard (Manager-Friendly) -->
+            <div id="statisticsPanel" class="mb-4">
+                <!-- Statistics will be injected here by StatisticsDashboard -->
+            </div>
+            
+            <hr>
+            
+            <h5><i class="bi bi-clipboard-data"></i> Selected Field</h5>
+            
+            <!-- Field Info -->
+            <div class="mb-3">
+                <h6>Field Information</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th>Field ID:</th>
+                            <td id="fieldIdDisplay">-</td>
+                        </tr>
+                        <tr>
+                            <th>Owner:</th>
+                            <td id="ownerDisplay">-</td>
+                        </tr>
+                        <tr>
+                            <th>Vertices:</th>
+                            <td id="verticesDisplay">-</td>
+                        </tr>
+                        <tr>
+                            <th>Area:</th>
+                            <td id="areaDisplay">-</td>
+                        </tr>
+                        <tr>
+                            <th>Perimeter:</th>
+                            <td id="perimeterDisplay">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Validation Status -->
+            <div class="mb-3">
+                <h6>Validation Status</h6>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-secondary" id="validationStatus">Not Validated</span>
+                    <span class="badge bg-secondary" id="verraStatus">Verra: Unknown</span>
+                </div>
+            </div>
+            
+            <!-- WHY INVALID (Plain English) -->
+            <div id="whyInvalidSection" class="mb-3" style="display: none;">
+                <div class="alert alert-danger">
+                    <h6 class="mb-2"><i class="bi bi-exclamation-triangle-fill"></i> WHY IS IT INVALID?</h6>
+                    <ul id="whyInvalidList" class="mb-0">
+                        <!-- Reasons will be injected here -->
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- HOW TO FIX (Simple Instructions) -->
+            <div id="howToFixSection" class="mb-3" style="display: none;">
+                <div class="alert alert-info">
+                    <h6 class="mb-2"><i class="bi bi-tools"></i> HOW TO FIX IT?</h6>
+                    <ol id="howToFixList" class="mb-0">
+                        <!-- Instructions will be injected here -->
+                    </ol>
+                </div>
+            </div>
+            
+            <!-- Validation Results (Technical Details - Collapsed by default) -->
+            <details class="mb-3">
+                <summary><h6 class="d-inline">Technical Details</h6></summary>
+                <div id="validationResults" class="mt-2"></div>
+            </details>
+            
+            <!-- Verra Compliance -->
+            <div id="verraCompliance"></div>
+        </div>
+    </div>
+    
+    <!-- Catalog Container (Hidden by default) -->
+    <div class="catalog-container" id="catalogContainer" style="display: none;">
+        <div class="catalog-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-collection"></i> Field Polygon Catalog</h2>
+                    <p>Complete Dataset Overview & Management</p>
+                </div>
+                <button class="btn btn-light" id="closeCatalog" onclick="app.toggleCatalog()">
+                    <i class="bi bi-x-lg"></i> Back to Corrector
+                </button>
+            </div>
+        </div>
+        
+        <div class="catalog-controls">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search fields...">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="catalogSort" onchange="app.catalogManager.setSortBy(this.value); app.renderCatalog()">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="area_large">Largest Area</option>
+                        <option value="area_small">Smallest Area</option>
+                        <option value="issues">Most Issues</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="catalogFilter" onchange="app.catalogManager.setFilterBy(this.value); app.renderCatalog()">
+                        <option value="all">All Fields</option>
+                        <option value="corrected">Corrected Only</option>
+                        <option value="pending">Pending Review</option>
+                        <option value="self_intersect">Self-Intersections</option>
+                        <option value="verra_issues">Verra Issues</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-success w-100" onclick="app.renderCatalog()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <span class="badge bg-info" id="catalogStats">Loading...</span>
+            </div>
+        </div>
+        
+        <div class="catalog-content" id="catalogContent">
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-3">Loading catalog...</p>
+            </div>
+        </div>
+        
+        <div class="catalog-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="app.catalogManager.prevPage(); app.renderCatalog()">
+                        <i class="bi bi-chevron-left"></i> Previous
+                    </button>
+                    <span class="mx-3" id="catalogPageInfo">Page 1 of 1</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="app.catalogManager.nextPage(); app.renderCatalog()">
+                        Next <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+                <div>
+                    <select class="form-select form-select-sm" onchange="app.catalogManager.setItemsPerPage(parseInt(this.value)); app.renderCatalog()">
+                        <option value="12">12 per page</option>
+                        <option value="24">24 per page</option>
+                        <option value="48">48 per page</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Catalog Tab Button -->
+    <div class="catalog-tab">
+        <button class="btn btn-info" id="toggleCatalog">
+            <i class="bi bi-collection"></i> View Catalog
+        </button>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-light" role="status"></div>
+        <p class="mt-3">Processing...</p>
+    </div>
+    
+    <!-- External JavaScript Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Application JavaScript (ES6 Modules) -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

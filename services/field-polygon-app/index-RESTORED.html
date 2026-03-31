@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCS FieldForce Polygon Intelligence Corrector</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1><i class="bi bi-tree-fill"></i> CCS FieldForce Polygon Intelligence Corrector</h1>
+        <p class="mb-0">Enhanced validation with clear criteria - Focus on genuine data quality</p>
+    </div>
+    
+    <!-- Memory-Only Mode Warning -->
+    <div id="memoryWarning" class="alert alert-warning" role="alert" style="display: none; margin: 10px 20px; border-radius: 8px;">
+        <strong><i class="bi bi-exclamation-triangle-fill"></i> Memory-Only Mode Active:</strong> 
+        Data stored in browser memory only. <strong>Export regularly!</strong> All data will be lost when you close or refresh this page.
+    </div>
+    
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Panel: Field Selection & Processing -->
+        <div class="panel">
+            <h5><i class="bi bi-folder"></i> Field Data & Filters</h5>
+            
+            <div class="mb-3">
+                <label class="form-label">Load Field Data</label>
+                <input type="file" id="fileInput" class="form-control" accept=".csv,.json,.geojson">
+                <small class="text-muted">GeoJSON, JSON, or CSV files</small>
+            </div>
+            
+            <!-- Search Box -->
+            <div class="search-box" style="position: relative; margin-bottom: 20px;">
+                <i class="bi bi-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d;"></i>
+                <input type="text" id="searchInput" class="form-control" style="padding-left: 40px;" placeholder="Search fields...">
+            </div>
+            
+            <!-- Filter Section -->
+            <div class="filter-section" style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px; max-height: 300px; overflow-y: auto;">
+                <h6><i class="bi bi-funnel"></i> Filter Fields</h6>
+                <div id="filterControls">
+                    <!-- Filters will be injected here by FilterManager -->
+                </div>
+            </div>
+            
+            <!-- Field List with Pagination -->
+            <div class="mt-4" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Fields: <span id="field-count">0</span> / <span id="filtered-count">0</span></h6>
+                    <div class="pagination-info">
+                        Page <span id="current-page">1</span> of <span id="total-pages">1</span>
+                    </div>
+                </div>
+                
+                <div id="field-list" style="flex: 1; overflow-y: auto; margin-bottom: 10px;">
+                    <!-- Field cards will be populated here -->
+                </div>
+                
+                <div class="pagination-controls" style="display: flex; gap: 10px; justify-content: space-between;">
+                    <button class="btn btn-sm btn-outline-secondary" id="prevPageBtn" disabled style="flex: 1;">
+                        <i class="bi bi-chevron-left"></i> Previous
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="nextPageBtn" disabled style="flex: 1;">
+                        Next <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel: Map -->
+        <div class="map-container" style="position: relative;">
+            <div id="map" style="width: 100%; height: 100%;"></div>
+            
+            <!-- Map Legend (Collapsible) -->
+            <div class="legend" id="mapLegend" style="position: absolute; top: 10px; right: 10px; background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 250px; max-height: calc(100% - 20px); overflow-y: auto;">
+                <div class="legend-toggle" id="legendToggle" style="cursor: pointer; text-align: right; margin-bottom: 10px;">
+                    <i class="bi bi-chevron-left"></i>
+                </div>
+                <div class="legend-title" style="font-weight: 600; margin-bottom: 15px;">
+                    <i class="bi bi-map"></i> Map Legend
+                </div>
+                <div id="legendContent">
+                    <!-- Legend content will be populated here -->
+                    <p class="text-muted" style="font-size: 12px;">Import data to see legend</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Panel: Field Analysis & Actions -->
+        <div class="panel">
+            <h5><i class="bi bi-gear"></i> Enhanced Field Analysis</h5>
+            
+            <!-- Statistics Dashboard -->
+            <div id="statisticsDashboard">
+                <!-- Statistics will be injected here -->
+            </div>
+            
+            <!-- Selected Field Info -->
+            <div class="mt-4" id="selectedFieldInfo">
+                <h6>Selected Field</h6>
+                <div id="fieldDetails">
+                    <p class="text-muted" style="font-size: 14px;">No field selected. Click a field card to view details.</p>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2 mt-4">
+                <button class="btn btn-success" id="validateBtn">
+                    <i class="bi bi-check-circle"></i> Validate Polygon
+                </button>
+                <button class="btn btn-warning" id="correctBtn">
+                    <i class="bi bi-tools"></i> Auto-Correct
+                </button>
+                <button class="btn btn-primary" id="processAllBtn">
+                    <i class="bi bi-gear"></i> Process All Fields
+                </button>
+            </div>
+            
+            <!-- Manual Editing Section -->
+            <div class="mt-4">
+                <h6>✏️ Manual Editing</h6>
+                <div class="alert alert-info" style="font-size: 12px; padding: 8px;">
+                    <strong>How it works:</strong><br>
+                    1. Click "Enable Edit Mode"<br>
+                    2. Drag numbered dots OR<br>
+                    3. Add/Remove vertices<br>
+                    4. Click "Save Changes"
+                </div>
+                <button class="btn btn-outline-primary w-100" id="enableEditBtn">
+                    <i class="bi bi-pencil"></i> Enable Edit Mode
+                </button>
+                <div id="editControls" style="display: none; margin-top: 10px;">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-success" id="addVertexBtn">
+                            <i class="bi bi-plus-circle"></i> Add Vertex
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" id="removeVertexBtn">
+                            <i class="bi bi-dash-circle"></i> Remove Vertex
+                        </button>
+                        <button class="btn btn-sm btn-success" id="saveChangesBtn">
+                            <i class="bi bi-save"></i> Save Changes
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="cancelEditBtn">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    </div>
+                    <div id="modeIndicator" class="alert alert-primary mt-2" style="font-size: 12px; padding: 8px; display: none;"></div>
+                </div>
+            </div>
+            
+            <!-- Export Options -->
+            <div class="mt-4">
+                <h6>📤 Export Data</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-info" id="exportGeoJSONBtn">
+                        <i class="bi bi-file-earmark-code"></i> GeoJSON
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" id="exportKMLBtn">
+                        <i class="bi bi-map"></i> KML
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" id="exportCSVBtn">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; text-align: center;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div id="loadingMessage" style="margin-top: 15px; font-weight: 500;">Processing...</div>
+            <div id="loadingProgress" style="margin-top: 10px; font-size: 14px; color: #6c757d;"></div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
+    
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

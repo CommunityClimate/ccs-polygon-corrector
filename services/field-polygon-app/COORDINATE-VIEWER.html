@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coordinate Viewer - Debug Tool</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #252526;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h1 {
+            color: #4ec9b0;
+            margin: 0 0 20px 0;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .output {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #3e3e42;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        .info { color: #569cd6; }
+        pre {
+            margin: 5px 0;
+            white-space: pre-wrap;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #3e3e42;
+            text-align: left;
+        }
+        th {
+            background: #0e639c;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #2d2d30;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Coordinate Viewer & Debug Tool</h1>
+        
+        <div>
+            <p class="info">This page lets you inspect your field coordinates without using the browser console.</p>
+            <p class="warning">⚠️ Open this page AFTER importing your data in the main app.</p>
+        </div>
+        
+        <div>
+            <button onclick="checkCoordinates()">Check Coordinates</button>
+            <button onclick="testDraw()">Test Draw Polygon</button>
+            <button onclick="checkMapLayers()">Check Map Layers</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+        
+        <div id="output" class="output">
+            <p class="info">Click "Check Coordinates" to start...</p>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const className = type;
+            output.innerHTML += `<pre class="${className}">${message}</pre>`;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '<p class="info">Output cleared. Click a button to run tests.</p>';
+        }
+
+        function checkCoordinates() {
+            clearOutput();
+            log('=== COORDINATE CHECK ===', 'success');
+            
+            try {
+                // Try to access data through window
+                if (!window.opener) {
+                    log('❌ This page needs to be opened from the main app!', 'error');
+                    log('Instructions:', 'warning');
+                    log('1. Keep the main app open', 'info');
+                    log('2. Import your data there first', 'info');
+                    log('3. Then open this page from that tab (right-click → Open in new tab)', 'info');
+                    return;
+                }
+                
+                const mainApp = window.opener.app;
+                const StorageService = window.opener.StorageService;
+                
+                if (!mainApp || !StorageService) {
+                    log('❌ Cannot access app data!', 'error');
+                    log('Make sure you imported data in the main app first.', 'warning');
+                    return;
+                }
+                
+                const allFields = StorageService.getAllFields();
+                log(`✅ Found ${allFields.length} fields in storage`, 'success');
+                
+                if (allFields.length === 0) {
+                    log('⚠️ No fields loaded. Import data in the main app first!', 'warning');
+                    return;
+                }
+                
+                // Check first 5 fields
+                log('\n📊 First 5 Fields:', 'success');
+                
+                let html = '<table><tr><th>Field ID</th><th>Vertices</th><th>First Vertex</th><th>Lat</th><th>Lng</th><th>Valid?</th></tr>';
+                
+                for (let i = 0; i < Math.min(5, allFields.length); i++) {
+                    const field = allFields[i];
+                    const firstCoord = field.originalCoordinates[0];
+                    const lat = firstCoord[0];
+                    const lng = firstCoord[1];
+                    
+                    const latValid = Math.abs(lat) <= 90;
+                    const lngValid = Math.abs(lng) <= 180;
+                    const valid = latValid && lngValid ? '✅' : '❌';
+                    
+                    html += `<tr>
+                        <td>${field.ccsFieldId}</td>
+                        <td>${field.originalCoordinates.length}</td>
+                        <td>[${lat.toFixed(6)}, ${lng.toFixed(6)}]</td>
+                        <td class="${latValid ? 'success' : 'error'}">${lat.toFixed(6)}</td>
+                        <td class="${lngValid ? 'success' : 'error'}">${lng.toFixed(6)}</td>
+                        <td>${valid}</td>
+                    </tr>`;
+                }
+                
+                html += '</table>';
+                document.getElementById('output').innerHTML += html;
+                
+                // Summary
+                const field1 = allFields[0];
+                const lat = field1.originalCoordinates[0][0];
+                const lng = field1.originalCoordinates[0][1];
+                
+                log('\n📝 Analysis:', 'info');
+                log(`Latitude: ${lat.toFixed(6)} (should be -90 to 90)`, Math.abs(lat) <= 90 ? 'success' : 'error');
+                log(`Longitude: ${lng.toFixed(6)} (should be -180 to 180)`, Math.abs(lng) <= 180 ? 'success' : 'error');
+                
+                if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+                    log('\n❌ COORDINATES ARE INVALID!', 'error');
+                    log('Coordinates are out of valid range.', 'error');
+                } else if (Math.abs(lat) < 37 && Math.abs(lng) < 52) {
+                    log('\n✅ Coordinates look valid for Africa!', 'success');
+                } else {
+                    log('\n⚠️ Coordinates are valid but outside typical Africa range', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log('Make sure the main app is open and data is imported.', 'warning');
+            }
+        }
+
+        function testDraw() {
+            clearOutput();
+            log('=== TEST DRAW POLYGON ===', 'success');
+            
+            try {
+                if (!window.opener) {
+                    log('❌ This page needs to be opened from the main app!', 'error');
+                    return;
+                }
+                
+                const mainApp = window.opener.app;
+                const StorageService = window.opener.StorageService;
+                const L = window.opener.L;
+                
+                const allFields = StorageService.getAllFields();
+                if (allFields.length === 0) {
+                    log('⚠️ No fields to draw!', 'warning');
+                    return;
+                }
+                
+                const field1 = allFields[0];
+                log(`Attempting to draw: ${field1.ccsFieldId}`, 'info');
+                log(`Vertices: ${field1.originalCoordinates.length}`, 'info');
+                
+                // Draw on main app's map
+                const testPoly = L.polygon(field1.originalCoordinates, {
+                    color: '#00ff00',
+                    weight: 10,
+                    opacity: 1.0,
+                    fillColor: '#00ff00',
+                    fillOpacity: 0.8
+                }).addTo(mainApp.mapManager.map);
+                
+                mainApp.mapManager.map.fitBounds(testPoly.getBounds());
+                
+                const bounds = testPoly.getBounds();
+                log('\n✅ THICK GREEN test polygon drawn!', 'success');
+                log(`SW Corner: [${bounds.getSouth().toFixed(6)}, ${bounds.getWest().toFixed(6)}]`, 'info');
+                log(`NE Corner: [${bounds.getNorth().toFixed(6)}, ${bounds.getEast().toFixed(6)}]`, 'info');
+                log('\nCheck the main app - you should see a THICK GREEN polygon!', 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function checkMapLayers() {
+            clearOutput();
+            log('=== MAP LAYERS CHECK ===', 'success');
+            
+            try {
+                if (!window.opener) {
+                    log('❌ This page needs to be opened from the main app!', 'error');
+                    return;
+                }
+                
+                const mainApp = window.opener.app;
+                const L = window.opener.L;
+                
+                const map = mainApp.mapManager.map;
+                const layers = Object.keys(map._layers);
+                
+                log(`✅ Map has ${layers.length} layers`, 'success');
+                log('\nLayer details:', 'info');
+                
+                for (const layerId of layers) {
+                    const layer = map._layers[layerId];
+                    const type = layer.constructor.name;
+                    log(`  - ${type} (ID: ${layerId})`, 'info');
+                }
+                
+                log(`\nCurrent zoom: ${map.getZoom()}`, 'info');
+                log(`Current center: [${map.getCenter().lat.toFixed(6)}, ${map.getCenter().lng.toFixed(6)}]`, 'info');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

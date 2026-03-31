@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCS FieldForce Polygon Intelligence Corrector</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 18px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+        .header p { margin: 4px 0 0 0; opacity: 0.9; font-size: 12px; }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            gap: 12px;
+            padding: 12px;
+            height: calc(100vh - 75px);
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 18px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .panel h5 {
+            color: #2c3e50;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .map-container {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+            height: 100%;
+            position: relative;
+            background: white;
+        }
+        
+        .map-panel-header {
+            background: white;
+            padding: 12px 16px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .map-panel-header h5 { margin: 0; font-size: 15px; font-weight: 600; color: #2c3e50; }
+        
+        #map { width: 100%; height: calc(100% - 50px); }
+        
+        /* Statistics Boxes */
+        .stat-box {
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        
+        .stat-box h6 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-box .big-number { font-size: 32px; font-weight: 700; margin: 0; line-height: 1; }
+        .stat-box .percentage { font-size: 14px; margin-top: 4px; opacity: 0.8; }
+        
+        .stat-box.total { background: white; border: 2px solid #e9ecef; }
+        .stat-box.valid { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-left: 4px solid #28a745; color: #155724; }
+        .stat-box.fixable { background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-left: 4px solid #ffc107; color: #856404; }
+        .stat-box.manual { background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545; color: #721c24; }
+        
+        /* Collapsible sections */
+        .collapse-btn {
+            width: 100%;
+            text-align: left;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .collapse-btn:hover { background: #e9ecef; }
+        .collapse-btn i { margin-right: 5px; }
+        
+        .count-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+        
+        .count-badge.all { background: #e7f3ff; color: #004085; }
+        .count-badge.valid { background: #d4edda; color: #155724; }
+        .count-badge.invalid { background: #f8d7da; color: #721c24; }
+        .count-badge.fixable { background: #fff3cd; color: #856404; }
+        .count-badge.manual { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1><i class="bi bi-geo-alt-fill"></i> CCS FieldForce Polygon Intelligence Corrector</h1>
+        <p>Advanced Polygon Validation & Correction for Carbon Credit Compliance</p>
+    </div>
+    
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Panel: All Controls -->
+        <div class="panel">
+            <h5><i class="bi bi-upload"></i> Input & Controls</h5>
+            
+            <!-- 1. IMPORT -->
+            <div class="mb-3">
+                <label class="form-label" style="font-weight: 600; font-size: 12px;">Import Data</label>
+                <input type="file" class="form-control form-control-sm" id="fileInput" accept=".json,.geojson,.csv">
+                <small class="text-muted" style="font-size: 11px;">GeoJSON, JSON, or CSV files</small>
+            </div>
+            
+            <!-- 2. FILTERS (Collapsible) -->
+            <button class="collapse-btn" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                <i class="bi bi-funnel-fill"></i> FILTER FIELDS
+            </button>
+            <div class="collapse" id="filterCollapse">
+                <div id="filterControls" style="margin-bottom: 15px;">
+                    <!-- Filters injected here -->
+                </div>
+            </div>
+            
+            <!-- 3. FIELD SELECTION -->
+            <div class="mb-3">
+                <label class="form-label" style="font-weight: 600; font-size: 12px;">Select Field</label>
+                <select class="form-select form-select-sm" id="fieldSelect">
+                    <option value="">Choose a field...</option>
+                </select>
+                <button class="btn btn-primary btn-sm w-100 mt-2" id="loadFieldBtn">
+                    <i class="bi bi-box-arrow-in-down"></i> Load Field
+                </button>
+            </div>
+            
+            <!-- 4. BATCH PROCESSING (Most Important!) -->
+            <div class="mb-3">
+                <div class="alert alert-warning" style="padding: 8px; font-size: 11px; margin-bottom: 8px;">
+                    <strong>⚠️ IMPORTANT:</strong> After importing, click "Process All Fields" to run Verra validation on all fields and populate accurate statistics.
+                </div>
+                <button class="btn btn-primary btn-sm w-100" id="processAllBtn">
+                    <i class="bi bi-gear-fill"></i> Process All Fields
+                </button>
+                <small class="text-muted" style="font-size: 10px; display: block; margin-top: 4px;">
+                    Validates & auto-corrects all fields (2-5 minutes)
+                </small>
+                
+                <!-- PROGRESS SECTION (Hidden by default) -->
+                <div id="batchProgressSection" style="display: none; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; border: 2px solid #0d6efd;">
+                    <div style="margin-bottom: 8px;">
+                        <strong style="color: #0d6efd; font-size: 12px;">
+                            <i class="bi bi-hourglass-split"></i> Processing Fields...
+                        </strong>
+                    </div>
+                    <div class="progress" style="height: 25px; margin-bottom: 8px;">
+                        <div id="batchProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%; font-size: 12px; font-weight: bold;">0%</div>
+                    </div>
+                    <div id="batchStatusText" style="font-size: 11px; color: #666;">
+                        Starting...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- INTERNAL REPORTS (For tracking only) -->
+            <div class="mb-3">
+                <div style="border-top: 1px solid #dee2e6; padding-top: 10px; margin-bottom: 8px;">
+                    <label class="form-label fw-bold" style="font-size: 11px; margin-bottom: 6px;">📊 INTERNAL REPORTS:</label>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm w-100" id="autoCorrectionReportBtn" title="Internal tracking report - not for Verra">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Auto-Correction Report
+                </button>
+                <small class="text-muted" style="font-size: 10px; display: block; margin-top: 4px;">
+                    Shows what was auto-corrected (internal use only)
+                </small>
+            </div>
+            
+            <!-- 5. SINGLE FIELD ACTIONS (After loading a field) -->
+            <div id="singleFieldActions" style="display: none;">
+                <div style="border-top: 1px solid #dee2e6; padding-top: 10px; margin-bottom: 10px;">
+                    <label class="form-label fw-bold" style="font-size: 11px; margin-bottom: 6px;">SINGLE FIELD ACTIONS:</label>
+                </div>
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-outline-success btn-sm" id="validateBtn">
+                        <i class="bi bi-check-circle"></i> Validate This Field
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" id="correctBtn">
+                        <i class="bi bi-tools"></i> Auto-Correct This Field
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 6. MANUAL EDITING (Collapsible) -->
+            <button class="collapse-btn" type="button" data-bs-toggle="collapse" data-bs-target="#editCollapse">
+                <i class="bi bi-pencil-fill"></i> MANUAL EDITING
+            </button>
+            <div class="collapse" id="editCollapse">
+                <div class="alert alert-info" style="font-size: 10px; padding: 6px; margin-bottom: 8px;">
+                    1. Enable Edit Mode<br>2. Drag dots OR Add/Remove<br>3. Save Changes
+                </div>
+                <button class="btn btn-outline-primary btn-sm w-100 mb-2" id="enableEditBtn">
+                    <i class="bi bi-pencil"></i> Enable Edit Mode
+                </button>
+                <div id="editControls" style="display: none;">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-success" id="addVertexBtn">
+                            <i class="bi bi-plus-circle"></i> Add Vertex
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" id="removeVertexBtn">
+                            <i class="bi bi-dash-circle"></i> Remove Vertex
+                        </button>
+                        <button class="btn btn-sm btn-success" id="saveChangesBtn">
+                            <i class="bi bi-save"></i> Save Changes
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="cancelEditBtn">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 7. EXPORT (Collapsible) -->
+            <button class="collapse-btn" type="button" data-bs-toggle="collapse" data-bs-target="#exportCollapse">
+                <i class="bi bi-download"></i> EXPORT DATA
+            </button>
+            <div class="collapse" id="exportCollapse">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-info" id="exportGeoJSONBtn">
+                        <i class="bi bi-file-earmark-code"></i> GeoJSON
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" id="exportKMLBtn">
+                        <i class="bi bi-map"></i> KML
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" id="exportCSVBtn">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel: Map -->
+        <div class="map-container">
+            <div class="map-panel-header">
+                <h5><i class="bi bi-map"></i> Interactive Map</h5>
+                <button class="btn btn-sm btn-outline-secondary" id="toggleMapLegend" style="position: absolute; right: 15px; top: 10px;">
+                    <i class="bi bi-list"></i> Legend
+                </button>
+            </div>
+            <div id="map"></div>
+            
+            <!-- Manual Fix Guidance Section (Hidden by default) -->
+            <div id="manual-fix-guidance" style="display: none;" class="mt-3"></div>
+        </div>
+        
+        <!-- Right Panel: ONLY Statistics -->
+        <div class="panel">
+            <h5><i class="bi bi-bar-chart-fill"></i> Field Summary</h5>
+            
+            <!-- TOTAL -->
+            <div class="stat-box total">
+                <h6>Total Fields</h6>
+                <div class="big-number" id="totalFieldsCount">0</div>
+            </div>
+            
+            <!-- VERRA READY TOTAL (Valid + Auto-Corrected) -->
+            <div class="stat-box" style="background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%); border-left: 4px solid #2e7d32; color: #1b5e20;">
+                <h6><i class="bi bi-patch-check-fill"></i> VERRA READY</h6>
+                <div class="big-number" id="verraReadyCount">0</div>
+                <div class="percentage" id="verraReadyPercentage">0%</div>
+                <small style="display: block; margin-top: 4px; font-size: 11px; font-weight: 600;">
+                    Valid + Auto-Corrected (for submission)
+                </small>
+            </div>
+            
+            <!-- NOT VALIDATED YET (shown when fields haven't been processed) -->
+            <div class="stat-box" id="notValidatedBox" style="background: linear-gradient(135deg, #fff3cd 0%, #ffecb5 100%); border-left: 4px solid #ff9800; color: #856404; display: none;">
+                <h6><i class="bi bi-hourglass-split"></i> NOT VALIDATED YET</h6>
+                <div class="big-number" id="notValidatedCount">0</div>
+                <div class="percentage" id="notValidatedPercentage">0%</div>
+                <small style="display: block; margin-top: 4px; font-size: 11px; font-weight: 600;">
+                    Click "Process All Fields" to validate
+                </small>
+            </div>
+            
+            <!-- VALID -->
+            <div class="stat-box valid">
+                <h6><i class="bi bi-check-circle-fill"></i> VALID</h6>
+                <div class="big-number" id="validFieldsCount">0</div>
+                <div class="percentage" id="validPercentage">0%</div>
+                <small style="display: block; margin-top: 4px; font-size: 11px;">Ready for Verra</small>
+            </div>
+            
+            <!-- AUTO-CORRECTED -->
+            <div class="stat-box" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-left: 4px solid #28a745; color: #155724;">
+                <h6><i class="bi bi-check-circle-fill"></i> AUTO-CORRECTED</h6>
+                <div class="big-number" id="fixableFieldsCount">0</div>
+                <div class="percentage" id="fixablePercentage">0%</div>
+            </div>
+            
+            <!-- NEEDS MANUAL EDIT -->
+            <div class="stat-box manual">
+                <h6><i class="bi bi-x-circle-fill"></i> NEEDS MANUAL EDIT</h6>
+                <div class="big-number" id="manualFieldsCount">0</div>
+                <div class="percentage" id="manualPercentage">0%</div>
+                <small style="display: block; margin-top: 4px; font-size: 11px;">Requires manual fixing</small>
+            </div>
+            
+            <!-- DUPLICATES -->
+            <div class="stat-box" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #2196f3; color: #0d47a1;">
+                <h6><i class="bi bi-files"></i> DUPLICATE FIELD IDs</h6>
+                <div class="big-number" id="duplicateFieldsCount">0</div>
+                <div class="percentage" id="duplicatePercentage">0%</div>
+                <small style="display: block; margin-top: 4px; font-size: 11px;">Same field ID appears multiple times</small>
+            </div>
+            
+            <!-- Help Message -->
+            <div class="alert alert-info" style="font-size: 11px; padding: 8px; margin-top: 15px;">
+                <strong>💡 Understanding Statistics:</strong><br>
+                <div style="margin-top: 6px;">
+                    <strong>BEFORE "Process All Fields":</strong><br>
+                    • Shows "NOT VALIDATED YET"<br>
+                    • Other stats show 0<br>
+                    <br>
+                    <strong>AFTER "Process All Fields":</strong><br>
+                    • VALID: ~80% (ready for Verra)<br>
+                    • CAN BE FIXED: ~15% (auto-fixable)<br>
+                    • NEEDS MANUAL: ~5% (manual editing)<br>
+                    <br>
+                    <strong>⚠️ "NOT VALIDATED YET" means:</strong><br>
+                    Your polygons are imported but NOT checked yet.<br>
+                    Most are probably FINE!<br>
+                    Click "Process All Fields" to find out.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 10px; text-align: center;">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div id="loadingMessage" style="margin-top: 15px; font-weight: 500;">Processing...</div>
+            <div id="loadingProgress" style="margin-top: 10px; font-size: 14px; color: #6c757d;"></div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
+    
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

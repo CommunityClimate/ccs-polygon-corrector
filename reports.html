@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Reports & Metrics</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="bi bi-graph-up"></i> System Reports & Metrics</h1>
+            <p class="mb-0">Field Polygon Validation System - Analytics Dashboard</p>
+        </div>
+        
+        <!-- Quick Stats Row -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="stat-label">Total Fields</div>
+                    <div class="stat-number" id="totalFields">0</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="stat-label">Verra Ready</div>
+                    <div class="stat-number" style="color: #28a745;" id="verraReady">0</div>
+                    <small id="verraReadyPercent">0%</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="stat-label">Manual Flags</div>
+                    <div class="stat-number" style="color: #dc3545;" id="manualFlagsTotal">0</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="stat-label">Auto-Corrected</div>
+                    <div class="stat-number" style="color: #ffc107;" id="autoCorrectedTotal">0</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 1 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <h5><i class="bi bi-pie-chart"></i> Validation Status</h5>
+                    <div class="chart-container">
+                        <canvas id="validationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <h5><i class="bi bi-bar-chart"></i> Correction Methods</h5>
+                    <div class="chart-container">
+                        <canvas id="correctionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 2 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <h5><i class="bi bi-flag-fill"></i> Manual Flags Breakdown</h5>
+                    <div class="chart-container">
+                        <canvas id="manualFlagsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <h5><i class="bi bi-rulers"></i> Field Size Distribution</h5>
+                    <div class="chart-container">
+                        <canvas id="sizeDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Buttons -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h5><i class="bi bi-download"></i> Export Reports</h5>
+                    <p class="text-muted small">
+                        <strong>Note:</strong> This reports page reads data from your browser's IndexedDB. 
+                        Your data is NOT deleted when you close this page. Simply close this tab to return to the main app.
+                    </p>
+                    <button class="btn btn-primary me-2" onclick="exportToPNG()">
+                        <i class="bi bi-image"></i> Export as PNG
+                    </button>
+                    <button class="btn btn-success me-2" onclick="printReport()">
+                        <i class="bi bi-printer"></i> Print Report
+                    </button>
+                    <button class="btn btn-info me-2" onclick="window.location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.close()">
+                        <i class="bi bi-x-circle"></i> Close Reports Tab
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        // IMPORTANT: Access StorageService from the opener window (main app)
+        // Reports opens in new tab, so we need to access the main app's data
+        let StorageService;
+        
+        if (window.opener && window.opener.StorageService) {
+            // Opened from main app - use its StorageService
+            StorageService = window.opener.StorageService;
+            console.log('📊 Using StorageService from main app window');
+        } else {
+            // Fallback: import our own (but data will be empty)
+            const module = await import('./services/storage-service.js');
+            StorageService = module.StorageService;
+            console.warn('⚠️ Could not access main app - using local StorageService (data may be empty)');
+        }
+        
+        // Load data and generate charts
+        async function loadData() {
+            const fields = StorageService.getAllFields();  // Remove await - it's synchronous
+            
+            console.log('📊 Reports: Loaded fields:', fields.length);
+            console.log('📊 First field sample:', fields[0]);
+            
+            // Calculate statistics
+            const stats = {
+                total: fields.length,
+                valid: 0,
+                invalid: 0,
+                autoCorrected: 0,
+                manuallyCorrected: 0,
+                needsManual: 0,
+                manualFlags: {
+                    total: 0,
+                    selfIntersection: 0,
+                    straightLine: 0,
+                    bowTie: 0,
+                    otherIssue: 0
+                },
+                sizeDistribution: {
+                    tooSmall: 0,   // < 0.2 ha
+                    small: 0,       // 0.2 - 1 ha
+                    medium: 0,      // 1 - 5 ha
+                    large: 0,       // 5 - 20 ha
+                    tooLarge: 0     // > 20 ha
+                }
+            };
+            
+            fields.forEach(field => {
+                // Validation status
+                if (field.validation?.verra?.overallStatus === 'PASS') {
+                    stats.valid++;
+                } else if (field.validation?.verra?.overallStatus === 'FIXABLE') {
+                    stats.invalid++;
+                    stats.autoCorrected++;  // Count FIXABLE as auto-correctable
+                } else if (field.validation?.verra?.overallStatus === 'NEEDS_MANUAL_FIX') {
+                    stats.needsManual++;
+                } else {
+                    stats.invalid++;
+                }
+                
+                // Manually corrected fields (where manual edit was applied)
+                if (field.correction?.applied && field.correction.method === 'manual_edit') {
+                    stats.manuallyCorrected++;
+                }
+                
+                // Manual flags
+                if (field.manualFlags) {
+                    let hasFlag = false;
+                    if (field.manualFlags.selfIntersection) {
+                        stats.manualFlags.selfIntersection++;
+                        hasFlag = true;
+                    }
+                    if (field.manualFlags.straightLine) {
+                        stats.manualFlags.straightLine++;
+                        hasFlag = true;
+                    }
+                    if (field.manualFlags.bowTie) {
+                        stats.manualFlags.bowTie++;
+                        hasFlag = true;
+                    }
+                    if (field.manualFlags.otherIssue) {
+                        stats.manualFlags.otherIssue++;
+                        hasFlag = true;
+                    }
+                    if (hasFlag) stats.manualFlags.total++;
+                }
+                
+                // Size distribution
+                const area = field.validation?.metrics?.areaHa || 0;
+                if (area < 0.2) stats.sizeDistribution.tooSmall++;
+                else if (area < 1) stats.sizeDistribution.small++;
+                else if (area < 5) stats.sizeDistribution.medium++;
+                else if (area < 20) stats.sizeDistribution.large++;
+                else stats.sizeDistribution.tooLarge++;
+            });
+            
+            console.log('📊 Final stats calculated:', stats);
+            console.log('📊 Verra Ready:', stats.valid + stats.autoCorrected + stats.manuallyCorrected);
+            
+            // Get duplicates from import stats
+            const importStats = StorageService.getImportStats();
+            const duplicatesFound = importStats.duplicatesFound || 0;
+            
+            console.log('📊 Duplicates found in source CSV:', duplicatesFound);
+            
+            // Update quick stats - Total includes duplicates
+            const totalWithDuplicates = stats.total + duplicatesFound;
+            document.getElementById('totalFields').textContent = totalWithDuplicates.toLocaleString();
+            
+            const verraReady = stats.valid + stats.autoCorrected + stats.manuallyCorrected;
+            document.getElementById('verraReady').textContent = verraReady.toLocaleString();
+            const verraPercent = stats.total > 0 ? Math.round((verraReady / stats.total) * 100) : 0;
+            document.getElementById('verraReadyPercent').textContent = `${verraPercent}%`;
+            document.getElementById('manualFlagsTotal').textContent = stats.manualFlags.total.toLocaleString();
+            document.getElementById('autoCorrectedTotal').textContent = stats.autoCorrected.toLocaleString();
+            
+            console.log('📊 Creating charts...');
+            
+            // Create charts
+            createValidationChart(stats);
+            createCorrectionChart(stats);
+            createManualFlagsChart(stats);
+            createSizeDistributionChart(stats);
+        }
+        
+        function createValidationChart(stats) {
+            const ctx = document.getElementById('validationChart');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Valid', 'Invalid', 'Needs Manual'],
+                    datasets: [{
+                        data: [stats.valid, stats.invalid, stats.needsManual],
+                        backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+        
+        function createCorrectionChart(stats) {
+            const ctx = document.getElementById('correctionChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Already Valid', 'Auto-Correctable', 'Needs Manual', 'Manually Corrected'],
+                    datasets: [{
+                        label: 'Fields',
+                        data: [stats.valid, stats.autoCorrected, stats.needsManual, stats.manuallyCorrected],
+                        backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#667eea']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+        
+        function createManualFlagsChart(stats) {
+            const ctx = document.getElementById('manualFlagsChart');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Self-Intersection', 'Straight Line', 'Bow-Tie', 'Other Issue'],
+                    datasets: [{
+                        data: [
+                            stats.manualFlags.selfIntersection,
+                            stats.manualFlags.straightLine,
+                            stats.manualFlags.bowTie,
+                            stats.manualFlags.otherIssue
+                        ],
+                        backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#6c757d']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+        
+        function createSizeDistributionChart(stats) {
+            const ctx = document.getElementById('sizeDistributionChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['< 0.2 ha', '0.2-1 ha', '1-5 ha', '5-20 ha', '> 20 ha'],
+                    datasets: [{
+                        label: 'Number of Fields',
+                        data: [
+                            stats.sizeDistribution.tooSmall,
+                            stats.sizeDistribution.small,
+                            stats.sizeDistribution.medium,
+                            stats.sizeDistribution.large,
+                            stats.sizeDistribution.tooLarge
+                        ],
+                        backgroundColor: '#667eea'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🔄 Reports page loaded, fetching data from IndexedDB...');
+            
+            try {
+                // Show loading
+                document.getElementById('totalFields').textContent = 'Loading...';
+                
+                await loadData();
+                
+                console.log('✅ Reports data loaded successfully');
+            } catch (error) {
+                console.error('❌ Error loading reports data:', error);
+                alert('Error loading data from IndexedDB. Please make sure you have imported data in the main app first.\n\nError: ' + error.message);
+            }
+        });
+        
+        // Make functions global
+        window.exportToPNG = function() {
+            window.print();
+            alert('Use your browser\'s print dialog to save as PDF');
+        };
+        
+        window.printReport = function() {
+            window.print();
+        };
+    </script>
+</body>
+</html>
