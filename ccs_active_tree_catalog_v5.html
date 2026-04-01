@@ -1059,24 +1059,19 @@ async function fetchAllTrees(token) {
   console.log('=== ccs_tree columns ===\n' + keys.join('\n'));
 
   // Detect column names by pattern
-  const latCol    = keys.find(k => k.includes('lat')    && k.startsWith('ccs_'));
-  const lngCol    = keys.find(k => k.includes('lon')    && k.startsWith('ccs_'));
-  const codeCol   = keys.find(k => k.includes('treecode')&& k.startsWith('ccs_'));
-  const specCol   = keys.find(k => k.includes('species') && k.startsWith('ccs_'));
-  const ownerCol  = keys.find(k => k.includes('fieldowner') && k.startsWith('ccs_') && !k.includes('yomi') && !k.includes('nrc'));
-  const nrcCol    = keys.find(k => k.includes('nrc')    && k.startsWith('ccs_'));
-  const accCol    = keys.find(k => k.includes('accuracy')&& k.startsWith('ccs_'));
+  // Hardcoded confirmed column names from Power BI ccs_tree table
+  // Plain text columns don't have _tree suffix; option set columns do
+  const latCol    = 'ccs_treelatitude';    // Σ Tree Latitude
+  const lngCol    = 'ccs_treelongitude';   // Σ Tree Longitude
+  const codeCol   = 'ccs_treecode';        // Tree Code (plain text)
+  const specCol   = 'ccs_species';         // Species (plain text, not ccs_species_tree which is option set)
+  const fieldCol  = 'ccs_field';           // Field (plain text FLD-xxx, not ccs_field_tree option set)
+  const ownerCol  = 'ccs_fieldowner';      // Field Owner (plain text)
+  const nrcCol    = 'ccs_fieldownernrc';   // Field Owner NRC (plain text)
+  const accCol    = 'ccs_accuracyreading'; // Accuracy reading Σ
 
-  // "Field" plain text column — confirmed in Power BI as the FLD-xxx text value
-  // ccs_field_tree returns an option set integer (765470000) — skip it
-  // Try ccs_field first, then fall back to other patterns
-  const fieldCol  = keys.find(k => k === 'ccs_field')
-    || keys.find(k => k === 'ccs_fieldid_tree')
-    || keys.find(k => k.includes('field') && k.startsWith('ccs_') && !k.includes('owner') && !k.includes('photo') && !k.includes('image') && !k.includes('size') && !k.includes('flag') && !k.includes('lookup') && !k.includes('zone') && !k.includes('esri') && k !== 'ccs_fieldid');
-
-  console.log('Tree cols — lat:', latCol, '| lng:', lngCol, '| code:', codeCol, '| spec:', specCol, '| field:', fieldCol, '| owner:', ownerCol);
-  // Log sample values to verify field column returns FLD-xxx not integers
-  if (sample && fieldCol) console.log('Sample field value:', sample[fieldCol]);
+  console.log('Tree cols — using hardcoded confirmed names');
+  console.log('Sample field value:', sample[fieldCol], '| Sample species:', sample[specCol]);
 
   const selectCols = [codeCol, latCol, lngCol, specCol, fieldCol, ownerCol, nrcCol, accCol, 'createdon']
     .filter(Boolean).join(',');
