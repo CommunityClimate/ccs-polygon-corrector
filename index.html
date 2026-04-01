@@ -1006,12 +1006,18 @@
         // Logical names follow the ccs_ prefix convention seen in the tree table
         const DV_SELECT = [
             'ccs_fieldid',          // CCS Field ID
-            'ccs_fieldgeojson',     // Field GeoJSON
             'ccs_fieldowner_field', // Field Owner
             'ccs_zone_field',       // Zone
             'ccs_fieldsizem2',      // Field Size (m2)
             'createdon'
         ].join(',');
+
+        // GeoJSON column — will be detected from first record
+        const DV_GEO_CANDIDATES = [
+            'ccs_fieldgeojson', 'ccs_fieldgeojson_field', 'ccs_wkt',
+            'ccs_fieldspolygon', 'ccs_fieldspolygon_field',
+            'ccs_fieldesrijson', 'ccs_fieldpolygon'
+        ];
 
         let msalApp = null;
         let dvAccount = null;
@@ -1064,7 +1070,38 @@
         };
 
         async function fetchAllFields(token) {
-            let url = `${DV_API}/ccs_fields?$select=${DV_SELECT}&$filter=statecode eq 0&$top=5000`;
+            // Step 1: fetch one record to detect the GeoJSON column name
+            setDvStatus('⬇ Detecting field schema…', '#0078d4');
+            const probeRes = await fetch(
+                `${DV_API}/ccs_fields?$top=1&$filter=statecode eq 0`,
+                { headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'OData-MaxVersion': '4.0', 'OData-Version': '4.0'
+                }}
+            );
+            if (!probeRes.ok) throw new Error(`Schema probe HTTP ${probeRes.status}`);
+            const probeData = await probeRes.json();
+            const sampleKeys = probeData.value?.length ? Object.keys(probeData.value[0]) : [];
+
+            // Find which GeoJSON-like column exists
+            let geoCol = DV_GEO_CANDIDATES.find(c => sampleKeys.includes(c));
+            if (!geoCol) {
+                // Log all keys so we can see what's there
+                console.warn('GeoJSON column not found. Available keys:', sampleKeys.join(', '));
+                setDvStatus(`⚠ GeoJSON column not found. Check console for available columns.`, '#dc3545');
+                // Fall back to fetching without geo — still populate field list
+                geoCol = null;
+            } else {
+                console.log('✓ GeoJSON column detected:', geoCol);
+            }
+
+            // Step 2: fetch all records with geo column included
+            const selectWithGeo = geoCol
+                ? DV_SELECT + ',' + geoCol
+                : DV_SELECT;
+
+            let url = `${DV_API}/ccs_fields?$select=${selectWithGeo}&$filter=statecode eq 0&$top=5000`;
             const rows = [];
             let page = 0;
 
@@ -1082,7 +1119,6 @@
                     }
                 });
 
-                // Token expired mid-fetch — refresh once
                 if (res.status === 401) {
                     token = await getToken();
                     res = await fetch(url, {
@@ -1098,8 +1134,7 @@
 
                 if (!res.ok) {
                     const body = await res.text();
-                    // If column names are wrong, surface them clearly
-                    throw new Error(`HTTP ${res.status} — ${body.substring(0, 200)}`);
+                    throw new Error(`HTTP ${res.status} — ${body.substring(0, 300)}`);
                 }
 
                 const data = await res.json();
@@ -1108,10 +1143,10 @@
             }
 
             setDvStatus(`✓ ${rows.length.toLocaleString()} fields loaded — converting…`, '#198754');
-            injectAsCSV(rows);
+            injectAsCSV(rows, geoCol);
         }
 
-        function injectAsCSV(rows) {
+        function injectAsCSV(rows, geoCol) {
             // Convert Dataverse rows → CSV matching what app.js expects
             // Header names match the column detection in app.js
             const headers = [
@@ -1133,7 +1168,7 @@
             for (const r of rows) {
                 csvRows.push([
                     escape(r.ccs_fieldid          || ''),
-                    escape(r.ccs_fieldgeojson     || ''),
+                    escape(geoCol ? (r[geoCol] || '') : ''),
                     escape(r.ccs_fieldowner_field || ''),
                     escape(r.ccs_zone_field       || ''),
                     escape(r.ccs_fieldsizem2      || ''),
