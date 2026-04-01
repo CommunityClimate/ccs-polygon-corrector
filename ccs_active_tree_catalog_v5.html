@@ -996,18 +996,19 @@ function setStatusDV(msg, cls) {
   el.className   = 'upload-status ' + (cls === 'ok' ? 'ok' : 'err');
 }
 
-async function dvFetchAll(token, url, label) {
+async function dvFetchAll(token, url, label, includeAnnotations = false) {
   const rows = [];
   let page = 0;
   while (url) {
     page++;
     setStatusDV(`⬇ ${label}: page ${page} (${rows.length.toLocaleString()} so far)…`, 'ok');
+    const prefer = 'odata.maxpagesize=5000' + (includeAnnotations ? ',odata.include-annotations="OData.Community.Display.V1.FormattedValue"' : '');
     let res = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
         'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
-        'Prefer': 'odata.maxpagesize=5000'
+        'Prefer': prefer
       }
     });
     if (res.status === 401) { token = await getToken(); continue; }
@@ -1043,60 +1044,45 @@ async function fetchAllFields(token) {
 }
 
 async function fetchAllTrees(token) {
-  // Step 1: probe one record to detect exact column names
-  const probeRes = await fetch(
-    `${DV_API}/ccs_trees?$top=1&$filter=statecode eq 0`,
-    { headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json',
-      'OData-MaxVersion': '4.0', 'OData-Version': '4.0'
-    }}
-  );
-  if (!probeRes.ok) throw new Error(`Tree probe HTTP ${probeRes.status}: ${await probeRes.text()}`);
-  const probeData = await probeRes.json();
-  const sample = probeData.value?.[0] || {};
-  const keys = Object.keys(sample).sort();
-  console.log('=== ccs_tree columns ===\n' + keys.join('\n'));
+  // All column names confirmed from live Dataverse API response 2026-04-01
+  const latCol    = 'ccs_treelatitude_tree';
+  const lngCol    = 'ccs_treelongitude_tree';
+  const codeCol   = 'ccs_treecode';
+  const ownerCol  = 'ccs_fieldowner_tree';
+  const nrcCol    = 'ccs_fieldownernrc_tree';
+  const accCol    = 'ccs_accuracyreading';
+  // Species is an option set (integer) — we request formatted values via header
+  // Field is a lookup — we expand to get FLD-xxx from the related ccs_field record
 
-  // Detect column names by pattern
-  // Hardcoded confirmed column names from Power BI ccs_tree table
-  // Plain text columns don't have _tree suffix; option set columns do
-  const latCol    = 'ccs_treelatitude';    // Σ Tree Latitude
-  const lngCol    = 'ccs_treelongitude';   // Σ Tree Longitude
-  const codeCol   = 'ccs_treecode';        // Tree Code (plain text)
-  const specCol   = 'ccs_species';         // Species (plain text, not ccs_species_tree which is option set)
-  const fieldCol  = 'ccs_field';           // Field (plain text FLD-xxx, not ccs_field_tree option set)
-  const ownerCol  = 'ccs_fieldowner';      // Field Owner (plain text)
-  const nrcCol    = 'ccs_fieldownernrc';   // Field Owner NRC (plain text)
-  const accCol    = 'ccs_accuracyreading'; // Accuracy reading Σ
-
-  console.log('Tree cols — using hardcoded confirmed names');
-  console.log('Sample field value:', sample[fieldCol], '| Sample species:', sample[specCol]);
-
-  const selectCols = [codeCol, latCol, lngCol, specCol, fieldCol, ownerCol, nrcCol, accCol, 'createdon']
-    .filter(Boolean).join(',');
+  const selectCols = [codeCol, latCol, lngCol, ownerCol, nrcCol, accCol, 'createdon'].join(',');
 
   const rows = await dvFetchAll(token,
-    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
-    'Trees'
+    `${DV_API}/ccs_trees?$select=${selectCols}&$expand=ccs_field_tree($select=ccs_cssfieldid_field)&$filter=statecode eq 0`,
+    'Trees',
+    true  // request formatted values for option sets
   );
 
   treesData = rows.map((r, i) => {
-    const lat = parseFloat(latCol ? r[latCol] : null);
-    const lng = parseFloat(lngCol ? r[lngCol] : null);
+    const lat = parseFloat(r[latCol]);
+    const lng = parseFloat(r[lngCol]);
     const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
-    const treeFieldVal = fieldCol ? String(r[fieldCol] || '') : '';
+    // Species: use formatted value annotation (sent when includeAnnotations=true)
+    const species = r['ccs_species_tree@OData.Community.Display.V1.FormattedValue']
+      || String(r['ccs_species_tree'] || '');
+    // Field: get FLD-xxx from expanded related field record
+    const expandedField = r['ccs_field_tree'];
+    const treeFieldVal  = expandedField?.ccs_cssfieldid_field || '';
     return {
       guid:          r.ccs_treeid || `T${i}`,
-      treeCode:      String(codeCol  ? r[codeCol]  : `T${i}`),
-      species:       String(specCol  ? r[specCol]  : ''),
+      treeCode:      String(r[codeCol] || `T${i}`),
+      species,
       lat:           coords ? coords.lat : null,
       lng:           coords ? coords.lng : null,
       treeField:     treeFieldVal.trim(),
-      fieldOwner:    String(ownerCol ? r[ownerCol] : ''),
-      fieldOwnerNRC: String(nrcCol   ? r[nrcCol]   : ''),
-      treeOwner:     String(ownerCol ? r[ownerCol] : ''),
-      accuracy:      parseFloat(accCol ? r[accCol] : null) || null,
+      fieldOwner:    String(r[ownerCol] || ''),
+      fieldOwnerNRC: String(r[nrcCol]   || ''),
+      treeOwner:     String(r[ownerCol] || ''),
+      accuracy:      parseFloat(r[accCol]) || null,
       createdOn:     r.createdon ? r.createdon.split('T')[0] : '',
     };
   });
