@@ -1021,20 +1021,18 @@ async function dvFetchAll(token, url, label, includeAnnotations = false) {
 
 async function fetchAllFields(token) {
   // Confirmed column names — include ccs_fieldowner_field (plain text) alongside contact lookup
-  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldowner_field,ccs_fieldsizem2_field,createdon';
+  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldsizem2_field,createdon';
   const rows = await dvFetchAll(token,
     `${DV_API}/ccs_fields?$select=${select}&$filter=statecode eq 0`,
     'Fields',
-    true  // request formatted values for contact lookup
+    true
   );
 
   fieldsData = rows.map((r, i) => ({
     guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
     fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
     geoJSON: String(r.ccs_fieldgeojson_field || ''),
-    // Use plain text owner first, fall back to contact formatted value
-    owner:   String(r.ccs_fieldowner_field
-      || r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
+    owner:   String(r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
       || r.ccs_contactid_field || ''),
     zone:    '',
     size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
