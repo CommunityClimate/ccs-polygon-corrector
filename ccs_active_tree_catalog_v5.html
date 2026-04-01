@@ -1063,24 +1063,26 @@ async function fetchAllTrees(token) {
   const lngCol    = keys.find(k => k.includes('lon')    && k.startsWith('ccs_'));
   const codeCol   = keys.find(k => k.includes('treecode')&& k.startsWith('ccs_'));
   const specCol   = keys.find(k => k.includes('species') && k.startsWith('ccs_'));
-  const fieldCol  = keys.find(k => k.includes('field')  && !k.includes('owner') && !k.includes('photo') && !k.includes('image') && !k.includes('size') && k.startsWith('ccs_') && k !== 'ccs_fieldid');
   const ownerCol  = keys.find(k => k.includes('fieldowner') && k.startsWith('ccs_') && !k.includes('yomi') && !k.includes('nrc'));
   const nrcCol    = keys.find(k => k.includes('nrc')    && k.startsWith('ccs_'));
   const accCol    = keys.find(k => k.includes('accuracy')&& k.startsWith('ccs_'));
 
-  console.log('Tree cols — lat:', latCol, '| lng:', lngCol, '| code:', codeCol, '| spec:', specCol, '| field:', fieldCol, '| owner:', ownerCol);
+  // "Field" plain text column — confirmed in Power BI as the FLD-xxx text value
+  // ccs_field_tree returns an option set integer (765470000) — skip it
+  // Try ccs_field first, then fall back to other patterns
+  const fieldCol  = keys.find(k => k === 'ccs_field')
+    || keys.find(k => k === 'ccs_fieldid_tree')
+    || keys.find(k => k.includes('field') && k.startsWith('ccs_') && !k.includes('owner') && !k.includes('photo') && !k.includes('image') && !k.includes('size') && !k.includes('flag') && !k.includes('lookup') && !k.includes('zone') && !k.includes('esri') && k !== 'ccs_fieldid');
 
-  const selectCols = [codeCol, latCol, lngCol, specCol, ownerCol, nrcCol, accCol, 'createdon']
+  console.log('Tree cols — lat:', latCol, '| lng:', lngCol, '| code:', codeCol, '| spec:', specCol, '| field:', fieldCol, '| owner:', ownerCol);
+  // Log sample values to verify field column returns FLD-xxx not integers
+  if (sample && fieldCol) console.log('Sample field value:', sample[fieldCol]);
+
+  const selectCols = [codeCol, latCol, lngCol, specCol, fieldCol, ownerCol, nrcCol, accCol, 'createdon']
     .filter(Boolean).join(',');
 
-  // Use $expand on the field lookup to get the FLD-xxx CCS Field ID
-  // ccs_field_tree is a lookup — we expand it to get ccs_cssfieldid_field
-  const expandClause = fieldCol
-    ? `&$expand=${fieldCol}($select=ccs_cssfieldid_field)`
-    : '';
-
   const rows = await dvFetchAll(token,
-    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0${expandClause}`,
+    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
     'Trees'
   );
 
@@ -1088,11 +1090,7 @@ async function fetchAllTrees(token) {
     const lat = parseFloat(latCol ? r[latCol] : null);
     const lng = parseFloat(lngCol ? r[lngCol] : null);
     const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
-    // Get FLD-xxx from the expanded field record, fall back to raw value
-    const expandedField = fieldCol ? r[fieldCol] : null;
-    const treeFieldVal  = expandedField?.ccs_cssfieldid_field
-      || (typeof expandedField === 'string' ? expandedField : '')
-      || '';
+    const treeFieldVal = fieldCol ? String(r[fieldCol] || '') : '';
     return {
       guid:          r.ccs_treeid || `T${i}`,
       treeCode:      String(codeCol  ? r[codeCol]  : `T${i}`),
