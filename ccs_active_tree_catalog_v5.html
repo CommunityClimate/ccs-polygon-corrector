@@ -922,39 +922,56 @@ async function fetchAllFields(token) {
 }
 
 async function fetchAllTrees(token) {
-  // Confirmed column names from ccs_tree table (same naming pattern as fields)
-  const select = [
-    'ccs_treecode',
-    'ccs_treelatitude',
-    'ccs_treelongitude',
-    'ccs_species_tree',
-    'ccs_field_tree',
-    'ccs_fieldowner',
-    'ccs_fieldownernrc',
-    'ccs_accuracyreading',
-    'createdon'
-  ].join(',');
+  // Step 1: probe one record to detect exact column names
+  const probeRes = await fetch(
+    `${DV_API}/ccs_trees?$top=1&$filter=statecode eq 0`,
+    { headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+      'OData-MaxVersion': '4.0', 'OData-Version': '4.0'
+    }}
+  );
+  if (!probeRes.ok) throw new Error(`Tree probe HTTP ${probeRes.status}: ${await probeRes.text()}`);
+  const probeData = await probeRes.json();
+  const sample = probeData.value?.[0] || {};
+  const keys = Object.keys(sample).sort();
+  console.log('=== ccs_tree columns ===\n' + keys.join('\n'));
+
+  // Detect column names by pattern
+  const latCol    = keys.find(k => k.includes('lat')    && k.startsWith('ccs_'));
+  const lngCol    = keys.find(k => k.includes('lon')    && k.startsWith('ccs_'));
+  const codeCol   = keys.find(k => k.includes('treecode')&& k.startsWith('ccs_'));
+  const specCol   = keys.find(k => k.includes('species') && k.startsWith('ccs_'));
+  const fieldCol  = keys.find(k => k.includes('field')  && !k.includes('owner') && !k.includes('photo') && !k.includes('image') && !k.includes('size') && k.startsWith('ccs_') && k !== 'ccs_fieldid');
+  const ownerCol  = keys.find(k => k.includes('fieldowner') && k.startsWith('ccs_') && !k.includes('yomi') && !k.includes('nrc'));
+  const nrcCol    = keys.find(k => k.includes('nrc')    && k.startsWith('ccs_'));
+  const accCol    = keys.find(k => k.includes('accuracy')&& k.startsWith('ccs_'));
+
+  console.log('Tree cols — lat:', latCol, '| lng:', lngCol, '| code:', codeCol, '| spec:', specCol, '| field:', fieldCol, '| owner:', ownerCol);
+
+  const selectCols = [codeCol, latCol, lngCol, specCol, fieldCol, ownerCol, nrcCol, accCol, 'createdon']
+    .filter(Boolean).join(',');
 
   const rows = await dvFetchAll(token,
-    `${DV_API}/ccs_trees?$select=${select}&$filter=statecode eq 0`,
+    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
     'Trees'
   );
 
   treesData = rows.map((r, i) => {
-    const lat = parseFloat(r.ccs_treelatitude);
-    const lng = parseFloat(r.ccs_treelongitude);
+    const lat = parseFloat(latCol ? r[latCol] : null);
+    const lng = parseFloat(lngCol ? r[lngCol] : null);
     const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
     return {
       guid:          r.ccs_treeid || `T${i}`,
-      treeCode:      String(r.ccs_treecode       || `T${i}`),
-      species:       String(r.ccs_species_tree   || ''),
+      treeCode:      String(codeCol  ? r[codeCol]  : `T${i}`),
+      species:       String(specCol  ? r[specCol]  : ''),
       lat:           coords ? coords.lat : null,
       lng:           coords ? coords.lng : null,
-      treeField:     String(r.ccs_field_tree     || ''),
-      fieldOwner:    String(r.ccs_fieldowner     || ''),
-      fieldOwnerNRC: String(r.ccs_fieldownernrc  || ''),
-      treeOwner:     String(r.ccs_fieldowner     || ''),
-      accuracy:      parseFloat(r.ccs_accuracyreading) || null,
+      treeField:     String(fieldCol ? r[fieldCol] : ''),
+      fieldOwner:    String(ownerCol ? r[ownerCol] : ''),
+      fieldOwnerNRC: String(nrcCol   ? r[nrcCol]   : ''),
+      treeOwner:     String(ownerCol ? r[ownerCol] : ''),
+      accuracy:      parseFloat(accCol ? r[accCol] : null) || null,
       createdOn:     r.createdon ? r.createdon.split('T')[0] : '',
     };
   });
