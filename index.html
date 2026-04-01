@@ -1085,6 +1085,8 @@
             const sample = probeData.value?.[0] || {};
             const sampleKeys = Object.keys(sample).sort();
             console.log('=== ccs_field columns ===\n' + sampleKeys.join('\n'));
+            setDvStatus(`Schema: ${sampleKeys.filter(k => k.startsWith('ccs_')).join(', ')}`, '#0078d4');
+            await new Promise(r => setTimeout(r, 3000)); // pause so user can read it
 
             // Auto-detect key columns
             const geoCol   = sampleKeys.find(k => k.includes('geojson') || k.includes('polygon') || k.includes('wkt') || k.includes('esrijson'));
