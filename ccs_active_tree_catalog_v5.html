@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <style>
 /* ── DESIGN SYSTEM ───────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap');
@@ -805,9 +805,9 @@ table.catalog tr.selected td { background: var(--green-bg); }
 
 const MSAL_CONFIG = {
   auth: {
-    clientId:    '60aa71ce-b771-46d9-9e0f-51fd1fe4f4d6',
+    clientId:    '3d61678f-e900-426f-a05c-4a765736f9c7',
     authority:   'https://login.microsoftonline.com/f9198cfe-2489-4324-b66f-e27f00e3f667',
-    redirectUri: window.location.href.split('?')[0]   // current page, no query string
+    redirectUri: window.location.href.split('?')[0]
   },
   cache: { cacheLocation: 'sessionStorage' }
 };
@@ -816,19 +816,6 @@ const DV_ENV     = 'https://fieldforce.crm14.dynamics.com';
 const DV_API     = `${DV_ENV}/api/data/v9.2`;
 const DV_SCOPE   = [`${DV_ENV}/user_impersonation`];
 
-// Columns to fetch from ccs_trees — matches what loadTrees() expects
-const DV_SELECT  = [
-  'ccs_treecode',          // Tree Code
-  'ccs_treelatitude',      // Tree Latitude
-  'ccs_treelongitude',     // Tree Longitude
-  'ccs_species_tree',      // Species
-  'ccs_field_tree',        // Field
-  'ccs_fieldowner',        // Field Owner
-  'ccs_fieldownernrc',     // Field Owner NRC
-  'ccs_accuracyreading',   // Accuracy
-  'createdon',             // Created On
-  'statecode'              // to filter active only
-].join(',');
 
 let msalInstance = null;
 let dvAccount    = null;
@@ -866,11 +853,18 @@ async function connectFieldforce() {
     const token = await getToken();
     const name  = dvAccount?.name || dvAccount?.username || 'Signed in';
     btn.innerHTML = `<span style="font-size:13px">✓</span> ${name}`;
-    setStatusDV('✓ Authenticated — fetching trees…', 'ok');
-    await fetchAllTrees(token);
+    btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+
+    // Fetch fields and trees in parallel
+    setStatusDV('✓ Authenticated — fetching fields & trees…', 'ok');
+    await Promise.all([
+      fetchAllFields(token),
+      fetchAllTrees(token)
+    ]);
   } catch(e) {
     btn.disabled = false;
     btn.innerHTML = '<span style="font-size:13px">☁</span> Connect to Fieldforce';
+    btn.style.background = '';
     setStatusDV('Auth failed: ' + (e.message || e), 'err');
   }
 }
@@ -881,67 +875,91 @@ function setStatusDV(msg, cls) {
   el.className   = 'upload-status ' + (cls === 'ok' ? 'ok' : 'err');
 }
 
-async function fetchAllTrees(token) {
-  let url = `${DV_API}/ccs_trees?$select=${DV_SELECT}&$filter=statecode eq 0&$top=5000`;
+async function dvFetchAll(token, url, label) {
   const rows = [];
   let page = 0;
-
   while (url) {
     page++;
-    setStatusDV(`⬇ Fetching page ${page} (${rows.length.toLocaleString()} trees so far)…`, 'ok');
-
-    const res = await fetch(url, {
+    setStatusDV(`⬇ ${label}: page ${page} (${rows.length.toLocaleString()} so far)…`, 'ok');
+    let res = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
-        'OData-MaxVersion': '4.0',
-        'OData-Version': '4.0',
+        'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
         'Prefer': 'odata.maxpagesize=5000'
       }
     });
-
-    if (!res.ok) {
-      // Token may have expired mid-fetch — refresh once
-      if (res.status === 401) {
-        token = await getToken();
-        continue;
-      }
-      throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-    }
-
+    if (res.status === 401) { token = await getToken(); continue; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).substring(0,200)}`);
     const data = await res.json();
     rows.push(...(data.value || []));
     url = data['@odata.nextLink'] || null;
   }
+  return rows;
+}
 
-  setStatusDV(`✓ ${rows.length.toLocaleString()} trees loaded from Fieldforce`, 'ok');
+async function fetchAllFields(token) {
+  // Confirmed column names from Dataverse schema probe
+  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldsizem2_field,createdon';
+  const rows = await dvFetchAll(token,
+    `${DV_API}/ccs_fields?$select=${select}&$filter=statecode eq 0`,
+    'Fields'
+  );
 
-  // Map Dataverse columns → same shape loadTrees() produces
+  fieldsData = rows.map((r, i) => ({
+    guid:    r.ccs_fieldid || `F${i}`,
+    fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
+    geoJSON: String(r.ccs_fieldgeojson_field || ''),
+    owner:   String(r.ccs_contactid_field   || ''),
+    zone:    '',
+    size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
+    ring:    null
+  })).map(f => { f.ring = parseGeoJSON(f.geoJSON); return f; });
+
+  const valid = fieldsData.filter(f => f.ring).length;
+  setStatus('statusFields', `✓ ${fieldsData.length.toLocaleString()} fields from Fieldforce — ${valid} with geometry`, true);
+  checkReady();
+}
+
+async function fetchAllTrees(token) {
+  // Confirmed column names from ccs_tree table (same naming pattern as fields)
+  const select = [
+    'ccs_treecode',
+    'ccs_treelatitude',
+    'ccs_treelongitude',
+    'ccs_species_tree',
+    'ccs_field_tree',
+    'ccs_fieldowner',
+    'ccs_fieldownernrc',
+    'ccs_accuracyreading',
+    'createdon'
+  ].join(',');
+
+  const rows = await dvFetchAll(token,
+    `${DV_API}/ccs_trees?$select=${select}&$filter=statecode eq 0`,
+    'Trees'
+  );
+
   treesData = rows.map((r, i) => {
     const lat = parseFloat(r.ccs_treelatitude);
     const lng = parseFloat(r.ccs_treelongitude);
-    let coords = null;
-    if (!isNaN(lat) && !isNaN(lng)) {
-      // autoLatLng handles coordinate order
-      coords = autoLatLng(lat, lng);
-    }
+    const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
     return {
       guid:          r.ccs_treeid || `T${i}`,
-      treeCode:      String(r.ccs_treecode  || `T${i}`),
-      species:       String(r.ccs_species_tree || ''),
+      treeCode:      String(r.ccs_treecode       || `T${i}`),
+      species:       String(r.ccs_species_tree   || ''),
       lat:           coords ? coords.lat : null,
       lng:           coords ? coords.lng : null,
-      treeField:     String(r.ccs_field_tree  || ''),
-      fieldOwner:    String(r.ccs_fieldowner  || ''),
-      fieldOwnerNRC: String(r.ccs_fieldownernrc || ''),
-      treeOwner:     String(r.ccs_fieldowner  || ''),
+      treeField:     String(r.ccs_field_tree     || ''),
+      fieldOwner:    String(r.ccs_fieldowner     || ''),
+      fieldOwnerNRC: String(r.ccs_fieldownernrc  || ''),
+      treeOwner:     String(r.ccs_fieldowner     || ''),
       accuracy:      parseFloat(r.ccs_accuracyreading) || null,
       createdOn:     r.createdon ? r.createdon.split('T')[0] : '',
     };
   });
 
   const withCoords = treesData.filter(t => t.lat !== null).length;
-  document.getElementById('statusTrees').textContent = '';
   setStatus('statusTrees',
     `✓ ${treesData.length.toLocaleString()} trees from Fieldforce — ${withCoords.toLocaleString()} with coordinates`, true);
   checkReady();
