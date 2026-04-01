@@ -510,7 +510,7 @@ table.catalog tr.selected td { background: var(--green-bg); }
 
 /* ── Floating Tree Catalog button ── */
 .fab-tree-catalog {
-  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  position: fixed; bottom: 52px; right: 20px; z-index: 9999;
   display: flex; align-items: center; gap: 8px;
   background: linear-gradient(135deg, #16a34a, #22c55e);
   color: #000; border: none; border-radius: 28px;
@@ -1338,8 +1338,15 @@ function determineStatus(tree, matchedField, insideFlag) {
   if (insideFlag) {
     const fieldMatch = matchedField &&
       tree.treeField.toLowerCase().trim() === matchedField.fieldId.toLowerCase().trim();
-    const ownerMatch = matchedField &&
-      tree.fieldOwner.toLowerCase().trim() === matchedField.owner.toLowerCase().trim();
+
+    // Owner comparison: use partial match since field stores contact name
+    // and tree stores plain text which may differ in format
+    const treeOwner  = tree.fieldOwner.toLowerCase().trim();
+    const fieldOwner = matchedField ? matchedField.owner.toLowerCase().trim() : '';
+    const ownerMatch = matchedField && treeOwner && fieldOwner &&
+      (treeOwner === fieldOwner ||
+       treeOwner.includes(fieldOwner) ||
+       fieldOwner.includes(treeOwner));
 
     if (fieldMatch && ownerMatch)  return 'Allocated';
     if (!fieldMatch && ownerMatch) return 'Allocated - Field mismatch';
@@ -1733,7 +1740,13 @@ function buildFieldList(sourceRows) {
 
 function selectField(fieldId) {
   selectedFieldId = fieldId;
-  buildFieldList(); // re-render to update active highlight
+  // Sync the field filter dropdown so body catalog updates too
+  const fltField = document.getElementById('fltField');
+  if (fltField) {
+    fltField.value = fieldId;
+    applyFilters();
+  }
+  buildFieldList();
   switchTab('map');
   renderFieldMap(fieldId);
 }
@@ -1979,8 +1992,13 @@ function clearFilters() {
 
 
 function openTreeCatalog() {
-  if (!allocation.length) { alert("Run allocation first — there is no tree data to show yet."); return; }
-  try { localStorage.setItem("ccs_tree_allocation", JSON.stringify(allocation)); } catch(e) {}
+  // Use allocation if available, fall back to raw treesData mapped to basic shape
+  let data = allocation;
+  if (!data.length && treesData.length) {
+    data = treesData.map(t => ({ ...t, status: '', matchedFieldId: t.treeField, insidePolygon: false }));
+  }
+  if (!data.length) { alert("Connect to Fieldforce and run allocation first."); return; }
+  try { localStorage.setItem("ccs_tree_allocation", JSON.stringify(data)); } catch(e) {}
   window.open("tree-catalog.html", "_blank");
 }
 
