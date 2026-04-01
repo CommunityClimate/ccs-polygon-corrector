@@ -1088,24 +1088,23 @@
 
             // Auto-detect key columns
             const geoCol   = sampleKeys.find(k => k.includes('geojson') || k.includes('polygon') || k.includes('wkt') || k.includes('esrijson'));
-            // CCS Field ID (FLD-xxx) is the primary name attribute = ccs_name in Dataverse
-            const idCol    = 'ccs_name';
-            const ownerCol = sampleKeys.find(k => k.includes('fieldowner') && !k.includes('yomi'));
-            const zoneCol  = sampleKeys.find(k => k.includes('zone') && !k.includes('yomi'));
-            const sizeCol  = sampleKeys.find(k => k.includes('fieldsize') || (k.includes('size') && k.startsWith('ccs_')));
+            // CCS Field ID logical name confirmed from Power BI as ccs_fieldid
+            const ownerCol = sampleKeys.find(k => k === 'ccs_fieldowner_field' || (k.includes('fieldowner') && !k.includes('yomi')));
+            const zoneCol  = sampleKeys.find(k => k.includes('zone') && k.startsWith('ccs_') && !k.includes('yomi'));
+            const sizeCol  = sampleKeys.find(k => (k.includes('fieldsize') || k.includes('sizem2')) && k.startsWith('ccs_'));
 
-            console.log('Detected — id: ccs_name | geo:', geoCol, '| owner:', ownerCol, '| zone:', zoneCol, '| size:', sizeCol);
+            console.log('Detected — id: ccs_fieldid | geo:', geoCol, '| owner:', ownerCol, '| zone:', zoneCol, '| size:', sizeCol);
 
             if (!geoCol) {
                 setDvStatus(`⚠ GeoJSON column not found. Open F12 Console — look for "ccs_field columns" to see all available names.`, '#dc3545');
                 return;
             }
 
-            // Step 2: build $select — NO $top so pagination works for all 28k+ records
-            const selectCols = ['ccs_name', geoCol, ownerCol, zoneCol, sizeCol, 'createdon']
+            // Step 2: build $select using confirmed ccs_fieldid for CCS Field ID
+            const selectCols = ['ccs_fieldid', geoCol, ownerCol, zoneCol, sizeCol, 'createdon']
                 .filter(Boolean).join(',');
 
-            // Remove $top — use Prefer header page size only so @odata.nextLink fires
+            // No $top — rely on Prefer header for page size so all 28k records are fetched
             let url = `${DV_API}/ccs_fields?$select=${selectCols}&$filter=statecode eq 0`;
             const rows = [];
             let page = 0;
@@ -1132,7 +1131,7 @@
             }
 
             setDvStatus(`✓ ${rows.length.toLocaleString()} fields loaded — converting…`, '#198754');
-            injectAsCSV(rows, 'ccs_name', geoCol, ownerCol, zoneCol, sizeCol);
+            injectAsCSV(rows, 'ccs_fieldid', geoCol, ownerCol, zoneCol, sizeCol);
         }
 
         function injectAsCSV(rows, idCol, geoCol, ownerCol, zoneCol, sizeCol) {
