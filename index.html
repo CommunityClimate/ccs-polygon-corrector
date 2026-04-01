@@ -1070,7 +1070,7 @@
         };
 
         async function fetchAllFields(token) {
-            // Step 1: fetch one record to detect the GeoJSON column name
+            // Step 1: probe one record with NO $select to get all available column names
             setDvStatus('⬇ Detecting field schema…', '#0078d4');
             const probeRes = await fetch(
                 `${DV_API}/ccs_fields?$top=1&$filter=statecode eq 0`,
@@ -1080,73 +1080,60 @@
                     'OData-MaxVersion': '4.0', 'OData-Version': '4.0'
                 }}
             );
-            if (!probeRes.ok) throw new Error(`Schema probe HTTP ${probeRes.status}`);
+            if (!probeRes.ok) throw new Error(`Schema probe HTTP ${probeRes.status}: ${await probeRes.text()}`);
             const probeData = await probeRes.json();
-            const sampleKeys = probeData.value?.length ? Object.keys(probeData.value[0]) : [];
+            const sample = probeData.value?.[0] || {};
+            const sampleKeys = Object.keys(sample).sort();
+            console.log('=== ccs_field columns ===\n' + sampleKeys.join('\n'));
 
-            // Find which GeoJSON-like column exists
-            let geoCol = DV_GEO_CANDIDATES.find(c => sampleKeys.includes(c));
+            // Auto-detect key columns
+            const geoCol   = sampleKeys.find(k => k.includes('geojson') || k.includes('polygon') || k.includes('wkt') || k.includes('esrijson'));
+            const ownerCol = sampleKeys.find(k => k.includes('fieldowner') || k.includes('owner'));
+            const zoneCol  = sampleKeys.find(k => k.includes('zone'));
+            const sizeCol  = sampleKeys.find(k => k.includes('fieldsize') || k.includes('size'));
+            const idCol    = sampleKeys.find(k => k === 'ccs_fieldid' || k.includes('ccsfieldid'));
+
+            console.log('Detected — geo:', geoCol, '| owner:', ownerCol, '| zone:', zoneCol, '| size:', sizeCol, '| id:', idCol);
+
             if (!geoCol) {
-                // Log all keys so we can see what's there
-                console.warn('GeoJSON column not found. Available keys:', sampleKeys.join(', '));
-                setDvStatus(`⚠ GeoJSON column not found. Check console for available columns.`, '#dc3545');
-                // Fall back to fetching without geo — still populate field list
-                geoCol = null;
-            } else {
-                console.log('✓ GeoJSON column detected:', geoCol);
+                setDvStatus(`⚠ GeoJSON column not found. Open F12 Console — look for "ccs_field columns" to see all available names.`, '#dc3545');
+                return;
             }
 
-            // Step 2: fetch all records with geo column included
-            const selectWithGeo = geoCol
-                ? DV_SELECT + ',' + geoCol
-                : DV_SELECT;
+            // Step 2: build $select from detected columns
+            const selectCols = [idCol, geoCol, ownerCol, zoneCol, sizeCol, 'createdon']
+                .filter(Boolean).join(',');
 
-            let url = `${DV_API}/ccs_fields?$select=${selectWithGeo}&$filter=statecode eq 0&$top=5000`;
+            let url = `${DV_API}/ccs_fields?$select=${selectCols}&$filter=statecode eq 0&$top=5000`;
             const rows = [];
             let page = 0;
 
             while (url) {
                 page++;
                 setDvStatus(`⬇ Fetching page ${page} — ${rows.length.toLocaleString()} fields so far…`, '#0078d4');
-
                 let res = await fetch(url, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json',
-                        'OData-MaxVersion': '4.0',
-                        'OData-Version': '4.0',
+                        'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
                         'Prefer': 'odata.maxpagesize=5000'
                     }
                 });
-
                 if (res.status === 401) {
                     token = await getToken();
-                    res = await fetch(url, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Accept': 'application/json',
-                            'OData-MaxVersion': '4.0',
-                            'OData-Version': '4.0',
-                            'Prefer': 'odata.maxpagesize=5000'
-                        }
-                    });
+                    continue;
                 }
-
-                if (!res.ok) {
-                    const body = await res.text();
-                    throw new Error(`HTTP ${res.status} — ${body.substring(0, 300)}`);
-                }
-
+                if (!res.ok) throw new Error(`HTTP ${res.status} — ${(await res.text()).substring(0, 300)}`);
                 const data = await res.json();
                 rows.push(...(data.value || []));
                 url = data['@odata.nextLink'] || null;
             }
 
             setDvStatus(`✓ ${rows.length.toLocaleString()} fields loaded — converting…`, '#198754');
-            injectAsCSV(rows, geoCol);
+            injectAsCSV(rows, idCol, geoCol, ownerCol, zoneCol, sizeCol);
         }
 
-        function injectAsCSV(rows, geoCol) {
+        function injectAsCSV(rows, idCol, geoCol, ownerCol, zoneCol, sizeCol) {
             // Convert Dataverse rows → CSV matching what app.js expects
             // Header names match the column detection in app.js
             const headers = [
@@ -1167,12 +1154,12 @@
             const csvRows = [headers.join(',')];
             for (const r of rows) {
                 csvRows.push([
-                    escape(r.ccs_fieldid          || ''),
-                    escape(geoCol ? (r[geoCol] || '') : ''),
-                    escape(r.ccs_fieldowner_field || ''),
-                    escape(r.ccs_zone_field       || ''),
-                    escape(r.ccs_fieldsizem2      || ''),
-                    escape(r.ccs_fieldid          || '')
+                    escape(idCol    ? (r[idCol]    || '') : ''),
+                    escape(geoCol   ? (r[geoCol]   || '') : ''),
+                    escape(ownerCol ? (r[ownerCol] || '') : ''),
+                    escape(zoneCol  ? (r[zoneCol]  || '') : ''),
+                    escape(sizeCol  ? (r[sizeCol]  || '') : ''),
+                    escape(idCol    ? (r[idCol]    || '') : '')
                 ].join(','));
             }
 
