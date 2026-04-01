@@ -177,11 +177,37 @@
         <div class="panel">
             <h5><i class="bi bi-upload"></i> Input & Controls</h5>
             
-            <!-- 1. IMPORT -->
+            <!-- FIELDFORCE LIVE CONNECTION -->
             <div class="mb-3">
-                <label class="form-label" style="font-weight: 600; font-size: 12px;">Import Data</label>
+                <label class="form-label" style="font-weight:600;font-size:12px;">Active Fields — Fieldforce</label>
+                <button class="btn btn-primary btn-sm w-100" id="btnFieldforce" onclick="connectFieldforce()"
+                    style="background:linear-gradient(135deg,#0078d4,#005a9e);border:none;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600">
+                    <i class="bi bi-cloud-arrow-down"></i> Connect to Fieldforce
+                </button>
+                <div id="dvStatus" style="font-size:10px;margin-top:4px;min-height:14px"></div>
+                <!-- divider -->
+                <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
+                    <div style="flex:1;height:1px;background:#dee2e6"></div>
+                    <span style="font-size:10px;color:#6c757d">OR</span>
+                    <div style="flex:1;height:1px;background:#dee2e6"></div>
+                </div>
+            </div>
+
+            <!-- FALLBACK: CSV/GeoJSON upload -->
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:12px;">Import Data — Manual</label>
                 <input type="file" class="form-control form-control-sm" id="fileInput" accept=".json,.geojson,.csv">
-                <small class="text-muted" style="font-size: 11px;">GeoJSON, JSON, or CSV files</small>
+                <small class="text-muted" style="font-size:11px;">GeoJSON, JSON, or CSV fallback</small>
+                
+                <div class="form-check mt-2" style="font-size:12px;">
+                    <input class="form-check-input" type="checkbox" id="preserveExistingData" checked>
+                    <label class="form-check-label" for="preserveExistingData" style="font-weight:500;">
+                        Preserve existing field data
+                    </label>
+                </div>
+                <small class="text-muted" style="font-size:10px;display:block;margin-top:2px;">
+                    Keep validation, corrections, and flags for existing fields
+                </small>
             </div>
             
             <!-- 2. FILTERS (Collapsible) -->
@@ -270,11 +296,23 @@
                 <div class="alert alert-info" style="font-size: 10px; padding: 6px; margin-bottom: 8px;">
                     1. Enable Edit Mode<br>2. Drag dots OR Add/Remove<br>3. Save Changes
                 </div>
+                
+                <!-- Direction Helper Panel -->
+                <div id="directionHelper" class="alert alert-warning" style="font-size: 11px; padding: 8px; margin-bottom: 8px; display: none;">
+                    <strong>Direction:</strong> <span id="currentDirection">-</span><br>
+                    <small>Verra requires: ⟳ Clockwise (CW)</small>
+                </div>
+                
                 <button class="btn btn-outline-primary btn-sm w-100 mb-2" id="enableEditBtn">
                     <i class="bi bi-pencil"></i> Enable Edit Mode
                 </button>
                 <div id="editControls" style="display: none;">
                     <div class="d-grid gap-2">
+                        <!-- NEW: Drag & Align Button -->
+                        <button class="btn btn-sm btn-outline-info" id="alignToNearestBtn" style="display: none;">
+                            <i class="bi bi-magnet"></i> Align to Nearest Vertex
+                        </button>
+                        
                         <button class="btn btn-sm btn-outline-success" id="addVertexBtn">
                             <i class="bi bi-plus-circle"></i> Add Vertex
                         </button>
@@ -282,7 +320,7 @@
                             <i class="bi bi-dash-circle"></i> Remove Vertex
                         </button>
                         <button class="btn btn-sm btn-success" id="saveChangesBtn">
-                            <i class="bi bi-save"></i> Save Changes
+                            <i class="bi bi-save"></i> Save Manual Correction
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" id="cancelEditBtn">
                             <i class="bi bi-x-circle"></i> Cancel
@@ -297,23 +335,78 @@
             </button>
             <div class="collapse" id="exportCollapse">
                 <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-info" id="exportCSVBtn">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Export All Fields (CSV)
+                    </button>
+                    
+                    <!-- NEW: Filtered Export Options -->
+                    <div style="border-top: 1px solid #dee2e6; margin: 8px 0; padding-top: 8px;">
+                        <small style="font-weight: 600; font-size: 10px; color: #6c757d; display: block; margin-bottom: 6px;">FILTERED EXPORTS:</small>
+                    </div>
+                    
+                    <button class="btn btn-sm btn-outline-success" id="exportAutoCorrectedBtn">
+                        <i class="bi bi-robot"></i> Auto-Corrected Only
+                    </button>
+                    
+                    <button class="btn btn-sm btn-outline-primary" id="exportManuallyCorrectedBtn">
+                        <i class="bi bi-hand-index"></i> Manually Corrected Only
+                    </button>
+                    
+                    <button class="btn btn-sm btn-outline-warning" id="exportNeedsManualBtn">
+                        <i class="bi bi-tools"></i> Needs Manual Edit Only
+                    </button>
+                    
+                    <button class="btn btn-sm btn-outline-primary" id="exportManuallyFlaggedBtn">
+                        <i class="bi bi-flag-fill"></i> Manually Flagged Only
+                    </button>
+                    
+                    <button class="btn btn-sm btn-outline-warning" id="exportOverlappingBtn">
+                        <i class="bi bi-arrow-left-right"></i> Overlapping Fields Only
+                    </button>
+                    
+                    <button class="btn btn-sm btn-outline-danger" id="exportDuplicateFieldIdsBtn">
+                        <i class="bi bi-files"></i> Duplicate Field IDs List
+                    </button>
+                    
+                    <div style="border-top: 1px solid #dee2e6; margin: 8px 0; padding-top: 8px;">
+                        <small style="font-weight: 600; font-size: 10px; color: #6c757d; display: block; margin-bottom: 6px;">OTHER FORMATS:</small>
+                    </div>
+                    
                     <button class="btn btn-sm btn-outline-info" id="exportGeoJSONBtn">
                         <i class="bi bi-file-earmark-code"></i> GeoJSON
                     </button>
                     <button class="btn btn-sm btn-outline-info" id="exportKMLBtn">
                         <i class="bi bi-map"></i> KML
                     </button>
-                    <button class="btn btn-sm btn-outline-info" id="exportCSVBtn">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV
-                    </button>
                 </div>
             </div>
+            
+            <!-- 8. REPORTS & METRICS -->
+            <button class="btn btn-sm w-100 mt-2" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.open('reports.html', '_blank')">
+                <i class="bi bi-graph-up"></i> Reports & Metrics
+            </button>
         </div>
         
         <!-- Center Panel: Map -->
         <div class="map-container">
             <div class="map-panel-header">
                 <h5><i class="bi bi-map"></i> Interactive Map</h5>
+                
+                <!-- Map Layer Switcher -->
+                <div style="position: absolute; right: 95px; top: 10px;">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="btnLayerStandard" onclick="switchMapLayer('osm')" title="Standard Map">
+                            <i class="bi bi-map"></i> Standard
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnLayerSatellite" onclick="switchMapLayer('satellite')" title="Satellite Imagery">
+                            <i class="bi bi-globe"></i> Satellite
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnLayerHybrid" onclick="switchMapLayer('hybrid')" title="Hybrid (Satellite + Labels)">
+                            <i class="bi bi-layers"></i> Hybrid
+                        </button>
+                    </div>
+                </div>
+                
                 <button class="btn btn-sm btn-outline-secondary" id="toggleMapLegend" style="position: absolute; right: 15px; top: 10px;">
                     <i class="bi bi-list"></i> Legend
                 </button>
@@ -324,86 +417,278 @@
             <div id="manual-fix-guidance" style="display: none;" class="mt-3"></div>
         </div>
         
-        <!-- Right Panel: ONLY Statistics -->
-        <div class="panel">
+        <!-- Right Panel: Statistics Dashboard (REDESIGNED v2.0) -->
+        <div class="panel" id="statisticsDashboard">
             <h5><i class="bi bi-bar-chart-fill"></i> Field Summary</h5>
             
-            <!-- TOTAL -->
-            <div class="stat-box total">
-                <h6>Total Fields</h6>
-                <div class="big-number" id="totalFieldsCount">0</div>
-            </div>
-            
-            <!-- VERRA READY TOTAL (Valid + Auto-Corrected) -->
-            <div class="stat-box" style="background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%); border-left: 4px solid #2e7d32; color: #1b5e20;">
-                <h6><i class="bi bi-patch-check-fill"></i> VERRA READY</h6>
-                <div class="big-number" id="verraReadyCount">0</div>
-                <div class="percentage" id="verraReadyPercentage">0%</div>
-                <small style="display: block; margin-top: 4px; font-size: 11px; font-weight: 600;">
-                    Valid + Auto-Corrected (for submission)
-                </small>
-            </div>
-            
-            <!-- NOT VALIDATED YET (shown when fields haven't been processed) -->
-            <div class="stat-box" id="notValidatedBox" style="background: linear-gradient(135deg, #fff3cd 0%, #ffecb5 100%); border-left: 4px solid #ff9800; color: #856404; display: none;">
-                <h6><i class="bi bi-hourglass-split"></i> NOT VALIDATED YET</h6>
-                <div class="big-number" id="notValidatedCount">0</div>
-                <div class="percentage" id="notValidatedPercentage">0%</div>
-                <small style="display: block; margin-top: 4px; font-size: 11px; font-weight: 600;">
-                    Click "Process All Fields" to validate
-                </small>
-            </div>
-            
-            <!-- VALID -->
-            <div class="stat-box valid">
-                <h6><i class="bi bi-check-circle-fill"></i> VALID</h6>
-                <div class="big-number" id="validFieldsCount">0</div>
-                <div class="percentage" id="validPercentage">0%</div>
-                <small style="display: block; margin-top: 4px; font-size: 11px;">Ready for Verra</small>
-            </div>
-            
-            <!-- AUTO-CORRECTED -->
-            <div class="stat-box" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-left: 4px solid #28a745; color: #155724;">
-                <h6><i class="bi bi-check-circle-fill"></i> AUTO-CORRECTED</h6>
-                <div class="big-number" id="fixableFieldsCount">0</div>
-                <div class="percentage" id="fixablePercentage">0%</div>
-            </div>
-            
-            <!-- NEEDS MANUAL EDIT -->
-            <div class="stat-box manual">
-                <h6><i class="bi bi-x-circle-fill"></i> NEEDS MANUAL EDIT</h6>
-                <div class="big-number" id="manualFieldsCount">0</div>
-                <div class="percentage" id="manualPercentage">0%</div>
-                <small style="display: block; margin-top: 4px; font-size: 11px;">Requires manual fixing</small>
-            </div>
-            
-            <!-- DUPLICATES -->
-            <div class="stat-box" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #2196f3; color: #0d47a1;">
-                <h6><i class="bi bi-files"></i> DUPLICATE FIELD IDs</h6>
-                <div class="big-number" id="duplicateFieldsCount">0</div>
-                <div class="percentage" id="duplicatePercentage">0%</div>
-                <small style="display: block; margin-top: 4px; font-size: 11px;">Same field ID appears multiple times</small>
-            </div>
-            
-            <!-- Help Message -->
-            <div class="alert alert-info" style="font-size: 11px; padding: 8px; margin-top: 15px;">
-                <strong>💡 Understanding Statistics:</strong><br>
-                <div style="margin-top: 6px;">
-                    <strong>BEFORE "Process All Fields":</strong><br>
-                    • Shows "NOT VALIDATED YET"<br>
-                    • Other stats show 0<br>
-                    <br>
-                    <strong>AFTER "Process All Fields":</strong><br>
-                    • VALID: ~80% (ready for Verra)<br>
-                    • CAN BE FIXED: ~15% (auto-fixable)<br>
-                    • NEEDS MANUAL: ~5% (manual editing)<br>
-                    <br>
-                    <strong>⚠️ "NOT VALIDATED YET" means:</strong><br>
-                    Your polygons are imported but NOT checked yet.<br>
-                    Most are probably FINE!<br>
-                    Click "Process All Fields" to find out.
+            <!-- ============================================================ -->
+            <!-- THE BIG NUMBER - Dominant Visual Element -->
+            <!-- ============================================================ -->
+            <div class="stat-box-hero" style="
+                background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+                color: white;
+                padding: 25px 20px;
+                border-radius: 12px;
+                text-align: center;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 12px rgba(46,125,50,0.3);
+            ">
+                <div style="font-size: 14px; font-weight: 600; opacity: 0.9; margin-bottom: 8px; letter-spacing: 1px;">
+                    VERRA COMPLIANCE STATUS
+                </div>
+                <div style="font-size: 64px; font-weight: 800; line-height: 1; margin-bottom: 8px;" id="verraReadyPercentageHero">
+                    0%
+                </div>
+                <div style="font-size: 18px; font-weight: 600; margin-bottom: 12px;">
+                    READY FOR SUBMISSION
+                </div>
+                <div style="font-size: 13px; opacity: 0.9; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 12px;">
+                    <span id="verraReadyCountHero">0</span> of <span id="totalFieldsCountHero">0</span> fields meet Verra requirements
                 </div>
             </div>
+            
+            <!-- ============================================================ -->
+            <!-- SECTION 1: VERRA COMPLIANCE (Critical - Always Visible) -->
+            <!-- ============================================================ -->
+            <div style="margin-bottom: 20px;">
+                <div style="
+                    background: #f5f5f5;
+                    padding: 10px 12px;
+                    border-radius: 6px 6px 0 0;
+                    border-left: 4px solid #2e7d32;
+                    font-weight: 600;
+                    font-size: 13px;
+                    color: #2e7d32;
+                    cursor: pointer;
+                " onclick="toggleSection('verraSection')">
+                    <i class="bi bi-patch-check-fill"></i> 🎯 VERRA COMPLIANCE
+                    <span style="float: right;" id="verraSectionIcon">▼</span>
+                </div>
+                
+                <div id="verraSection" style="display: block;">
+                    <!-- Ready for Submission -->
+                    <div class="stat-box" style="
+                        background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+                        border-left: 4px solid #2e7d32;
+                        color: #1b5e20;
+                        border-radius: 0;
+                    ">
+                        <h6 style="font-size: 12px; margin-bottom: 8px;">
+                            <i class="bi bi-check-circle-fill"></i> READY FOR SUBMISSION
+                        </h6>
+                        <div class="big-number" id="verraReadyCount">0</div>
+                        <div class="percentage" id="verraReadyPercentage">0%</div>
+                        
+                        <!-- Expandable Breakdown -->
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-outline-success" style="font-size: 10px; padding: 3px 8px;" onclick="toggleBreakdown('verraBreakdown')">
+                                <span id="verraBreakdownToggle">▶</span> View breakdown
+                            </button>
+                            <div id="verraBreakdown" style="display: none; margin-top: 8px; font-size: 11px; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>• Originally valid:</span>
+                                    <span style="font-weight: 600;" id="validFieldsCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>• Auto-corrected:</span>
+                                    <span style="font-weight: 600;" id="autoCorrectedCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span>• Manually corrected:</span>
+                                    <span style="font-weight: 600;" id="manuallyCorrectedCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Needs Correction -->
+                    <div class="stat-box manual" style="border-radius: 0 0 6px 6px;">
+                        <h6 style="font-size: 12px; margin-bottom: 8px;">
+                            <i class="bi bi-exclamation-triangle-fill"></i> NEEDS CORRECTION
+                        </h6>
+                        <div class="big-number" id="totalNeedsWorkCount">0</div>
+                        <div class="percentage" id="totalNeedsWorkPercentage">0%</div>
+                        
+                        <!-- Expandable Breakdown -->
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-outline-danger" style="font-size: 10px; padding: 3px 8px;" onclick="toggleBreakdown('issuesBreakdown')">
+                                <span id="issuesBreakdownToggle">▶</span> View issues
+                            </button>
+                            <div id="issuesBreakdown" style="display: none; margin-top: 8px; font-size: 11px; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>• Can be auto-fixed:</span>
+                                    <span style="font-weight: 600;" id="fixableFieldsCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span>• Needs manual editing:</span>
+                                    <span style="font-weight: 600;" id="manualFieldsCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================================ -->
+            <!-- SECTION 2: DATA QUALITY (Informational - Collapsed by Default) -->
+            <!-- ============================================================ -->
+            <div style="margin-bottom: 20px;">
+                <div style="
+                    background: #f5f5f5;
+                    padding: 10px 12px;
+                    border-radius: 6px;
+                    border-left: 4px solid #1976d2;
+                    font-weight: 600;
+                    font-size: 13px;
+                    color: #1976d2;
+                    cursor: pointer;
+                " onclick="toggleSection('dataQualitySection')">
+                    <i class="bi bi-info-circle-fill"></i> ℹ️ DATA QUALITY
+                    <span style="float: right;" id="dataQualitySectionIcon">▶</span>
+                </div>
+                
+                <div id="dataQualitySection" style="display: none; margin-top: 10px;">
+                    <!-- Total Fields -->
+                    <div class="stat-box total" style="margin-bottom: 10px;">
+                        <h6 style="font-size: 11px;">Total Fields Imported</h6>
+                        <div style="font-size: 24px; font-weight: 700;" id="totalFieldsCount">0</div>
+                    </div>
+                    
+                    <!-- Duplicates -->
+                    <div class="stat-box" style="
+                        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                        border-left: 4px solid #2196f3;
+                        color: #0d47a1;
+                        margin-bottom: 10px;
+                    ">
+                        <h6 style="font-size: 11px;"><i class="bi bi-files"></i> Duplicate Field IDs</h6>
+                        <div style="font-size: 20px; font-weight: 700;" id="duplicateFieldsCount">0</div>
+                        <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Same ID appears multiple times</div>
+                    </div>
+                    
+                    <!-- Parse Failed -->
+                    <div class="stat-box" style="
+                        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+                        border-left: 4px solid #ffc107;
+                        color: #856404;
+                    ">
+                        <h6 style="font-size: 11px;"><i class="bi bi-exclamation-triangle-fill"></i> Parse Failed</h6>
+                        <div style="font-size: 20px; font-weight: 700;" id="parseFailedCount">0</div>
+                        <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">CSV rows that couldn't be parsed</div>
+                    </div>
+                    
+                    <!-- Not Validated Yet -->
+                    <div class="stat-box" id="notValidatedBox" style="
+                        background: linear-gradient(135deg, #fff3cd 0%, #ffecb5 100%);
+                        border-left: 4px solid #ff9800;
+                        color: #856404;
+                        margin-top: 10px;
+                        display: none;
+                    ">
+                        <h6 style="font-size: 11px;"><i class="bi bi-hourglass-split"></i> Not Validated Yet</h6>
+                        <div style="font-size: 20px; font-weight: 700;" id="notValidatedCount">0</div>
+                        <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Click "Process All Fields" to validate</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================================ -->
+            <!-- SECTION 3: YOUR CORRECTIONS (Collapsed by Default) -->
+            <!-- ============================================================ -->
+            <div style="margin-bottom: 20px;">
+                <div style="
+                    background: #f5f5f5;
+                    padding: 10px 12px;
+                    border-radius: 6px;
+                    border-left: 4px solid #43a047;
+                    font-weight: 600;
+                    font-size: 13px;
+                    color: #2e7d32;
+                    cursor: pointer;
+                " onclick="toggleSection('correctionsSection')">
+                    <i class="bi bi-graph-up-arrow"></i> 📈 YOUR CORRECTIONS
+                    <span style="float: right;" id="correctionsSectionIcon">▶</span>
+                </div>
+                
+                <div id="correctionsSection" style="display: none; margin-top: 10px;">
+                    <!-- Auto-Corrected -->
+                    <div class="stat-box" style="
+                        background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+                        border-left: 4px solid #ff9800;
+                        color: #e65100;
+                        margin-bottom: 10px;
+                    ">
+                        <h6 style="font-size: 11px;"><i class="bi bi-robot"></i> Auto-Corrected</h6>
+                        <div style="font-size: 20px; font-weight: 700;" id="autoCorrectedCountProgress">0</div>
+                        <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Fixed by algorithm</div>
+                    </div>
+                    
+                    <!-- Manually Corrected -->
+                    <div class="stat-box" style="
+                        background: linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%);
+                        border-left: 4px solid #9c27b0;
+                        color: #4a148c;
+                    ">
+                        <h6 style="font-size: 11px;"><i class="bi bi-hand-index-thumb"></i> Manually Corrected</h6>
+                        <div style="font-size: 20px; font-weight: 700;" id="manuallyCorrectedCountProgress">0</div>
+                        <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Fixed by you</div>
+                    </div>
+                    
+                    <!-- Manual Flags -->
+                    <div class="stat-box" id="manualFlagsBox" style="
+                        background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+                        border-left: 4px solid #e91e63;
+                        color: #880e4f;
+                        margin-top: 10px;
+                        display: none;
+                    ">
+                        <h6 style="font-size: 11px;"><i class="bi bi-flag-fill"></i> Flagged for Review</h6>
+                        <div style="font-size: 20px; font-weight: 700;" id="totalManualFlagsCount">0</div>
+                        
+                        <div style="margin-top: 8px;">
+                            <button class="btn btn-sm btn-outline-secondary" style="font-size: 10px; padding: 3px 8px;" onclick="toggleBreakdown('flagsBreakdown')">
+                                <span id="flagsBreakdownToggle">▶</span> View flags
+                            </button>
+                            <div id="flagsBreakdown" style="display: none; margin-top: 8px; font-size: 11px; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                    <span>Self-Intersection:</span>
+                                    <span style="font-weight: 600;" id="selfIntersectionFlagsCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                    <span>Straight Line:</span>
+                                    <span style="font-weight: 600;" id="straightLineFlagsCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                    <span>Bow Tie:</span>
+                                    <span style="font-weight: 600;" id="bowTieFlagsCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                    <span>Overlapping:</span>
+                                    <span style="font-weight: 600;" id="overlappingFlagsCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span>Other:</span>
+                                    <span style="font-weight: 600;" id="otherIssueFlagsCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================================ -->
+            <!-- HELP TEXT (Simplified) -->
+            <!-- ============================================================ -->
+            <div class="alert alert-info" style="font-size: 11px; padding: 10px; background: #e3f2fd; border-left: 3px solid #1976d2; border-radius: 6px;">
+                <strong>💡 Quick Guide:</strong><br>
+                <div style="margin-top: 6px; line-height: 1.6;">
+                    <strong style="color: #2e7d32;">Green = Ready</strong> for Verra submission<br>
+                    <strong style="color: #dc3545;">Red = Needs</strong> your attention<br>
+                    Click <strong>▶</strong> to expand sections for details
+                </div>
+            </div>
+            
+            <!-- Progress Panel will be appended here by progress-panel.js -->
         </div>
     </div>
     
@@ -429,6 +714,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
     
     <!-- Catalog Script -->
     <script>
@@ -478,8 +764,400 @@
                 }
             }, 100);
         }
+        
+        // Switch map layer (Standard/Satellite/Hybrid)
+        function switchMapLayer(layerType) {
+            console.log(`🗺️ Switching to ${layerType} layer...`);
+            
+            // Update button states
+            document.getElementById('btnLayerStandard').classList.remove('active');
+            document.getElementById('btnLayerSatellite').classList.remove('active');
+            document.getElementById('btnLayerHybrid').classList.remove('active');
+            
+            // Activate clicked button
+            if (layerType === 'osm') {
+                document.getElementById('btnLayerStandard').classList.add('active');
+            } else if (layerType === 'satellite') {
+                document.getElementById('btnLayerSatellite').classList.add('active');
+            } else if (layerType === 'hybrid') {
+                document.getElementById('btnLayerHybrid').classList.add('active');
+            }
+            
+            // Trigger layer switch via custom event (will be caught by app.js)
+            document.dispatchEvent(new CustomEvent('switchMapLayer', { 
+                detail: { layerType: layerType } 
+            }));
+        }
+        
+        // Listen for manual flag updates from catalog
+        document.addEventListener('fieldManualFlagUpdated', async (event) => {
+            const { fieldId, manualFlags } = event.detail;
+            console.log(`🚩 Received manual flag update for ${fieldId}:`, manualFlags);
+            
+            // Trigger save to IndexedDB via custom event that app.js will catch
+            document.dispatchEvent(new CustomEvent('saveManualFlagsToIndexedDB', {
+                detail: { fieldId, manualFlags }
+            }));
+        });
     </script>
     
-    <script type="module" src="./app.js"></script>
+    <!-- ============================================================ -->
+    <!-- DASHBOARD REDESIGN v2.0 - Toggle Functions -->
+    <!-- ============================================================ -->
+    <script>
+        /**
+         * Toggle collapsible sections
+         */
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const icon = document.getElementById(sectionId + 'Icon');
+            
+            if (section && section.style.display === 'none') {
+                section.style.display = 'block';
+                if (icon) icon.textContent = '▼';
+            } else if (section) {
+                section.style.display = 'none';
+                if (icon) icon.textContent = '▶';
+            }
+        }
+
+        /**
+         * Toggle breakdown details
+         */
+        function toggleBreakdown(breakdownId) {
+            const breakdown = document.getElementById(breakdownId);
+            const toggle = document.getElementById(breakdownId + 'Toggle');
+            
+            if (breakdown && breakdown.style.display === 'none') {
+                breakdown.style.display = 'block';
+                if (toggle) toggle.textContent = '▼';
+            } else if (breakdown) {
+                breakdown.style.display = 'none';
+                if (toggle) toggle.textContent = '▶';
+            }
+        }
+
+        /**
+         * Update hero section with latest stats
+         * Called from StatisticsDashboard.updateDisplay()
+         */
+        function updateHeroSection(stats) {
+            const verraReadyCount = stats.valid + stats.autoCorrected + stats.manuallyCorrected;
+            const verraReadyPercent = stats.total > 0 ? Math.round((verraReadyCount / stats.total) * 100) : 0;
+            
+            // Update hero
+            const heroPercent = document.getElementById('verraReadyPercentageHero');
+            const heroCount = document.getElementById('verraReadyCountHero');
+            const heroTotal = document.getElementById('totalFieldsCountHero');
+            
+            if (heroPercent) heroPercent.textContent = verraReadyPercent + '%';
+            if (heroCount) heroCount.textContent = verraReadyCount.toLocaleString();
+            if (heroTotal) heroTotal.textContent = stats.total.toLocaleString();
+            
+            // Update "Needs Correction" total
+            const needsWorkCount = stats.canBeFixed + stats.needsManual;
+            const needsWorkPercent = stats.total > 0 ? Math.round((needsWorkCount / stats.total) * 100) : 0;
+            
+            const needsWorkEl = document.getElementById('totalNeedsWorkCount');
+            const needsWorkPercentEl = document.getElementById('totalNeedsWorkPercentage');
+            
+            if (needsWorkEl) needsWorkEl.textContent = needsWorkCount.toLocaleString();
+            if (needsWorkPercentEl) needsWorkPercentEl.textContent = needsWorkPercent + '%';
+            
+            // Update progress section duplicate displays
+            const autoProgressEl = document.getElementById('autoCorrectedCountProgress');
+            const manualProgressEl = document.getElementById('manuallyCorrectedCountProgress');
+            
+            if (autoProgressEl) autoProgressEl.textContent = stats.autoCorrected.toLocaleString();
+            if (manualProgressEl) manualProgressEl.textContent = stats.manuallyCorrected.toLocaleString();
+        }
+    </script>
+    
+    <!-- ULTIMATE HERO FIX - Multiple Update Methods -->
+    <script>
+        (function() {
+            console.log('🚀 Ultimate Hero Fix loaded');
+            
+            // Core update function
+            function updateHeroFromBreakdown() {
+                try {
+                    // Method 1: Find the breakdown count element directly
+                    const readyEl = document.getElementById('verraReadyCount');
+                    const totalEl = document.getElementById('totalFieldsCount');
+                    
+                    let ready = 0;
+                    let total = 0;
+                    
+                    if (readyEl && totalEl) {
+                        ready = parseInt(readyEl.textContent.replace(/[^0-9]/g, ''));
+                        total = parseInt(totalEl.textContent.replace(/[^0-9]/g, ''));
+                    }
+                    
+                    // Method 2: Parse from page text if Method 1 fails
+                    if (ready === 0 || total === 0) {
+                        const pageText = document.body.textContent;
+                        const readyMatch = pageText.match(/READY FOR SUBMISSION\s+(\d+[',\s]?\d+)/);
+                        const totalMatch = pageText.match(/(\d+[',\s]?\d+)\s+fields meet Verra/);
+                        
+                        if (readyMatch) ready = parseInt(readyMatch[1].replace(/[^0-9]/g, ''));
+                        if (totalMatch) total = parseInt(totalMatch[1].replace(/[^0-9]/g, ''));
+                    }
+                    
+                    // Update hero if we have valid numbers
+                    if (ready > 1000 && total > 1000) {
+                        const percent = Math.round((ready / total) * 100);
+                        
+                        const heroPercent = document.getElementById('verraReadyPercentageHero');
+                        const heroCount = document.getElementById('verraReadyCountHero');
+                        const heroTotal = document.getElementById('totalFieldsCountHero');
+                        
+                        if (heroPercent && heroPercent.textContent !== percent + '%') {
+                            heroPercent.textContent = percent + '%';
+                            console.log('✅ Hero percent updated:', percent + '%');
+                        }
+                        
+                        if (heroCount && heroCount.textContent !== ready.toLocaleString()) {
+                            heroCount.textContent = ready.toLocaleString();
+                            console.log('✅ Hero count updated:', ready.toLocaleString());
+                        }
+                        
+                        if (heroTotal && heroTotal.textContent !== total.toLocaleString()) {
+                            heroTotal.textContent = total.toLocaleString();
+                            console.log('✅ Hero total updated:', total.toLocaleString());
+                        }
+                        
+                        return true; // Success
+                    }
+                    
+                    return false; // No valid data yet
+                } catch (err) {
+                    console.error('Error updating hero:', err);
+                    return false;
+                }
+            }
+            
+            // Trigger 1: Watch for changes in the breakdown section
+            const observer = new MutationObserver(function() {
+                updateHeroFromBreakdown();
+            });
+            
+            // Start observing after a short delay
+            setTimeout(function() {
+                const summaryPanel = document.querySelector('[class*="panel"]');
+                if (summaryPanel) {
+                    observer.observe(summaryPanel, {
+                        childList: true,
+                        subtree: true,
+                        characterData: true
+                    });
+                    console.log('📡 Watching for breakdown changes');
+                }
+            }, 1000);
+            
+            // Trigger 2: Check every 2 seconds
+            setInterval(updateHeroFromBreakdown, 2000);
+            console.log('⏰ Auto-check every 2 seconds started');
+            
+            // Trigger 3: Run on page load
+            window.addEventListener('DOMContentLoaded', function() {
+                setTimeout(updateHeroFromBreakdown, 3000);
+                console.log('📄 Page loaded - will check in 3 seconds');
+            });
+            
+            // Trigger 4: Hook into "Process All Fields" button
+            setTimeout(function() {
+                const processButton = document.querySelector('button[onclick*="processAllFields"], button:contains("Process All Fields")');
+                if (processButton) {
+                    processButton.addEventListener('click', function() {
+                        setTimeout(updateHeroFromBreakdown, 5000);
+                        console.log('🔄 Process All Fields clicked - will update hero');
+                    });
+                }
+            }, 2000);
+            
+            // Run immediately
+            setTimeout(updateHeroFromBreakdown, 2000);
+            
+            // Make function globally available for manual trigger
+            window.fixHero = updateHeroFromBreakdown;
+            console.log('💡 Run window.fixHero() to manually update hero');
+        })();
+    </script>
+    
+    <!-- ============================================================ -->
+    <!-- DATAVERSE / FIELDFORCE INTEGRATION                          -->
+    <!-- ============================================================ -->
+    <script>
+    (function() {
+        const MSAL_CONFIG = {
+            auth: {
+                clientId:    '60aa71ce-b771-46d9-9e0f-51fd1fe4f4d6',
+                authority:   'https://login.microsoftonline.com/f9198cfe-2489-4324-b66f-e27f00e3f667',
+                redirectUri: window.location.origin + window.location.pathname
+            },
+            cache: { cacheLocation: 'sessionStorage' }
+        };
+
+        const DV_ENV   = 'https://fieldforce.crm14.dynamics.com';
+        const DV_API   = `${DV_ENV}/api/data/v9.2`;
+        const DV_SCOPE = [`${DV_ENV}/user_impersonation`];
+
+        // Columns to fetch — covers all columns the app needs
+        // Logical names follow the ccs_ prefix convention seen in the tree table
+        const DV_SELECT = [
+            'ccs_ccsfieldid',       // CCS Field ID
+            'ccs_fieldgeojson',     // Field GeoJSON
+            'ccs_fieldowner',       // Field Owner
+            'ccs_zone',             // Zone
+            'ccs_fieldsize',        // Field Size
+            'ccs_fieldid',          // GUID / Do Not Modify
+            'createdon'
+        ].join(',');
+
+        let msalApp = null;
+        let dvAccount = null;
+
+        function getMSAL() {
+            if (!msalApp) msalApp = new msal.PublicClientApplication(MSAL_CONFIG);
+            return msalApp;
+        }
+
+        async function getToken() {
+            const app = getMSAL();
+            const accounts = app.getAllAccounts();
+            if (accounts.length > 0) dvAccount = accounts[0];
+            const req = { scopes: DV_SCOPE, account: dvAccount || undefined };
+            try {
+                const r = await app.acquireTokenSilent(req);
+                dvAccount = r.account;
+                return r.accessToken;
+            } catch(e) {
+                const r = await app.acquireTokenPopup(req);
+                dvAccount = r.account;
+                return r.accessToken;
+            }
+        }
+
+        function setDvStatus(msg, color) {
+            const el = document.getElementById('dvStatus');
+            if (el) { el.textContent = msg; el.style.color = color || '#6c757d'; }
+        }
+
+        window.connectFieldforce = async function() {
+            const btn = document.getElementById('btnFieldforce');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Signing in…';
+            setDvStatus('Authenticating with Microsoft 365…', '#0078d4');
+
+            try {
+                const token = await getToken();
+                const name = dvAccount?.name || dvAccount?.username || 'Connected';
+                btn.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> ${name}`;
+                btn.style.background = 'linear-gradient(135deg,#198754,#146c43)';
+                setDvStatus('✓ Authenticated — fetching fields from Fieldforce…', '#198754');
+                await fetchAllFields(token);
+            } catch(e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cloud-arrow-down me-1"></i> Connect to Fieldforce';
+                btn.style.background = '';
+                setDvStatus('❌ ' + (e.message || String(e)), '#dc3545');
+            }
+        };
+
+        async function fetchAllFields(token) {
+            let url = `${DV_API}/ccs_fields?$select=${DV_SELECT}&$filter=statecode eq 0&$top=5000`;
+            const rows = [];
+            let page = 0;
+
+            while (url) {
+                page++;
+                setDvStatus(`⬇ Fetching page ${page} — ${rows.length.toLocaleString()} fields so far…`, '#0078d4');
+
+                let res = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0',
+                        'Prefer': 'odata.maxpagesize=5000'
+                    }
+                });
+
+                // Token expired mid-fetch — refresh once
+                if (res.status === 401) {
+                    token = await getToken();
+                    res = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json',
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Prefer': 'odata.maxpagesize=5000'
+                        }
+                    });
+                }
+
+                if (!res.ok) {
+                    const body = await res.text();
+                    // If column names are wrong, surface them clearly
+                    throw new Error(`HTTP ${res.status} — ${body.substring(0, 200)}`);
+                }
+
+                const data = await res.json();
+                rows.push(...(data.value || []));
+                url = data['@odata.nextLink'] || null;
+            }
+
+            setDvStatus(`✓ ${rows.length.toLocaleString()} fields loaded — converting…`, '#198754');
+            injectAsCSV(rows);
+        }
+
+        function injectAsCSV(rows) {
+            // Convert Dataverse rows → CSV matching what app.js expects
+            // Header names match the column detection in app.js
+            const headers = [
+                'CCS Field ID',
+                'Field GeoJSON',
+                'Field Owner',
+                'Zone',
+                'Field Size',
+                'Do Not Modify'
+            ];
+
+            const escape = v => {
+                if (v === null || v === undefined) return '';
+                const s = String(v).replace(/"/g, '""');
+                return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
+            };
+
+            const csvRows = [headers.join(',')];
+            for (const r of rows) {
+                csvRows.push([
+                    escape(r.ccs_ccsfieldid   || r.ccs_fieldid || ''),
+                    escape(r.ccs_fieldgeojson || ''),
+                    escape(r.ccs_fieldowner   || ''),
+                    escape(r.ccs_zone         || ''),
+                    escape(r.ccs_fieldsize    || ''),
+                    escape(r.ccs_fieldid      || '')
+                ].join(','));
+            }
+
+            const csv     = csvRows.join('\n');
+            const blob    = new Blob([csv], { type: 'text/csv' });
+            const file    = new File([blob], 'active_fields_fieldforce.csv', { type: 'text/csv' });
+
+            // Inject into the fileInput that app.js is watching
+            const input = document.getElementById('fileInput');
+            const dt    = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+
+            setDvStatus(`✓ ${rows.length.toLocaleString()} fields ready — click Process All Fields`, '#198754');
+        }
+    })();
+    </script>
+
+    <script type="module" src="./app.js?v=7"></script>
 </body>
 </html>
