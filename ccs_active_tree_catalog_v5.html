@@ -974,10 +974,9 @@ async function connectFieldforce() {
     btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
 
     setStatusDV('✓ Authenticated — fetching fields & trees…', 'ok');
-    await Promise.all([
-      fetchAllFields(token),
-      fetchAllTrees(token)
-    ]);
+    // Fields must complete first — tree mapping uses fieldsData GUID lookup
+    await fetchAllFields(token);
+    await fetchAllTrees(token);
 
     // Save to IndexedDB cache after both fetches complete
     await saveToCache(fieldsData, treesData);
@@ -1029,7 +1028,7 @@ async function fetchAllFields(token) {
   );
 
   fieldsData = rows.map((r, i) => ({
-    guid:    r.ccs_fieldid || `F${i}`,
+    guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
     fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
     geoJSON: String(r.ccs_fieldgeojson_field || ''),
     owner:   String(r.ccs_contactid_field   || ''),
@@ -1054,24 +1053,27 @@ async function fetchAllTrees(token) {
   // Species is an option set (integer) — we request formatted values via header
   // Field is a lookup — we expand to get FLD-xxx from the related ccs_field record
 
-  const selectCols = [codeCol, latCol, lngCol, ownerCol, nrcCol, accCol, 'createdon'].join(',');
+  const selectCols = [codeCol, latCol, lngCol, ownerCol, nrcCol, accCol, 'createdon', '_ccs_field_tree_value'].join(',');
 
   const rows = await dvFetchAll(token,
-    `${DV_API}/ccs_trees?$select=${selectCols}&$expand=ccs_field_tree($select=ccs_cssfieldid_field)&$filter=statecode eq 0`,
+    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
     'Trees',
     true  // request formatted values for option sets
   );
+
+  // Build a GUID → fieldId lookup from already-loaded fieldsData
+  const guidToFieldId = {};
+  fieldsData.forEach(f => { if (f.guid) guidToFieldId[f.guid.toLowerCase()] = f.fieldId; });
 
   treesData = rows.map((r, i) => {
     const lat = parseFloat(r[latCol]);
     const lng = parseFloat(r[lngCol]);
     const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
-    // Species: use formatted value annotation (sent when includeAnnotations=true)
     const species = r['ccs_species_tree@OData.Community.Display.V1.FormattedValue']
       || String(r['ccs_species_tree'] || '');
-    // Field: get FLD-xxx from expanded related field record
-    const expandedField = r['ccs_field_tree'];
-    const treeFieldVal  = expandedField?.ccs_cssfieldid_field || '';
+    // Resolve field GUID → FLD-xxx using our loaded fieldsData
+    const fieldGuid = (r['_ccs_field_tree_value'] || '').toLowerCase();
+    const treeFieldVal = guidToFieldId[fieldGuid] || '';
     return {
       guid:          r.ccs_treeid || `T${i}`,
       treeCode:      String(r[codeCol] || `T${i}`),
