@@ -581,10 +581,13 @@ table.catalog tr.selected td { background: var(--green-bg); }
     <div class="sb-section">
       <span class="sb-label">Active Trees</span>
       <!-- Primary: Fieldforce live connection -->
-      <button class="btn btn-primary" id="btnFieldforce" onclick="connectFieldforce()"
-        style="width:100%;margin-bottom:5px;background:linear-gradient(135deg,#0078d4,#005a9e);display:flex;align-items:center;justify-content:center;gap:6px">
-        <span style="font-size:13px">☁</span> Connect to Fieldforce
-      </button>
+      <div class="btn-row" style="margin-bottom:5px">
+        <button class="btn btn-primary" id="btnFieldforce" onclick="connectFieldforce()"
+          style="flex:1;background:linear-gradient(135deg,#0078d4,#005a9e);display:flex;align-items:center;justify-content:center;gap:6px">
+          <span style="font-size:13px">☁</span> Connect to Fieldforce
+        </button>
+        <button class="btn btn-secondary" onclick="forceRefresh()" title="Clear cache and fetch fresh data" style="width:36px;font-size:14px">↺</button>
+      </div>
       <div class="upload-status" id="statusFieldforce"></div>
       <!-- Divider -->
       <div style="display:flex;align-items:center;gap:6px;margin:6px 0">
@@ -800,8 +803,118 @@ table.catalog tr.selected td { background: var(--green-bg); }
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
-// DATAVERSE / MSAL INTEGRATION
+// INDEXEDDB CACHE
 // ═══════════════════════════════════════════════════════════════════════════
+
+const DB_NAME    = 'ccs_tree_catalog';
+const DB_VERSION = 1;
+const CACHE_TTL  = 6 * 60 * 60 * 1000; // 6 hours in ms
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('cache')) {
+        db.createObjectStore('cache', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function cacheSet(key, value) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx   = db.transaction('cache', 'readwrite');
+      const store = tx.objectStore('cache');
+      store.put({ key, value, ts: Date.now() });
+      tx.oncomplete = () => resolve();
+      tx.onerror    = e => reject(e.target.error);
+    });
+  } catch(e) { console.warn('Cache write failed:', e); }
+}
+
+async function cacheGet(key) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction('cache', 'readonly');
+      const store = tx.objectStore('cache');
+      const req   = store.get(key);
+      req.onsuccess = e => {
+        const rec = e.target.result;
+        if (!rec) return resolve(null);
+        if (Date.now() - rec.ts > CACHE_TTL) return resolve(null); // expired
+        resolve(rec.value);
+      };
+      req.onerror = e => reject(e.target.error);
+    });
+  } catch(e) { return null; }
+}
+
+async function cacheClear() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('cache', 'readwrite');
+      tx.objectStore('cache').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror    = e => reject(e.target.error);
+    });
+  } catch(e) {}
+}
+
+async function tryLoadFromCache() {
+  const cached = await cacheGet('allocation_run');
+  if (!cached) return false;
+  const ageHours = ((Date.now() - cached.ts) / 3600000).toFixed(1);
+  const useCache = confirm(
+    `Cached data available from ${ageHours} hours ago.\n` +
+    `Fields: ${cached.fieldsCount.toLocaleString()} · Trees: ${cached.treesCount.toLocaleString()}\n\n` +
+    `Click OK to load from cache (instant)\nClick Cancel to fetch fresh data from Fieldforce`
+  );
+  if (!useCache) return false;
+
+  fieldsData = cached.fields;
+  treesData  = cached.trees;
+  // Re-parse rings (they don't survive JSON serialisation)
+  fieldsData.forEach(f => { f.ring = f.ring || parseGeoJSON(f.geoJSON); });
+  const valid = fieldsData.filter(f => f.ring).length;
+  setStatus('statusFields', `✓ ${fieldsData.length.toLocaleString()} fields (cached ${ageHours}h ago)`, true);
+  setStatus('statusTrees',  `✓ ${treesData.length.toLocaleString()} trees (cached ${ageHours}h ago)`, true);
+
+  const btn = document.getElementById('btnFieldforce');
+  btn.innerHTML = `<span style="font-size:13px">✓</span> Cache (${ageHours}h ago)`;
+  btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+  checkReady();
+  return true;
+}
+
+async function saveToCache(fields, trees) {
+  // Strip rings before storing (can be re-parsed from geoJSON)
+  const fieldsToStore = fields.map(f => ({ ...f, ring: null }));
+  await cacheSet('allocation_run', {
+    fields:      fieldsToStore,
+    trees,
+    fieldsCount: fields.length,
+    treesCount:  trees.length,
+    ts:          Date.now()
+  });
+  console.log('✓ Data cached to IndexedDB');
+}
+
+async function forceRefresh() {
+  await cacheClear();
+  setStatusDV('Cache cleared — connecting to Fieldforce…', 'ok');
+  const btn = document.getElementById('btnFieldforce');
+  btn.innerHTML = '<span style="font-size:13px">☁</span> Connect to Fieldforce';
+  btn.style.background = 'linear-gradient(135deg,#0078d4,#005a9e)';
+  btn.disabled = false;
+  connectFieldforce();
+}
 
 const MSAL_CONFIG = {
   auth: {
@@ -845,6 +958,11 @@ async function getToken() {
 
 async function connectFieldforce() {
   const btn = document.getElementById('btnFieldforce');
+
+  // Try cache first
+  const loadedFromCache = await tryLoadFromCache();
+  if (loadedFromCache) return;
+
   btn.disabled = true;
   btn.innerHTML = '<span style="font-size:13px">⏳</span> Signing in…';
   setStatusDV('Authenticating with Microsoft…', 'ok');
@@ -855,12 +973,15 @@ async function connectFieldforce() {
     btn.innerHTML = `<span style="font-size:13px">✓</span> ${name}`;
     btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
 
-    // Fetch fields and trees in parallel
     setStatusDV('✓ Authenticated — fetching fields & trees…', 'ok');
     await Promise.all([
       fetchAllFields(token),
       fetchAllTrees(token)
     ]);
+
+    // Save to IndexedDB cache after both fetches complete
+    await saveToCache(fieldsData, treesData);
+    setStatusDV('✓ Data cached — next session will load instantly', 'ok');
   } catch(e) {
     btn.disabled = false;
     btn.innerHTML = '<span style="font-size:13px">☁</span> Connect to Fieldforce';
@@ -949,11 +1070,17 @@ async function fetchAllTrees(token) {
 
   console.log('Tree cols — lat:', latCol, '| lng:', lngCol, '| code:', codeCol, '| spec:', specCol, '| field:', fieldCol, '| owner:', ownerCol);
 
-  const selectCols = [codeCol, latCol, lngCol, specCol, fieldCol, ownerCol, nrcCol, accCol, 'createdon']
+  const selectCols = [codeCol, latCol, lngCol, specCol, ownerCol, nrcCol, accCol, 'createdon']
     .filter(Boolean).join(',');
 
+  // Use $expand on the field lookup to get the FLD-xxx CCS Field ID
+  // ccs_field_tree is a lookup — we expand it to get ccs_cssfieldid_field
+  const expandClause = fieldCol
+    ? `&$expand=${fieldCol}($select=ccs_cssfieldid_field)`
+    : '';
+
   const rows = await dvFetchAll(token,
-    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
+    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0${expandClause}`,
     'Trees'
   );
 
@@ -961,13 +1088,18 @@ async function fetchAllTrees(token) {
     const lat = parseFloat(latCol ? r[latCol] : null);
     const lng = parseFloat(lngCol ? r[lngCol] : null);
     const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
+    // Get FLD-xxx from the expanded field record, fall back to raw value
+    const expandedField = fieldCol ? r[fieldCol] : null;
+    const treeFieldVal  = expandedField?.ccs_cssfieldid_field
+      || (typeof expandedField === 'string' ? expandedField : '')
+      || '';
     return {
       guid:          r.ccs_treeid || `T${i}`,
       treeCode:      String(codeCol  ? r[codeCol]  : `T${i}`),
       species:       String(specCol  ? r[specCol]  : ''),
       lat:           coords ? coords.lat : null,
       lng:           coords ? coords.lng : null,
-      treeField:     String(fieldCol ? r[fieldCol] : ''),
+      treeField:     treeFieldVal.trim(),
       fieldOwner:    String(ownerCol ? r[ownerCol] : ''),
       fieldOwnerNRC: String(nrcCol   ? r[nrcCol]   : ''),
       treeOwner:     String(ownerCol ? r[ownerCol] : ''),
