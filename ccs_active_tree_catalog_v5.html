@@ -1378,14 +1378,44 @@ async function runAllocation() {
   btn.textContent = '⏳ Running…';
 
   showProgress(true);
-  setProgress(0, 'Preparing allocation…', `${treesData.length.toLocaleString()} trees × ${fieldsData.length} fields`);
+  setProgress(0, 'Building spatial index…', `${fieldsData.length.toLocaleString()} fields`);
   allocation = [];
 
   const validFields = fieldsData.filter(f => f.ring);
-  const total       = treesData.length;
-  const CHUNK       = 100; // process N trees per frame
 
-  // Yield control every CHUNK trees so the progress bar actually renders
+  // ── Build bounding-box spatial grid index ──────────────────────────────
+  // Compute bbox for every field ring
+  const CELL = 0.1; // ~11km grid cells in degrees
+  const grid  = {};  // key: "row:col" → array of field indices
+
+  validFields.forEach((field, idx) => {
+    let minLat = Infinity, maxLat = -Infinity;
+    let minLng = Infinity, maxLng = -Infinity;
+    for (const [lng, lat] of field.ring) {
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+    }
+    field._bbox = { minLat, maxLat, minLng, maxLng };
+
+    // Register field in all grid cells it overlaps
+    const r0 = Math.floor(minLat / CELL), r1 = Math.floor(maxLat / CELL);
+    const c0 = Math.floor(minLng / CELL), c1 = Math.floor(maxLng / CELL);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const key = `${r}:${c}`;
+        if (!grid[key]) grid[key] = [];
+        grid[key].push(idx);
+      }
+    }
+  });
+
+  setProgress(5, 'Spatial index ready — allocating trees…',
+    `${validFields.length.toLocaleString()} fields indexed · ${treesData.length.toLocaleString()} trees to process`);
+  await new Promise(r => requestAnimationFrame(r));
+
+  const total = treesData.length;
+  const CHUNK = 500; // larger chunks — index makes each tree fast
+
   for (let start = 0; start < total; start += CHUNK) {
     const end   = Math.min(start + CHUNK, total);
     const chunk = treesData.slice(start, end);
@@ -1396,24 +1426,34 @@ async function runAllocation() {
       let matchCount   = 0;
 
       if (tree.lat !== null && tree.lng !== null) {
+        // Look up only fields in the same grid cell
+        const key = `${Math.floor(tree.lat / CELL)}:${Math.floor(tree.lng / CELL)}`;
+        const candidates = grid[key] || [];
+
         let spatialMatches = [];
-        for (const field of validFields) {
+        for (const idx of candidates) {
+          const field = validFields[idx];
+          // Quick bbox pre-filter before expensive pip
+          const b = field._bbox;
+          if (tree.lat < b.minLat || tree.lat > b.maxLat ||
+              tree.lng < b.minLng || tree.lng > b.maxLng) continue;
           if (pip(tree.lat, tree.lng, field.ring)) {
             spatialMatches.push(field);
           }
         }
+
         matchCount = spatialMatches.length;
         if (matchCount > 0) {
           insideFlag = true;
-          // Priority 1: field whose ID exactly matches the tree's treeField text
+          // Priority 1: admin match — tree's treeField matches field ID
           const adminMatch = spatialMatches.find(f =>
             tree.treeField && f.fieldId.toLowerCase().trim() === tree.treeField.toLowerCase().trim()
           );
-          // Priority 2: field whose owner matches
+          // Priority 2: owner match
           const ownerMatch = !adminMatch && spatialMatches.find(f =>
             tree.fieldOwner && f.owner.toLowerCase().trim() === tree.fieldOwner.toLowerCase().trim()
           );
-          // Priority 3: fall back to first spatial match
+          // Priority 3: first spatial hit
           matchedField = adminMatch || ownerMatch || spatialMatches[0];
         }
       }
