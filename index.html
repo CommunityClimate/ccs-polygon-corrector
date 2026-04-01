@@ -1005,12 +1005,11 @@
         // Columns to fetch — covers all columns the app needs
         // Logical names follow the ccs_ prefix convention seen in the tree table
         const DV_SELECT = [
-            'ccs_ccsfieldid',       // CCS Field ID
+            'ccs_fieldid',          // CCS Field ID
             'ccs_fieldgeojson',     // Field GeoJSON
-            'ccs_fieldowner',       // Field Owner
-            'ccs_zone',             // Zone
-            'ccs_fieldsize',        // Field Size
-            'ccs_fieldid',          // GUID / Do Not Modify
+            'ccs_fieldowner_field', // Field Owner
+            'ccs_zone_field',       // Zone
+            'ccs_fieldsizem2',      // Field Size (m2)
             'createdon'
         ].join(',');
 
@@ -1133,12 +1132,12 @@
             const csvRows = [headers.join(',')];
             for (const r of rows) {
                 csvRows.push([
-                    escape(r.ccs_ccsfieldid   || r.ccs_fieldid || ''),
-                    escape(r.ccs_fieldgeojson || ''),
-                    escape(r.ccs_fieldowner   || ''),
-                    escape(r.ccs_zone         || ''),
-                    escape(r.ccs_fieldsize    || ''),
-                    escape(r.ccs_fieldid      || '')
+                    escape(r.ccs_fieldid          || ''),
+                    escape(r.ccs_fieldgeojson     || ''),
+                    escape(r.ccs_fieldowner_field || ''),
+                    escape(r.ccs_zone_field       || ''),
+                    escape(r.ccs_fieldsizem2      || ''),
+                    escape(r.ccs_fieldid          || '')
                 ].join(','));
             }
 
