@@ -1020,18 +1020,22 @@ async function dvFetchAll(token, url, label, includeAnnotations = false) {
 }
 
 async function fetchAllFields(token) {
-  // Confirmed column names from Dataverse schema probe
-  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldsizem2_field,createdon';
+  // Confirmed column names — include ccs_fieldowner_field (plain text) alongside contact lookup
+  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldowner_field,ccs_fieldsizem2_field,createdon';
   const rows = await dvFetchAll(token,
     `${DV_API}/ccs_fields?$select=${select}&$filter=statecode eq 0`,
-    'Fields'
+    'Fields',
+    true  // request formatted values for contact lookup
   );
 
   fieldsData = rows.map((r, i) => ({
     guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
     fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
     geoJSON: String(r.ccs_fieldgeojson_field || ''),
-    owner:   String(r.ccs_contactid_field   || ''),
+    // Use plain text owner first, fall back to contact formatted value
+    owner:   String(r.ccs_fieldowner_field
+      || r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
+      || r.ccs_contactid_field || ''),
     zone:    '',
     size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
     ring:    null
@@ -1053,7 +1057,7 @@ async function fetchAllTrees(token) {
   // Species is an option set (integer) — we request formatted values via header
   // Field is a lookup — we expand to get FLD-xxx from the related ccs_field record
 
-  const selectCols = [codeCol, latCol, lngCol, ownerCol, nrcCol, accCol, 'createdon', '_ccs_field_tree_value'].join(',');
+  const selectCols = [codeCol, latCol, lngCol, ownerCol, nrcCol, accCol, 'createdon', '_ccs_field_tree_value', 'ccs_species_tree'].join(',');
 
   const rows = await dvFetchAll(token,
     `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
