@@ -551,7 +551,83 @@ table.catalog tr.selected td { background: var(--green-bg); }
   </div>
   <div class="header-spacer"></div>
   <button class="btn btn-amber" id="btnExport" onclick="exportCSV()" disabled>⬇ Export CSV</button>
+  <button class="btn btn-blue"  id="btnSaveDV" onclick="saveToFieldforce()" disabled
+    style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b)">
+    ☁ Save to Fieldforce
+  </button>
+  <button class="btn btn-secondary" id="btnReport" onclick="showReportModal()" disabled>
+    📄 Compliance Report
+  </button>
 </header>
+
+<!-- ── COMPLIANCE REPORT MODAL ──────────────────────────────────────────── -->
+<div id="reportModal" style="display:none;position:fixed;inset:0;z-index:10000;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    width:480px;max-width:95vw;padding:24px;font-family:var(--font-sans)">
+    <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;
+      letter-spacing:2px;color:var(--green);text-transform:uppercase;margin-bottom:16px">
+      📄 Verra Compliance Report
+    </div>
+
+    <!-- Sections to include -->
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono);letter-spacing:1px">
+      INCLUDE SECTIONS
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="checkbox" id="rpt_summary" checked> Executive Summary
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="checkbox" id="rpt_allocation" checked> Allocation Overview
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="checkbox" id="rpt_species" checked> Species Breakdown
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="checkbox" id="rpt_fields" checked> Field Summary
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="checkbox" id="rpt_exceptions" checked> Exceptions
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="checkbox" id="rpt_polygon" checked> Polygon Quality
+      </label>
+    </div>
+
+    <!-- Filter scope -->
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono);letter-spacing:1px">
+      SCOPE
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="radio" name="rptScope" id="rpt_all" checked> All trees
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="radio" name="rptScope" id="rpt_filtered"> Current filter only
+      </label>
+    </div>
+
+    <!-- Format -->
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono);letter-spacing:1px">
+      FORMAT
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="radio" name="rptFmt" id="fmt_pdf" checked> PDF (Verra submission)
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+        <input type="radio" name="rptFmt" id="fmt_csv"> CSV (data export)
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeReportModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="generateReport()">Generate Report</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── TAB BAR ───────────────────────────────────────────────────────────── -->
 <div class="tab-bar">
@@ -759,10 +835,6 @@ table.catalog tr.selected td { background: var(--green-bg); }
         <div class="exc-card amber"  id="exc-fieldmismatch" onclick="filterException('Allocated - Field mismatch')">
           <div class="ec-num" id="excN3">—</div>
           <div class="ec-label">Field mismatch</div>
-        </div>
-        <div class="exc-card amber"  id="exc-ownermismatch" onclick="filterException('Allocated - Owner mismatch')">
-          <div class="ec-num" id="excN4">—</div>
-          <div class="ec-label">Owner mismatch</div>
         </div>
       </div>
       <!-- Mismatch breakdown panel -->
@@ -1488,6 +1560,8 @@ async function runAllocation() {
   updateExceptions();
   document.getElementById('filterSection').style.display = '';
   document.getElementById('btnExport').disabled = false;
+  document.getElementById('btnSaveDV').disabled = false;
+  document.getElementById('btnReport').disabled = false;
 
   const inside  = allocation.filter(r => r.insidePolygon).length;
   const outside = allocation.length - inside;
@@ -1818,19 +1892,16 @@ function renderFieldMap(fieldId) {
 
 function updateExceptions() {
   const fieldMismatches = allocation.filter(r => r.status === 'Allocated - Field mismatch');
-  const ownerMismatches = allocation.filter(r => r.status === 'Allocated - Owner mismatch');
   const total = allocation.length;
 
   const counts = {
     'Outside polygon':                  allocation.filter(r => r.status === 'Outside polygon').length,
     'Outside polygon but field tagged': allocation.filter(r => r.status === 'Outside polygon but field tagged').length,
     'Allocated - Field mismatch':       fieldMismatches.length,
-    'Allocated - Owner mismatch':       ownerMismatches.length,
   };
   document.getElementById('excN1').textContent = counts['Outside polygon'].toLocaleString();
   document.getElementById('excN2').textContent = counts['Outside polygon but field tagged'].toLocaleString();
   document.getElementById('excN3').textContent = counts['Allocated - Field mismatch'].toLocaleString();
-  document.getElementById('excN4').textContent = counts['Allocated - Owner mismatch'].toLocaleString();
 
   buildMismatchBreakdown(fieldMismatches, total);
   renderExceptionsTable(null);
@@ -1897,8 +1968,8 @@ function buildMismatchBreakdown(fieldMismatches, total) {
 
 function filterException(status) {
   excActiveFilter = excActiveFilter === status ? null : status;
-  ['outside','tagged','fieldmismatch','ownermismatch'].forEach((id, i) => {
-    const statuses = ['Outside polygon','Outside polygon but field tagged','Allocated - Field mismatch','Allocated - Owner mismatch'];
+  ['outside','tagged','fieldmismatch'].forEach((id, i) => {
+    const statuses = ['Outside polygon','Outside polygon but field tagged','Allocated - Field mismatch'];
     document.getElementById('exc-' + id).classList.toggle('active-filter', excActiveFilter === statuses[i]);
   });
   renderExceptionsTable(excActiveFilter);
@@ -1908,7 +1979,7 @@ function renderExceptionsTable(statusFilter) {
   const rows = allocation.filter(r => {
     if (statusFilter) return r.status === statusFilter;
     return ['Outside polygon','Outside polygon but field tagged',
-            'Allocated - Field mismatch','Allocated - Owner mismatch'].includes(r.status);
+            'Allocated - Field mismatch'].includes(r.status);
   });
 
   const tbody = document.getElementById('excBody');
@@ -2011,15 +2082,410 @@ function clearAll() {
     `<tr><td colspan="10"><div class="empty-state">Upload <strong>Active Fields</strong> and <strong>Active Trees</strong> files<br>then click <strong>▶ Run Allocation</strong></div></td></tr>`;
   document.getElementById('excBody').innerHTML =
     `<tr><td colspan="9"><div class="empty-state">Run allocation to see exceptions</div></td></tr>`;
-  ['excN1','excN2','excN3','excN4'].forEach(id => document.getElementById(id).textContent = '—');
+  ['excN1','excN2','excN3'].forEach(id => document.getElementById(id).textContent = '—');
   if (map) { mapLayers.forEach(l => map.removeLayer(l)); mapLayers = []; }
   document.getElementById('mapOverlay').style.display = 'none';
   document.getElementById('mapLegend').style.display  = 'none';
   document.getElementById('fieldListCount').textContent = '';
 }
-</script>
+// ═══════════════════════════════════════════════════════════════════════════
+// WRITE-BACK TO FIELDFORCE (DATAVERSE)
+// ═══════════════════════════════════════════════════════════════════════════
 
-<!-- Floating Tree Catalog button -->
+async function saveToFieldforce() {
+  if (!allocation.length) return;
+
+  // Columns to write back — must exist on ccs_tree in Dataverse
+  // ccs_matchedfield_computed (Text), ccs_allocationstatus_computed (Text)
+  const BATCH_SIZE = 100;
+  const btn = document.getElementById('btnSaveDV');
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving…';
+
+  try {
+    const token = await getToken();
+    let saved = 0, errors = 0;
+    const total = allocation.length;
+
+    for (let i = 0; i < total; i += BATCH_SIZE) {
+      const batch = allocation.slice(i, i + BATCH_SIZE);
+      btn.textContent = `⏳ ${saved.toLocaleString()} / ${total.toLocaleString()} saved…`;
+
+      // Use OData $batch for efficiency
+      const batchBody = batch.map(r => {
+        const id = r.guid;
+        const body = JSON.stringify({
+          ccs_matchedfield_computed:    r.matchedFieldId  || '',
+          ccs_allocationstatus_computed: r.status         || '',
+          ccs_fieldmatch_computed:      r.fieldMatch === true ? true : false
+        });
+        return [
+          `--batch_ccs`,
+          `Content-Type: application/http`,
+          `Content-Transfer-Encoding: binary`,
+          ``,
+          `PATCH ${DV_API}/ccs_trees(${id}) HTTP/1.1`,
+          `Content-Type: application/json`,
+          ``,
+          body
+        ].join('\r\n');
+      }).join('\r\n') + '\r\n--batch_ccs--';
+
+      const res = await fetch(`${DV_API}/$batch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/mixed;boundary=batch_ccs',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        },
+        body: batchBody
+      });
+
+      if (res.status === 401) { token = await getToken(); i -= BATCH_SIZE; continue; }
+      if (!res.ok) { errors++; } else { saved += batch.length; }
+      await new Promise(r => requestAnimationFrame(r));
+    }
+
+    btn.textContent = errors ? `⚠ ${saved.toLocaleString()} saved · ${errors} errors` : `✓ ${saved.toLocaleString()} saved to Fieldforce`;
+    btn.style.background = errors ? 'var(--amber-bg)' : 'var(--green-bg)';
+    btn.style.color = errors ? 'var(--amber)' : 'var(--green)';
+    btn.style.borderColor = errors ? 'var(--amber-b)' : 'var(--green-b)';
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '☁ Save to Fieldforce';
+      btn.style = '';
+    }, 5000);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '☁ Save to Fieldforce';
+    alert('Write-back failed: ' + e.message + '\n\nNote: The columns ccs_matchedfield_computed, ccs_allocationstatus_computed and ccs_fieldmatch_computed must first be created on the ccs_tree table in Dataverse.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPLIANCE REPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function showReportModal() {
+  document.getElementById('reportModal').style.display = 'flex';
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').style.display = 'none';
+}
+
+function generateReport() {
+  const usePDF     = document.getElementById('fmt_pdf').checked;
+  const useFiltered= document.getElementById('rpt_filtered').checked;
+  const data       = useFiltered ? filtered : allocation;
+
+  if (usePDF) generatePDF(data);
+  else        generateReportCSV(data);
+  closeReportModal();
+}
+
+function generatePDF(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, margin = 14;
+  let y = 20;
+
+  const GREEN = [34, 197, 94], AMBER = [245, 158, 11], RED = [239, 68, 68];
+  const DARK  = [8, 12, 16],  MID   = [20, 29, 43],   LIGHT = [212, 228, 247];
+
+  // ── Helper functions ──
+  const line = (x1, y1, x2, y2, color = [31, 46, 66]) => {
+    doc.setDrawColor(...color); doc.line(x1, y1, x2, y2);
+  };
+  const rect = (x, yy, w, h, fill) => {
+    doc.setFillColor(...fill); doc.rect(x, yy, w, h, 'F');
+  };
+  const text = (str, x, yy, size = 9, color = LIGHT, bold = false) => {
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.text(String(str), x, yy);
+  };
+  const newPage = () => {
+    doc.addPage();
+    y = 20;
+    rect(0, 0, W, 12, DARK);
+    text('CCS ACTIVE TREE CATALOG — VERRA COMPLIANCE REPORT', margin, 8, 7, GREEN, true);
+    text(`Page ${doc.internal.getNumberOfPages()}`, W - margin - 10, 8, 7, [74, 100, 128]);
+    y = 22;
+  };
+  const checkPage = (needed = 20) => { if (y + needed > 275) newPage(); };
+
+  // ── Stats ──
+  const total     = data.length;
+  const allocated = data.filter(r => r.status === 'Allocated').length;
+  const mismatch  = data.filter(r => r.status === 'Allocated - Field mismatch').length;
+  const outside   = data.filter(r => r.status && r.status.includes('Outside')).length;
+  const allocPct  = total ? Math.round(allocated / total * 100) : 0;
+  const date      = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' });
+
+  // ── Cover / Header ──
+  rect(0, 0, W, 40, DARK);
+  rect(0, 40, W, 2, GREEN);
+  doc.setFontSize(18); doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...GREEN);
+  doc.text('CCS ACTIVE TREE CATALOG', margin, 18);
+  text('Verra Compliance Report', margin, 27, 11, LIGHT);
+  text(`Generated: ${date}`, margin, 34, 8, [74, 100, 128]);
+  text(`Community Climate Solutions AG`, W - margin, 34, 8, [74, 100, 128], false);
+  doc.setTextColor(...[74, 100, 128]);
+  doc.text('Community Climate Solutions AG', W - margin, 34, { align: 'right' });
+  y = 52;
+
+  // ── Executive Summary ──
+  if (document.getElementById('rpt_summary').checked) {
+    text('EXECUTIVE SUMMARY', margin, y, 9, [74, 100, 128], true); y += 6;
+    line(margin, y, W - margin, y); y += 5;
+
+    // Big compliance % box
+    rect(margin, y, 50, 24, MID);
+    doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...(allocPct >= 90 ? GREEN : allocPct >= 70 ? AMBER : RED));
+    doc.text(`${allocPct}%`, margin + 25, y + 13, { align: 'center' });
+    text('VERRA COMPLIANCE', margin + 25, y + 20, 7, [74, 100, 128], true);
+    doc.setFont('helvetica', 'normal');
+
+    // Stat boxes
+    const stats = [
+      { label: 'Total Trees',  val: total.toLocaleString(),     col: LIGHT },
+      { label: 'Allocated',    val: allocated.toLocaleString(), col: GREEN },
+      { label: 'Field Mismatch', val: mismatch.toLocaleString(), col: AMBER },
+      { label: 'Outside',      val: outside.toLocaleString(),   col: RED   },
+    ];
+    stats.forEach((s, i) => {
+      const bx = margin + 55 + i * 34;
+      rect(bx, y, 32, 24, MID);
+      doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...s.col);
+      doc.text(s.val, bx + 16, y + 12, { align: 'center' });
+      text(s.label, bx + 16, y + 20, 6, [74, 100, 128], false);
+      doc.setFont('helvetica', 'normal');
+    });
+    y += 30;
+
+    // Verdict
+    const verdict = allocPct >= 95
+      ? `✓ ${allocPct}% of trees are correctly allocated within their registered field polygons. Dataset meets Verra spatial compliance threshold.`
+      : allocPct >= 80
+      ? `⚠ ${allocPct}% compliance. ${mismatch.toLocaleString()} field mismatches require review before Verra submission.`
+      : `✗ ${allocPct}% compliance is below the recommended Verra threshold. Significant data quality work is required.`;
+    doc.setFontSize(9); doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...LIGHT);
+    const lines = doc.splitTextToSize(verdict, W - margin * 2);
+    doc.text(lines, margin, y); y += lines.length * 5 + 6;
+  }
+
+  // ── Allocation Overview ──
+  if (document.getElementById('rpt_allocation').checked) {
+    checkPage(40);
+    text('ALLOCATION OVERVIEW', margin, y, 9, [74, 100, 128], true); y += 6;
+    line(margin, y, W - margin, y); y += 5;
+    const rows = [
+      ['Status', 'Count', '% of Total'],
+      ['Allocated (correct field)', allocated.toLocaleString(), allocPct + '%'],
+      ['Allocated - Field mismatch', mismatch.toLocaleString(), total ? Math.round(mismatch/total*100) + '%' : '0%'],
+      ['Outside polygon', outside.toLocaleString(), total ? Math.round(outside/total*100) + '%' : '0%'],
+      ['Total', total.toLocaleString(), '100%'],
+    ];
+    rows.forEach((row, i) => {
+      if (i === 0) rect(margin, y - 4, W - margin * 2, 8, [20, 29, 43]);
+      else if (i === rows.length - 1) rect(margin, y - 4, W - margin * 2, 8, [20, 29, 43]);
+      else if (i % 2 === 0) rect(margin, y - 4, W - margin * 2, 8, [14, 29, 43]);
+      const cols = [74, 100, i === 0 ? 62 : 140, i === 0 ? 165 : 165];
+      row.forEach((cell, j) => {
+        const color = i === 0 ? [74,100,128] : j === 0 ? LIGHT : j === 1 && i === 1 ? GREEN : j === 1 && i === 2 ? AMBER : j === 1 && i === 3 ? RED : LIGHT;
+        text(cell, cols[j], y, 9, color, i === 0 || i === rows.length - 1);
+      });
+      y += 8;
+    });
+    y += 4;
+  }
+
+  // ── Species Breakdown ──
+  if (document.getElementById('rpt_species').checked) {
+    checkPage(50);
+    text('SPECIES BREAKDOWN', margin, y, 9, [74, 100, 128], true); y += 6;
+    line(margin, y, W - margin, y); y += 5;
+
+    const specMap = {};
+    data.forEach(r => {
+      const s = r.species || 'Unknown';
+      if (!specMap[s]) specMap[s] = { total: 0, allocated: 0 };
+      specMap[s].total++;
+      if (r.status === 'Allocated') specMap[s].allocated++;
+    });
+    const specRows = Object.entries(specMap)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 20);
+
+    rect(margin, y - 4, W - margin * 2, 8, MID);
+    ['Species', 'Total Trees', 'Allocated', 'Compliance %'].forEach((h, i) => {
+      text(h, [margin, margin + 50, margin + 95, margin + 140][i], y, 8, [74,100,128], true);
+    });
+    y += 8;
+    specRows.forEach(([sp, s], i) => {
+      checkPage(8);
+      if (i % 2 === 0) rect(margin, y - 4, W - margin * 2, 8, [14, 21, 33]);
+      const pct = s.total ? Math.round(s.allocated / s.total * 100) : 0;
+      const col = pct >= 90 ? GREEN : pct >= 70 ? AMBER : RED;
+      text(sp, margin, y, 8, LIGHT);
+      text(s.total.toLocaleString(), margin + 50, y, 8, LIGHT);
+      text(s.allocated.toLocaleString(), margin + 95, y, 8, GREEN);
+      text(pct + '%', margin + 140, y, 8, col, true);
+      y += 8;
+    });
+    y += 4;
+  }
+
+  // ── Field Summary ──
+  if (document.getElementById('rpt_fields').checked) {
+    checkPage(50);
+    text('FIELD SUMMARY (Top 20 by tree count)', margin, y, 9, [74, 100, 128], true); y += 6;
+    line(margin, y, W - margin, y); y += 5;
+
+    const fieldMap = {};
+    data.forEach(r => {
+      const f = r.matchedFieldId || r.treeField || 'Unassigned';
+      if (!fieldMap[f]) fieldMap[f] = { total: 0, allocated: 0, mismatch: 0 };
+      fieldMap[f].total++;
+      if (r.status === 'Allocated') fieldMap[f].allocated++;
+      if (r.status === 'Allocated - Field mismatch') fieldMap[f].mismatch++;
+    });
+    const fieldRows = Object.entries(fieldMap)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 20);
+
+    rect(margin, y - 4, W - margin * 2, 8, MID);
+    ['Field ID', 'Total', 'Allocated', 'Mismatch', 'Status'].forEach((h, i) => {
+      text(h, [margin, margin + 55, margin + 90, margin + 125, margin + 155][i], y, 8, [74,100,128], true);
+    });
+    y += 8;
+    fieldRows.forEach(([fid, s], i) => {
+      checkPage(8);
+      if (i % 2 === 0) rect(margin, y - 4, W - margin * 2, 8, [14, 21, 33]);
+      const pct = s.total ? Math.round(s.allocated / s.total * 100) : 0;
+      const statusCol = pct >= 90 ? GREEN : pct >= 70 ? AMBER : RED;
+      const shortId = fid.length > 22 ? fid.slice(0, 20) + '…' : fid;
+      text(shortId, margin, y, 7, LIGHT);
+      text(s.total.toLocaleString(), margin + 55, y, 8, LIGHT);
+      text(s.allocated.toLocaleString(), margin + 90, y, 8, GREEN);
+      text(s.mismatch.toLocaleString(), margin + 125, y, 8, s.mismatch > 0 ? AMBER : LIGHT);
+      text(pct + '%', margin + 155, y, 8, statusCol, true);
+      y += 8;
+    });
+    y += 4;
+  }
+
+  // ── Exceptions ──
+  if (document.getElementById('rpt_exceptions').checked) {
+    checkPage(50);
+    text('EXCEPTIONS — TREES REQUIRING REVIEW', margin, y, 9, [74, 100, 128], true); y += 6;
+    line(margin, y, W - margin, y); y += 5;
+
+    const exceptions = data.filter(r => r.status && r.status !== 'Allocated').slice(0, 50);
+    if (!exceptions.length) {
+      text('✓ No exceptions found.', margin, y, 9, GREEN); y += 10;
+    } else {
+      text(`Showing first ${Math.min(50, exceptions.length)} of ${data.filter(r => r.status && r.status !== 'Allocated').length.toLocaleString()} exceptions`, margin, y, 8, [74,100,128]);
+      y += 6;
+      rect(margin, y - 4, W - margin * 2, 8, MID);
+      ['Tree Code', 'Species', 'Tree Field', 'Matched Field', 'Status'].forEach((h, i) => {
+        text(h, [margin, margin + 40, margin + 80, margin + 120, margin + 155][i], y, 8, [74,100,128], true);
+      });
+      y += 8;
+      exceptions.forEach((r, i) => {
+        checkPage(8);
+        if (i % 2 === 0) rect(margin, y - 4, W - margin * 2, 8, [14, 21, 33]);
+        const sc = r.status === 'Allocated - Field mismatch' ? AMBER : RED;
+        text((r.treeCode || '').slice(0, 18), margin, y, 7, LIGHT);
+        text((r.species || '—').slice(0, 14), margin + 40, y, 7, LIGHT);
+        text((r.treeField || '—').slice(0, 16), margin + 80, y, 7, LIGHT);
+        text((r.matchedFieldId || '—').slice(0, 16), margin + 120, y, 7, GREEN);
+        text((r.status || '').replace('Allocated - ', ''), margin + 155, y, 7, sc);
+        y += 8;
+      });
+    }
+    y += 4;
+  }
+
+  // ── Polygon Quality ──
+  if (document.getElementById('rpt_polygon').checked) {
+    checkPage(50);
+    text('POLYGON QUALITY — SUSPECT BOUNDARIES', margin, y, 9, [74, 100, 128], true); y += 6;
+    line(margin, y, W - margin, y); y += 5;
+
+    const fieldStats = {};
+    data.forEach(r => {
+      const f = r.matchedFieldId;
+      if (!f) return;
+      if (!fieldStats[f]) fieldStats[f] = { inside: 0, mismatch: 0 };
+      if (r.insidePolygon) fieldStats[f].inside++;
+      if (r.status === 'Allocated - Field mismatch') fieldStats[f].mismatch++;
+    });
+    const suspects = Object.entries(fieldStats)
+      .filter(([, s]) => s.inside >= 3 && s.mismatch / s.inside >= 0.8)
+      .sort((a, b) => (b[1].mismatch / b[1].inside) - (a[1].mismatch / a[1].inside))
+      .slice(0, 20);
+
+    if (!suspects.length) {
+      text('✓ No suspect polygons detected (no field with ≥80% mismatch rate).', margin, y, 9, GREEN); y += 10;
+    } else {
+      text(`${suspects.length} field polygon(s) have ≥80% mismatch rate and likely require boundary correction:`, margin, y, 8, AMBER);
+      y += 7;
+      rect(margin, y - 4, W - margin * 2, 8, MID);
+      ['Field ID', 'Trees Inside', 'Mismatched', 'Mismatch Rate'].forEach((h, i) => {
+        text(h, [margin, margin + 60, margin + 100, margin + 140][i], y, 8, [74,100,128], true);
+      });
+      y += 8;
+      suspects.forEach(([fid, s], i) => {
+        checkPage(8);
+        if (i % 2 === 0) rect(margin, y - 4, W - margin * 2, 8, [14, 21, 33]);
+        const rate = Math.round(s.mismatch / s.inside * 100);
+        text(fid.slice(0, 28), margin, y, 7, LIGHT);
+        text(s.inside.toLocaleString(), margin + 60, y, 8, LIGHT);
+        text(s.mismatch.toLocaleString(), margin + 100, y, 8, AMBER);
+        text(rate + '%', margin + 140, y, 8, RED, true);
+        y += 8;
+      });
+    }
+  }
+
+  // ── Footer on last page ──
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    rect(0, 287, W, 10, DARK);
+    text(`CCS Active Tree Catalog · Verra Compliance Report · ${date}`, margin, 293, 7, [74,100,128]);
+    text(`Page ${p} of ${pageCount}`, W - margin, 293, 7, [74,100,128]);
+    doc.setFont('helvetica', 'normal');
+  }
+
+  doc.save(`CCS_Verra_Compliance_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+function generateReportCSV(data) {
+  const cols = ['treeCode','species','treeField','matchedFieldId','fieldMatch','status','lat','lng','accuracy','createdOn'];
+  const headers = ['Tree Code','Species','Tree Field','Matched Field','Field Match','Status','Latitude','Longitude','Accuracy','Created On'];
+  const rows = [headers, ...data.map(r => cols.map(c => {
+    const v = r[c];
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    return String(v);
+  }))];
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `CCS_Compliance_Report_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
 <button class="fab-tree-catalog" onclick="openTreeCatalog()" title="Open Tree Catalog — grid view of all trees">
   <span class="fab-icon">🌳</span> Tree Catalog
 </button>
