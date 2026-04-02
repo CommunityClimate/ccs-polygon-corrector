@@ -694,6 +694,22 @@ table.catalog tr.selected td { background: var(--green-bg); }
       </div>
     </div>
 
+    <!-- Excluded Fields -->
+    <div class="sb-section" id="excludedSection">
+      <span class="sb-label" style="color:var(--red)">Excluded Polygons <span id="excludedCount" style="color:var(--red)"></span></span>
+      <div style="font-size:9px;color:var(--muted);margin-bottom:6px;line-height:1.5">
+        Excluded from spatial matching — trees fall back to their admin field tag.
+      </div>
+      <div id="excludedList" style="margin-bottom:6px"></div>
+      <div class="btn-row">
+        <input type="text" id="excludeInput" placeholder="FLD-XXXXX…"
+          style="flex:1;font-size:9px;padding:4px 6px"
+          onkeydown="if(event.key==='Enter')addExclusion()"/>
+        <button class="btn btn-red" onclick="addExclusion()" style="font-size:9px;padding:5px 8px">+ Exclude</button>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:5px">Re-run allocation to apply changes.</div>
+    </div>
+
     <!-- Field list (for map view) -->
     <div class="sb-section" style="padding-bottom:4px">
       <span class="sb-label">Fields <span id="fieldListCount" style="color:var(--green)"></span></span>
@@ -1242,6 +1258,12 @@ let fieldsData  = [];   // raw parsed field rows
 let treesData   = [];   // raw parsed tree rows
 let allocation  = [];   // computed allocation result rows
 let filtered    = [];   // current filtered view
+// Excluded field IDs — these polygons are skipped during spatial matching
+// Trees fall back to their admin field tag (treeField) instead
+let excludedFields = new Set([
+  'FLD-G3H2F-T5J0S-001',   // Dyness Chalwe — polygon spans continent, 82k false mismatches
+  'FLD-M6S5C-N1D8R-001',   // Grace Chibubi — similarly oversized polygon, 24k false mismatches
+]);
 let sortCol     = 'status';
 let sortDir     = 1;
 let currentPage = 1;
@@ -1430,7 +1452,15 @@ async function runAllocation() {
   setProgress(0, 'Building spatial index…', `${fieldsData.length.toLocaleString()} fields`);
   allocation = [];
 
-  const validFields = fieldsData.filter(f => f.ring);
+  // Filter out excluded polygons before building spatial index
+  // Excluded fields are skipped for spatial matching — trees fall back to treeField admin tag
+  const validFields = fieldsData.filter(f => f.ring && !excludedFields.has(f.fieldId));
+  const skipped = fieldsData.filter(f => f.ring && excludedFields.has(f.fieldId));
+  if (skipped.length) {
+    setProgress(0, 'Building spatial index…',
+      `Excluding ${skipped.length} suspect polygon(s): ${skipped.map(f=>f.fieldId).join(', ')}`);
+    await new Promise(r => requestAnimationFrame(r));
+  }
 
   // ── Build bounding-box spatial grid index ──────────────────────────────
   // Compute bbox for every field ring
@@ -2168,6 +2198,76 @@ function clearAll() {
   document.getElementById('mapLegend').style.display  = 'none';
   document.getElementById('fieldListCount').textContent = '';
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXCLUDED POLYGON MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderExcludedList() {
+  const list = document.getElementById('excludedList');
+  const count = document.getElementById('excludedCount');
+  count.textContent = excludedFields.size ? `(${excludedFields.size})` : '';
+
+  if (!excludedFields.size) {
+    list.innerHTML = '<div style="font-size:9px;color:var(--muted);font-style:italic">None excluded</div>';
+    return;
+  }
+
+  list.innerHTML = [...excludedFields].map(fid => `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      background:var(--red-bg);border:1px solid var(--red-b);border-radius:4px;
+      padding:4px 8px;margin-bottom:4px">
+      <span style="font-family:var(--font-mono);font-size:9px;color:var(--red);
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px"
+        title="${esc(fid)}">${esc(fid)}</span>
+      <button onclick="removeExclusion('${esc(fid)}')"
+        style="background:none;border:none;color:var(--red);cursor:pointer;
+        font-size:12px;padding:0 0 0 6px;line-height:1;flex-shrink:0"
+        title="Remove exclusion">✕</button>
+    </div>`).join('');
+}
+
+function addExclusion() {
+  const input = document.getElementById('excludeInput');
+  const fid = input.value.trim();
+  if (!fid) return;
+  if (!fid.startsWith('FLD-')) {
+    alert('Field ID must start with FLD-');
+    return;
+  }
+  excludedFields.add(fid);
+  input.value = '';
+  renderExcludedList();
+  saveExclusions();
+}
+
+function removeExclusion(fid) {
+  excludedFields.delete(fid);
+  renderExcludedList();
+  saveExclusions();
+}
+
+function saveExclusions() {
+  try {
+    localStorage.setItem('ccs_excluded_fields', JSON.stringify([...excludedFields]));
+  } catch(e) {}
+}
+
+function loadExclusions() {
+  try {
+    const saved = localStorage.getItem('ccs_excluded_fields');
+    if (saved) {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr)) {
+        arr.forEach(fid => excludedFields.add(fid));
+      }
+    }
+  } catch(e) {}
+  renderExcludedList();
+}
+
+// Load saved exclusions on startup
+loadExclusions();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WRITE-BACK TO FIELDFORCE (DATAVERSE)
