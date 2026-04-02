@@ -1632,8 +1632,15 @@ function debouncedFilter() {
   filterTimer = setTimeout(() => applyFilters(), 220);
 }
 
-function applyFilters() {
+// Filter runs in async chunks of 10k rows so the browser stays responsive
+// Each chunk yields control back to the UI thread via requestAnimationFrame
+const FILTER_CHUNK = 10000;
+let   filterRunId  = 0; // incremented on each new filter call to cancel stale runs
+
+async function applyFilters() {
   clearTimeout(filterTimer);
+  const runId = ++filterRunId; // this run's ID — stale runs self-cancel
+
   const q       = (document.getElementById('catalogSearch').value || '').toLowerCase().trim();
   const status  = document.getElementById('fltStatus').value;
   const field   = document.getElementById('fltField').value;
@@ -1643,24 +1650,38 @@ function applyFilters() {
 
   const hasFilters = q || status || field || owner || species || zone;
 
-  // Fast path — no filters: show all, skip expensive loop
+  // Fast path — no filters, no loop needed
   if (!hasFilters) {
     filtered = allocation.slice();
   } else {
     filtered = [];
-    for (let i = 0; i < allocation.length; i++) {
-      const r = allocation[i];
-      if (status  && r.status !== status)                                        continue;
-      if (field   && r.matchedFieldId !== field && r.treeField !== field)        continue;
-      if (owner   && r.matchedFieldOwner !== owner && r.fieldOwner !== owner)    continue;
-      if (species && r.species !== species)                                       continue;
-      if (zone    && r.matchedFieldZone !== zone)                                continue;
-      if (q && !searchIndex[i].includes(q))                                      continue;
-      filtered.push(r);
+    const total = allocation.length;
+
+    for (let i = 0; i < total; i += FILTER_CHUNK) {
+      // If user changed filters while we were running, abort this pass
+      if (runId !== filterRunId) return;
+
+      const end = Math.min(i + FILTER_CHUNK, total);
+      for (let j = i; j < end; j++) {
+        const r = allocation[j];
+        if (status  && r.status !== status)                                      continue;
+        if (field   && r.matchedFieldId !== field && r.treeField !== field)      continue;
+        if (owner   && r.matchedFieldOwner !== owner && r.fieldOwner !== owner)  continue;
+        if (species && r.species !== species)                                     continue;
+        if (zone    && r.matchedFieldZone !== zone)                               continue;
+        if (q && !searchIndex[j].includes(q))                                    continue;
+        filtered.push(r);
+      }
+
+      // Yield to browser between chunks — keeps UI responsive
+      await new Promise(r => requestAnimationFrame(r));
     }
+
+    // Abort if superseded
+    if (runId !== filterRunId) return;
   }
 
-  // Sort — only sort filtered subset, not full 100k array
+  // Sort filtered subset
   if (filtered.length < allocation.length || sortCol !== 'status') {
     filtered.sort((a, b) => {
       let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
@@ -1672,7 +1693,6 @@ function applyFilters() {
 
   currentPage = 1;
   document.getElementById('filterSpinner').style.display = 'none';
-  // Update field list to show only fields present in current filtered results
   buildFieldList(filtered.length < allocation.length ? filtered : null);
   renderCatalog();
 }
