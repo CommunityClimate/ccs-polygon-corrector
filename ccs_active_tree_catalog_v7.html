@@ -2173,24 +2173,40 @@ function generatePDF(data) {
   const W = 210, M = 14;
   let y = 20;
 
-  const GREEN = [34,197,94], AMBER = [245,158,11], RED = [239,68,68];
-  const DARK  = [8,12,16],   MID   = [20,29,43],   LIGHT = [212,228,247];
+  // ── Print-safe colour palette (readable on white paper) ──────────────────
+  const INK     = [15, 25, 40];       // near-black for body text
+  const MUTED   = [90, 105, 125];     // grey for labels / secondary
+  const HDR_BG  = [15, 25, 40];       // dark navy header bars
+  const HDR_TXT = [255, 255, 255];    // white text on dark header
+  const ROW_ALT = [242, 246, 251];    // very light blue-grey alternating rows
+  const ROW_HDR = [225, 233, 245];    // slightly stronger blue-grey for col headers
+  const GREEN   = [21, 128, 61];      // dark green — readable on white
+  const AMBER   = [161, 98, 7];       // dark amber — readable on white
+  const RED     = [185, 28, 28];      // dark red — readable on white
+  const DIVIDER = [180, 195, 215];    // light rule lines
 
-  const ln  = (x1,y1,x2,y2,col=[31,46,66]) => { doc.setDrawColor(...col); doc.line(x1,y1,x2,y2); };
+  const ln  = (x1,y1,x2,y2,col=DIVIDER) => { doc.setDrawColor(...col); doc.line(x1,y1,x2,y2); };
   const rct = (x,yy,w,h,fill) => { doc.setFillColor(...fill); doc.rect(x,yy,w,h,'F'); };
-  const txt = (s,x,yy,sz=9,col=LIGHT,bold=false) => {
+  const txt = (s,x,yy,sz=9,col=INK,bold=false) => {
     doc.setFontSize(sz); doc.setTextColor(...col);
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
     doc.text(String(s), x, yy);
   };
+  const sectionHead = (label) => {
+    chk(16);
+    rct(M, y-4, W-M*2, 9, ROW_HDR);
+    txt(label, M+2, y+1, 9, INK, true);
+    y += 8;
+    ln(M, y, W-M, y); y += 5;
+  };
   const newPage = () => {
     doc.addPage(); y = 20;
-    rct(0,0,W,12,DARK);
-    txt('CCS ACTIVE TREE CATALOG — VERRA COMPLIANCE REPORT', M, 8, 7, GREEN, true);
-    txt(`Page ${doc.internal.getNumberOfPages()}`, W-M-10, 8, 7, [74,100,128]);
-    y = 22;
+    rct(0, 0, W, 11, HDR_BG);
+    txt('CCS ACTIVE TREE CATALOG  —  VERRA COMPLIANCE REPORT', M, 7.5, 7, HDR_TXT, true);
+    txt(`Page ${doc.internal.getNumberOfPages()}`, W-M-10, 7.5, 7, [180,195,215]);
+    y = 20;
   };
-  const chk = (need=20) => { if (y + need > 275) newPage(); };
+  const chk = (need=20) => { if (y + need > 278) newPage(); };
 
   const total     = data.length;
   const allocated = data.filter(r => r.status === 'Allocated').length;
@@ -2198,86 +2214,95 @@ function generatePDF(data) {
   const outside   = data.filter(r => r.status && r.status.includes('Outside')).length;
   const allocPct  = total ? Math.round(allocated / total * 100) : 0;
   const date      = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'long',year:'numeric'});
+  const pctCol    = allocPct >= 90 ? GREEN : allocPct >= 70 ? AMBER : RED;
 
-  // ── Cover ──
-  rct(0,0,W,40,DARK); rct(0,40,W,2,GREEN);
-  doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(...GREEN);
-  doc.text('CCS ACTIVE TREE CATALOG', M, 18);
-  txt('Verra Compliance Report', M, 27, 11, LIGHT);
-  txt(`Generated: ${date}`, M, 34, 8, [74,100,128]);
-  doc.setFont('helvetica','normal'); doc.setTextColor(...[74,100,128]);
-  doc.text('Community Climate Solutions AG', W-M, 34, {align:'right'});
-  y = 52;
+  // ── Cover header ──────────────────────────────────────────────────────────
+  rct(0, 0, W, 38, HDR_BG);
+  rct(0, 38, W, 2, [21,128,61]);
+  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(...[21,128,61]);
+  doc.text('CCS ACTIVE TREE CATALOG', M, 16);
+  txt('Verra Compliance Report', M, 25, 12, HDR_TXT);
+  txt(`Generated: ${date}`, M, 33, 8, [160,180,210]);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(...[160,180,210]);
+  doc.text('Community Climate Solutions AG', W-M, 33, {align:'right'});
+  y = 50;
 
-  // ── Executive Summary ──
+  // ── Executive Summary ─────────────────────────────────────────────────────
   if (document.getElementById('rpt_summary').checked) {
-    chk(50);
-    txt('EXECUTIVE SUMMARY', M, y, 9, [74,100,128], true); y += 6;
-    ln(M,y,W-M,y); y += 5;
+    sectionHead('EXECUTIVE SUMMARY');
 
-    rct(M,y,50,24,MID);
-    doc.setFontSize(22); doc.setFont('helvetica','bold');
-    doc.setTextColor(...(allocPct>=90?GREEN:allocPct>=70?AMBER:RED));
-    doc.text(`${allocPct}%`, M+25, y+13, {align:'center'});
-    txt('VERRA COMPLIANCE', M+25, y+20, 7, [74,100,128], true);
+    // Big compliance score box
+    rct(M, y, 46, 28, allocPct>=90?[236,253,245]:allocPct>=70?[255,251,235]:[254,242,242]);
+    doc.setDrawColor(...(allocPct>=90?[21,128,61]:allocPct>=70?[161,98,7]:[185,28,28]));
+    doc.setLineWidth(0.5); doc.rect(M, y, 46, 28);
+    doc.setLineWidth(0.2);
+    doc.setFontSize(28); doc.setFont('helvetica','bold'); doc.setTextColor(...pctCol);
+    doc.text(`${allocPct}%`, M+23, y+16, {align:'center'});
+    txt('VERRA COMPLIANCE', M+23, y+24, 7, pctCol, true);
     doc.setFont('helvetica','normal');
 
-    [{label:'Total Trees',val:total.toLocaleString(),col:LIGHT},
-     {label:'Allocated',val:allocated.toLocaleString(),col:GREEN},
-     {label:'Field Mismatch',val:mismatch.toLocaleString(),col:AMBER},
-     {label:'Outside',val:outside.toLocaleString(),col:RED}
+    // Stat boxes
+    [{label:'Total Trees',val:total.toLocaleString(),col:INK,bg:[245,248,252]},
+     {label:'Allocated',val:allocated.toLocaleString(),col:GREEN,bg:[236,253,245]},
+     {label:'Field Mismatch',val:mismatch.toLocaleString(),col:AMBER,bg:[255,251,235]},
+     {label:'Outside',val:outside.toLocaleString(),col:RED,bg:[254,242,242]}
     ].forEach((s,i) => {
-      const bx = M+55+i*34;
-      rct(bx,y,32,24,MID);
-      doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(...s.col);
-      doc.text(s.val, bx+16, y+12, {align:'center'});
-      txt(s.label, bx+16, y+20, 6, [74,100,128]);
+      const bx = M+50+i*34;
+      rct(bx, y, 32, 28, s.bg);
+      doc.setDrawColor(...DIVIDER); doc.setLineWidth(0.3); doc.rect(bx, y, 32, 28);
+      doc.setLineWidth(0.2);
+      doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.setTextColor(...s.col);
+      doc.text(s.val, bx+16, y+14, {align:'center'});
+      txt(s.label, bx+16, y+23, 6.5, MUTED, false);
       doc.setFont('helvetica','normal');
     });
-    y += 30;
+    y += 34;
 
+    // Verdict text — ASCII only, no special chars
     const verdict = allocPct>=95
-      ? `✓ ${allocPct}% of trees correctly allocated within registered field polygons. Dataset meets Verra spatial compliance threshold.`
+      ? `PASS: ${allocPct}% of trees are correctly allocated within their registered field polygons. Dataset meets the Verra spatial compliance threshold.`
       : allocPct>=80
-      ? `⚠ ${allocPct}% compliance. ${mismatch.toLocaleString()} field mismatches require review before Verra submission.`
-      : `✗ ${allocPct}% compliance is below the recommended Verra threshold. Significant data quality work is required.`;
-    doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(...LIGHT);
-    const lines = doc.splitTextToSize(verdict, W-M*2);
-    doc.text(lines, M, y); y += lines.length * 5 + 6;
+      ? `REVIEW: ${allocPct}% compliance. ${mismatch.toLocaleString()} field mismatches require review before Verra submission.`
+      : `ACTION REQUIRED: ${allocPct}% compliance is below the recommended Verra threshold. Significant data quality work is required before submission.`;
+    doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(...(allocPct>=95?GREEN:allocPct>=80?AMBER:RED));
+    const vLines = doc.splitTextToSize(verdict, W-M*2);
+    doc.text(vLines, M, y); y += vLines.length * 5 + 8;
     doc.setFont('helvetica','normal');
   }
 
-  // ── Allocation Overview ──
+  // ── Allocation Overview ───────────────────────────────────────────────────
   if (document.getElementById('rpt_allocation').checked) {
     chk(60);
-    txt('ALLOCATION OVERVIEW', M, y, 9, [74,100,128], true); y += 6;
-    ln(M,y,W-M,y); y += 5;
+    sectionHead('ALLOCATION OVERVIEW');
 
-    const rows = [
-      ['Status','Count','%'],
+    const ovRows = [
+      ['Status', 'Count', '%'],
       ['Allocated (correct field)', allocated.toLocaleString(), allocPct+'%'],
-      ['Allocated — Field mismatch', mismatch.toLocaleString(), total?Math.round(mismatch/total*100)+'%':'0%'],
+      ['Allocated - Field mismatch', mismatch.toLocaleString(), total?Math.round(mismatch/total*100)+'%':'0%'],
       ['Outside polygon', outside.toLocaleString(), total?Math.round(outside/total*100)+'%':'0%'],
       ['Total', total.toLocaleString(), '100%'],
     ];
-    rows.forEach((row,i) => {
-      if (i===0||i===rows.length-1) rct(M,y-4,W-M*2,8,MID);
-      else if (i%2===0) rct(M,y-4,W-M*2,8,[14,29,43]);
-      const cols = [74,100,i===0?62:140,i===0?165:165];
-      row.forEach((cell,j) => {
-        const col = i===0?[74,100,128]:j===0?LIGHT:j===1&&i===1?GREEN:j===1&&i===2?AMBER:j===1&&i===3?RED:LIGHT;
-        txt(cell, cols[j], y, 9, col, i===0||i===rows.length-1);
-      });
+    ovRows.forEach((row,i) => {
+      const isHead = i===0, isTot = i===ovRows.length-1;
+      if (isHead||isTot) rct(M,y-4,W-M*2,8,ROW_HDR);
+      else if (i%2===1) rct(M,y-4,W-M*2,8,ROW_ALT);
+      const xCols = [M+2, M+115, M+160];
+      const bold  = isHead||isTot;
+      const col0  = isHead ? MUTED : INK;
+      const col1  = isHead||isTot ? INK : i===1?GREEN : i===2?AMBER : RED;
+      txt(row[0], xCols[0], y, 9, col0, bold);
+      txt(row[1], xCols[1], y, 9, col1, bold);
+      txt(row[2], xCols[2], y, 9, isHead?MUTED:INK, bold);
       y += 8;
     });
     y += 4;
   }
 
-  // ── Species Breakdown ──
+  // ── Species Breakdown ─────────────────────────────────────────────────────
   if (document.getElementById('rpt_species').checked) {
     chk(50);
-    txt('SPECIES BREAKDOWN', M, y, 9, [74,100,128], true); y += 6;
-    ln(M,y,W-M,y); y += 5;
+    sectionHead('SPECIES BREAKDOWN');
 
     const specMap = {};
     data.forEach(r => {
@@ -2288,28 +2313,28 @@ function generatePDF(data) {
     });
     const specRows = Object.entries(specMap).sort((a,b)=>b[1].total-a[1].total).slice(0,20);
 
-    rct(M,y-4,W-M*2,8,MID);
+    rct(M,y-4,W-M*2,8,ROW_HDR);
     ['Species','Total Trees','Allocated','Compliance %'].forEach((h,i)=>
-      txt(h,[M,M+50,M+95,M+140][i],y,8,[74,100,128],true));
+      txt(h,[M+2,M+80,M+115,M+152][i],y,8,MUTED,true));
     y += 8;
     specRows.forEach(([sp,s],i) => {
       chk(8);
-      if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+      if (i%2===1) rct(M,y-4,W-M*2,8,ROW_ALT);
       const pct = s.total ? Math.round(s.allocated/s.total*100) : 0;
-      txt(sp,M,y,8,LIGHT);
-      txt(s.total.toLocaleString(),M+50,y,8,LIGHT);
-      txt(s.allocated.toLocaleString(),M+95,y,8,GREEN);
-      txt(pct+'%',M+140,y,8,pct>=90?GREEN:pct>=70?AMBER:RED,true);
+      const pc  = pct>=90?GREEN:pct>=70?AMBER:RED;
+      txt(sp,               M+2,  y, 8, INK);
+      txt(s.total.toLocaleString(),    M+80, y, 8, MUTED);
+      txt(s.allocated.toLocaleString(),M+115,y, 8, GREEN);
+      txt(pct+'%',          M+152,y, 8, pc, true);
       y += 8;
     });
     y += 4;
   }
 
-  // ── Field Summary ──
+  // ── Field Summary ─────────────────────────────────────────────────────────
   if (document.getElementById('rpt_fields').checked) {
     chk(50);
-    txt('FIELD SUMMARY (Top 20 by tree count)', M, y, 9, [74,100,128], true); y += 6;
-    ln(M,y,W-M,y); y += 5;
+    sectionHead('FIELD SUMMARY  (Top 20 by tree count)');
 
     const fieldMap = {};
     data.forEach(r => {
@@ -2321,60 +2346,59 @@ function generatePDF(data) {
     });
     const fieldRows = Object.entries(fieldMap).sort((a,b)=>b[1].total-a[1].total).slice(0,20);
 
-    rct(M,y-4,W-M*2,8,MID);
+    rct(M,y-4,W-M*2,8,ROW_HDR);
     ['Field ID','Total','Allocated','Mismatch','Status %'].forEach((h,i)=>
-      txt(h,[M,M+55,M+90,M+125,M+155][i],y,8,[74,100,128],true));
+      txt(h,[M+2,M+80,M+108,M+136,M+163][i],y,8,MUTED,true));
     y += 8;
     fieldRows.forEach(([fid,s],i) => {
       chk(8);
-      if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+      if (i%2===1) rct(M,y-4,W-M*2,8,ROW_ALT);
       const pct = s.total ? Math.round(s.allocated/s.total*100) : 0;
-      txt(fid.length>22?fid.slice(0,20)+'…':fid, M,y,7,LIGHT);
-      txt(s.total.toLocaleString(),M+55,y,8,LIGHT);
-      txt(s.allocated.toLocaleString(),M+90,y,8,GREEN);
-      txt(s.mismatch.toLocaleString(),M+125,y,8,s.mismatch>0?AMBER:LIGHT);
-      txt(pct+'%',M+155,y,8,pct>=90?GREEN:pct>=70?AMBER:RED,true);
+      txt(fid.length>26?fid.slice(0,24)+'..':fid, M+2,  y, 7, INK);
+      txt(s.total.toLocaleString(),     M+80, y, 8, MUTED);
+      txt(s.allocated.toLocaleString(), M+108,y, 8, GREEN);
+      txt(s.mismatch.toLocaleString(),  M+136,y, 8, s.mismatch>0?AMBER:MUTED);
+      txt(pct+'%',                      M+163,y, 8, pct>=90?GREEN:pct>=70?AMBER:RED, true);
       y += 8;
     });
     y += 4;
   }
 
-  // ── Exceptions ──
+  // ── Exceptions ───────────────────────────────────────────────────────────
   if (document.getElementById('rpt_exceptions').checked) {
     chk(50);
-    txt('EXCEPTIONS — TREES REQUIRING REVIEW', M, y, 9, [74,100,128], true); y += 6;
-    ln(M,y,W-M,y); y += 5;
+    sectionHead('EXCEPTIONS  —  TREES REQUIRING REVIEW');
 
     const exceptions = data.filter(r => r.status && r.status !== 'Allocated').slice(0,50);
     if (!exceptions.length) {
-      txt('✓ No exceptions found.', M, y, 9, GREEN); y += 10;
+      txt('PASS: No exceptions found.', M+2, y, 9, GREEN, true); y += 10;
     } else {
-      txt(`Showing first ${Math.min(50,exceptions.length)} of ${data.filter(r=>r.status&&r.status!=='Allocated').length.toLocaleString()} exceptions`,M,y,8,[74,100,128]);
+      const excTotal = data.filter(r=>r.status&&r.status!=='Allocated').length;
+      txt(`Showing first ${Math.min(50,excTotal)} of ${excTotal.toLocaleString()} exceptions`, M+2, y, 8, MUTED);
       y += 6;
-      rct(M,y-4,W-M*2,8,MID);
+      rct(M,y-4,W-M*2,8,ROW_HDR);
       ['Tree Code','Species','Tree Field','Matched Field','Status'].forEach((h,i)=>
-        txt(h,[M,M+40,M+80,M+120,M+155][i],y,8,[74,100,128],true));
+        txt(h,[M+2,M+48,M+88,M+128,M+162][i],y,8,MUTED,true));
       y += 8;
       exceptions.forEach((r,i) => {
         chk(8);
-        if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+        if (i%2===1) rct(M,y-4,W-M*2,8,ROW_ALT);
         const sc = r.status==='Allocated - Field mismatch'?AMBER:RED;
-        txt((r.treeCode||'').slice(0,18),M,y,7,LIGHT);
-        txt((r.species||'—').slice(0,14),M+40,y,7,LIGHT);
-        txt((r.treeField||'—').slice(0,16),M+80,y,7,LIGHT);
-        txt((r.matchedFieldId||'—').slice(0,16),M+120,y,7,GREEN);
-        txt((r.status||'').replace('Allocated - ',''),M+155,y,7,sc);
+        txt((r.treeCode||'').slice(0,16),           M+2,  y, 7, INK);
+        txt((r.species||'-').slice(0,14),            M+48, y, 7, INK);
+        txt((r.treeField||'-').slice(0,15),          M+88, y, 7, MUTED);
+        txt((r.matchedFieldId||'-').slice(0,15),     M+128,y, 7, GREEN);
+        txt((r.status||'').replace('Allocated - ,''), M+162,y, 7, sc);
         y += 8;
       });
     }
     y += 4;
   }
 
-  // ── Polygon Quality ──
+  // ── Polygon Quality ───────────────────────────────────────────────────────
   if (document.getElementById('rpt_polygon').checked) {
     chk(50);
-    txt('POLYGON QUALITY — SUSPECT BOUNDARIES', M, y, 9, [74,100,128], true); y += 6;
-    ln(M,y,W-M,y); y += 5;
+    sectionHead('POLYGON QUALITY  —  SUSPECT BOUNDARIES');
 
     const fStats = {};
     data.forEach(r => {
@@ -2389,34 +2413,37 @@ function generatePDF(data) {
       .slice(0,20);
 
     if (!suspects.length) {
-      txt('✓ No suspect polygons detected (no field with ≥80% mismatch rate).', M, y, 9, GREEN); y += 10;
+      txt('PASS: No suspect polygons detected (no field with >= 80% mismatch rate).', M+2, y, 9, GREEN, true); y += 10;
     } else {
-      txt(`${suspects.length} field polygon(s) have ≥80% mismatch rate and likely require boundary correction:`,M,y,8,AMBER);
-      y += 7;
-      rct(M,y-4,W-M*2,8,MID);
+      const msg = `${suspects.length} field polygon(s) have >= 80% mismatch rate and likely require boundary correction:`;
+      const msgLines = doc.splitTextToSize(msg, W-M*2);
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(...AMBER);
+      doc.text(msgLines, M+2, y); y += msgLines.length*5+4;
+      rct(M,y-4,W-M*2,8,ROW_HDR);
       ['Field ID','Trees Inside','Mismatched','Mismatch Rate'].forEach((h,i)=>
-        txt(h,[M,M+60,M+100,M+140][i],y,8,[74,100,128],true));
+        txt(h,[M+2,M+80,M+115,M+152][i],y,8,MUTED,true));
       y += 8;
       suspects.forEach(([fid,s],i) => {
         chk(8);
-        if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+        if (i%2===1) rct(M,y-4,W-M*2,8,ROW_ALT);
         const rate = Math.round(s.mismatch/s.inside*100);
-        txt(fid.slice(0,28),M,y,7,LIGHT);
-        txt(s.inside.toLocaleString(),M+60,y,8,LIGHT);
-        txt(s.mismatch.toLocaleString(),M+100,y,8,AMBER);
-        txt(rate+'%',M+140,y,8,RED,true);
+        txt(fid.slice(0,30),              M+2,  y, 7, INK);
+        txt(s.inside.toLocaleString(),    M+80, y, 8, MUTED);
+        txt(s.mismatch.toLocaleString(),  M+115,y, 8, AMBER, true);
+        txt(rate+'%',                     M+152,y, 8, RED,   true);
         y += 8;
       });
     }
   }
 
-  // ── Footer on every page ──
+  // ── Footer on every page ──────────────────────────────────────────────────
   const pageCount = doc.internal.getNumberOfPages();
   for (let p=1; p<=pageCount; p++) {
     doc.setPage(p);
-    rct(0,287,W,10,DARK);
-    txt(`CCS Active Tree Catalog · Verra Compliance Report · ${date}`,M,293,7,[74,100,128]);
-    txt(`Page ${p} of ${pageCount}`,W-M,293,7,[74,100,128]);
+    rct(0, 287, W, 10, [235,240,248]);
+    ln(0, 287, W, 287, DIVIDER);
+    txt(`CCS Active Tree Catalog  |  Verra Compliance Report  |  ${date}`, M, 293, 7, MUTED);
+    txt(`Page ${p} of ${pageCount}`, W-M, 293, 7, MUTED);
     doc.setFont('helvetica','normal');
   }
 
