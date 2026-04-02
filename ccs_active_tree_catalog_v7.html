@@ -1060,15 +1060,14 @@ async function dvFetchAll(token, url, label, includeAnnotations = false) {
 }
 
 async function fetchAllFields(token) {
-  // ccs_fieldowner_field = contact lookup -> use FormattedValue for display name
-  // ccs_nrclookup        = NRC directly on field record -> use for owner matching
-  // ccs_zone_field       = zone lookup -> use FormattedValue for zone name
+  // ccs_contactid_field confirmed working against live API (v5/v6)
+  // ccs_fieldowner_field schema name unconfirmed -- removed to avoid HTTP 400
+  // ccs_nrclookup / ccs_zone_field -- schema names need live API verification
+  // TODO: add NRC + Zone once correct schema names confirmed via API metadata
   const select = [
     'ccs_cssfieldid_field',
     'ccs_fieldgeojson_field',
-    'ccs_fieldowner_field',
-    'ccs_nrclookup',
-    'ccs_zone_field',
+    'ccs_contactid_field',
     'ccs_fieldsizem2_field',
     'createdon'
   ].join(',');
@@ -1083,18 +1082,15 @@ async function fetchAllFields(token) {
     guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
     fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
     geoJSON: String(r.ccs_fieldgeojson_field || ''),
-    // Owner display name - contact lookup, resolved via FormattedValue
+    // Owner display name - ccs_contactid_field confirmed working
     owner:   String(
-      r['ccs_fieldowner_field@OData.Community.Display.V1.FormattedValue']
-      || r.ccs_fieldowner_field || ''
+      r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
+      || r.ccs_contactid_field || ''
     ),
-    // NRC - canonical owner identifier, used for secondary matching
-    nrc:     String(r['ccs_nrclookup'] || '').trim(),
-    // Zone - lookup, resolved via FormattedValue
-    zone:    String(
-      r['ccs_zone_field@OData.Community.Display.V1.FormattedValue']
-      || r.ccs_zone_field || ''
-    ),
+    // NRC and Zone: schema names need verification against live API
+    // Set to empty for now -- will add once column names confirmed
+    nrc:     '',
+    zone:    '',
     size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
     ring:    null
   })).map(f => { f.ring = parseGeoJSON(f.geoJSON); return f; });
