@@ -1,0 +1,2455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>CCS Active Tree Catalog</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<style>
+/* ── DESIGN SYSTEM ───────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap');
+
+:root {
+  --bg:       #080c10;
+  --surface:  #0f1520;
+  --panel:    #141d2b;
+  --card:     #1a2538;
+  --border:   #1f2e42;
+  --border2:  #263548;
+  --text:     #d4e4f7;
+  --muted:    #4a6480;
+  --faint:    #1e3050;
+
+  --green:    #22c55e;
+  --green-bg: rgba(34,197,94,0.08);
+  --green-b:  rgba(34,197,94,0.25);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,0.08);
+  --red-b:    rgba(239,68,68,0.25);
+  --amber:    #f59e0b;
+  --amber-bg: rgba(245,158,11,0.08);
+  --amber-b:  rgba(245,158,11,0.25);
+  --blue:     #38bdf8;
+  --blue-bg:  rgba(56,189,248,0.08);
+  --blue-b:   rgba(56,189,248,0.25);
+  --purple:   #a78bfa;
+
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── HEADER ──────────────────────────────────────────────────────────────── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.logo {
+  display: flex; align-items: center; gap: 8px;
+}
+.logo-icon {
+  width: 28px; height: 28px; background: var(--green);
+  border-radius: 6px; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; flex-shrink: 0;
+}
+.logo-text {
+  font-family: var(--font-mono);
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 2px; color: var(--text);
+  text-transform: uppercase;
+}
+.logo-sub {
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 1px; font-family: var(--font-mono);
+}
+.header-divider { width: 1px; height: 24px; background: var(--border); }
+.header-spacer { flex: 1; }
+
+/* KPI chips in header */
+.kpi-strip {
+  display: flex; gap: 8px; align-items: center;
+}
+.kpi-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 10px;
+  font-family: var(--font-mono); font-size: 11px;
+}
+.kpi-chip .kv { font-weight: 700; font-size: 13px; }
+.kpi-chip .kl { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-chip.green { border-color: var(--green-b); background: var(--green-bg); }
+.kpi-chip.green .kv { color: var(--green); }
+.kpi-chip.red   { border-color: var(--red-b);   background: var(--red-bg); }
+.kpi-chip.red   .kv { color: var(--red); }
+.kpi-chip.amber { border-color: var(--amber-b); background: var(--amber-bg); }
+.kpi-chip.amber .kv { color: var(--amber); }
+.kpi-chip.blue  { border-color: var(--blue-b);  background: var(--blue-bg); }
+.kpi-chip.blue  .kv { color: var(--blue); }
+
+/* ── TAB BAR ─────────────────────────────────────────────────────────────── */
+.tab-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  padding: 0 16px;
+  gap: 0;
+  flex-shrink: 0;
+}
+.tab {
+  padding: 8px 16px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* ── MAIN LAYOUT ─────────────────────────────────────────────────────────── */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── LEFT SIDEBAR ────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 300px; flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.sb-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-label {
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; color: var(--muted);
+  text-transform: uppercase; display: block;
+  margin-bottom: 6px;
+}
+.upload-zone {
+  border: 1px dashed var(--border2);
+  border-radius: 6px; padding: 10px 8px;
+  text-align: center; cursor: pointer;
+  transition: all 0.2s; position: relative;
+  background: var(--faint);
+}
+.upload-zone:hover, .upload-zone.drag {
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+.upload-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0;
+  cursor: pointer; width: 100%; height: 100%;
+}
+.upload-icon { font-size: 20px; margin-bottom: 4px; }
+.upload-text { font-size: 10px; color: var(--muted); line-height: 1.5; }
+.upload-status { margin-top: 5px; font-size: 10px; font-family: var(--font-mono); }
+.upload-status.ok  { color: var(--green); }
+.upload-status.err { color: var(--red); }
+
+/* Filter controls */
+.filter-row {
+  display: flex; gap: 5px; margin-bottom: 5px;
+}
+.filter-row:last-child { margin-bottom: 0; }
+select, input[type=text] {
+  flex: 1; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: var(--font-mono);
+  font-size: 10px; padding: 5px 7px; outline: none;
+  transition: border-color 0.2s;
+}
+select:focus, input[type=text]:focus { border-color: var(--green); }
+select option { background: var(--panel); }
+
+/* Buttons */
+.btn {
+  border: none; border-radius: 4px; cursor: pointer;
+  font-weight: 700; font-size: 10px;
+  letter-spacing: 1px; text-transform: uppercase;
+  transition: opacity 0.15s, transform 0.1s;
+  padding: 7px 12px; white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.btn:hover { opacity: 0.85; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-primary { background: var(--green); color: #000; flex: 1; }
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-amber { background: var(--amber); color: #000; }
+.btn-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-b); }
+.btn-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-b); }
+.btn-row { display: flex; gap: 5px; }
+
+/* Field list */
+.field-list { flex: 1; overflow-y: auto; }
+.field-item {
+  padding: 7px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+  display: flex; align-items: center; gap: 8px;
+}
+.field-item:hover { background: var(--card); }
+.field-item.active { background: var(--green-bg); border-left: 3px solid var(--green); }
+.fi-id {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--green); font-weight: 700; flex: 1;
+}
+.fi-owner { font-size: 10px; color: var(--muted); }
+.fi-count {
+  font-family: var(--font-mono); font-size: 10px;
+  background: var(--green-bg); color: var(--green);
+  border-radius: 10px; padding: 1px 7px; font-weight: 700;
+}
+.fi-count.zero { background: var(--red-bg); color: var(--red); }
+
+/* ── CONTENT PANELS ──────────────────────────────────────────────────────── */
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Views */
+.view { display: none; flex: 1; overflow: hidden; }
+.view.active { display: flex; flex-direction: column; }
+
+/* ── CATALOG VIEW ────────────────────────────────────────────────────────── */
+.catalog-toolbar {
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0; flex-wrap: wrap;
+}
+.catalog-search {
+  flex: 1; min-width: 180px; max-width: 280px;
+}
+.catalog-table-wrap { flex: 1; overflow-y: auto; }
+table.catalog {
+  width: 100%; border-collapse: collapse;
+  font-size: 11px; font-family: var(--font-mono);
+}
+table.catalog thead {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--surface);
+}
+table.catalog th {
+  padding: 8px 10px; text-align: left;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; color: var(--muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap; cursor: pointer;
+  user-select: none;
+}
+table.catalog th:hover { color: var(--text); }
+table.catalog th.sorted { color: var(--green); }
+table.catalog td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+table.catalog tr:hover td { background: var(--card); }
+table.catalog tr.selected td { background: var(--green-bg); }
+
+/* Status badges */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 3px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.5px; white-space: nowrap;
+}
+.badge.allocated    { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-b); }
+.badge.mismatch     { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-b); }
+.badge.outside      { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-b); }
+.badge.outside-tagged { background: rgba(167,139,250,0.1); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+.badge.missing      { background: var(--faint); color: var(--muted); border: 1px solid var(--border); }
+.flag-yes { color: var(--green); font-weight: 700; }
+.flag-no  { color: var(--red);   font-weight: 700; }
+.flag-na  { color: var(--muted); }
+
+/* Pagination */
+.pagination {
+  padding: 8px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; color: var(--muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.pagination .spacer { flex: 1; }
+.page-btn {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); border-radius: 3px;
+  padding: 3px 8px; cursor: pointer; font-size: 10px;
+  font-family: var(--font-mono);
+}
+.page-btn:hover { border-color: var(--green); color: var(--green); }
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── MAP VIEW ────────────────────────────────────────────────────────────── */
+.map-view-wrap {
+  flex: 1; position: relative; display: flex; flex-direction: column;
+}
+#map {
+  flex: 1; width: 100%;
+}
+.map-placeholder {
+  flex: 1; display: flex; align-items: center;
+  justify-content: center; background: #0a0e14;
+  color: var(--muted); font-family: var(--font-mono);
+  font-size: 12px; text-align: center; line-height: 2.5;
+}
+.map-overlay-panel {
+  position: absolute; top: 10px; right: 10px; z-index: 1000;
+  background: rgba(15,21,32,0.95); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px;
+  min-width: 200px; backdrop-filter: blur(6px);
+}
+.mop-title {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.mop-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 4px; font-size: 11px;
+}
+.mop-label { color: var(--muted); font-size: 10px; }
+.mop-value { font-family: var(--font-mono); font-weight: 700; }
+.mop-value.green { color: var(--green); }
+.mop-value.red   { color: var(--red); }
+.mop-value.amber { color: var(--amber); }
+
+/* Map legend */
+.map-legend {
+  position: absolute; bottom: 10px; left: 10px; z-index: 1000;
+  background: rgba(15,21,32,0.92); border: 1px solid var(--border);
+  border-radius: 5px; padding: 8px 10px;
+  font-size: 10px; backdrop-filter: blur(4px);
+}
+.ml-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.ml-row:last-child { margin-bottom: 0; }
+.ml-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── EXCEPTIONS VIEW ─────────────────────────────────────────────────────── */
+.exc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px; padding: 12px;
+  flex-shrink: 0;
+}
+.exc-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+.exc-card:hover { border-color: var(--border2); }
+.exc-card.active-filter { border-color: var(--amber); background: var(--amber-bg); }
+.exc-card .ec-num {
+  font-family: var(--font-mono); font-size: 28px; font-weight: 700;
+  line-height: 1; margin-bottom: 4px;
+}
+.exc-card .ec-label {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.exc-card.red   .ec-num { color: var(--red); }
+.exc-card.amber .ec-num { color: var(--amber); }
+.exc-card.purple .ec-num { color: var(--purple); }
+.exc-card.blue  .ec-num { color: var(--blue); }
+
+/* ── EMPTY / LOADING STATES ──────────────────────────────────────────────── */
+.empty-state {
+  color: var(--muted); font-family: var(--font-mono);
+  font-size: 11px; text-align: center;
+  padding: 40px 20px; line-height: 2.2;
+}
+.empty-state strong { color: var(--text); }
+.spinner-wrap {
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; gap: 10px; color: var(--green);
+  font-family: var(--font-mono); font-size: 11px;
+}
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+
+/* Progress bar */
+.progress-wrap {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.progress-label { color: var(--text); font-weight: 600; }
+.progress-pct   { color: var(--green); font-weight: 700; font-size: 12px; }
+.progress-track {
+  height: 6px;
+  background: var(--faint);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.12s ease;
+}
+.progress-bar.complete {
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+}
+.progress-detail {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+/* Mismatch breakdown panel */
+.mismatch-breakdown {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0 12px 8px;
+  flex-shrink: 0;
+}
+.mb-title {
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; color: var(--amber);
+  text-transform: uppercase; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.mb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mb-cell {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+}
+.mb-cell.highlight-bad  { border-color: var(--red-b);   background: var(--red-bg); }
+.mb-cell.highlight-warn { border-color: var(--amber-b); background: var(--amber-bg); }
+.mb-cell.highlight-ok   { border-color: var(--green-b); background: var(--green-bg); }
+.mb-num {
+  font-family: var(--font-mono);
+  font-size: 20px; font-weight: 800;
+  line-height: 1; margin-bottom: 3px;
+}
+.mb-num.red    { color: var(--red); }
+.mb-num.amber  { color: var(--amber); }
+.mb-num.green  { color: var(--green); }
+.mb-num.muted  { color: var(--muted); }
+.mb-lbl {
+  font-size: 9px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  line-height: 1.4;
+}
+.mb-pct {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--muted);
+  margin-top: 2px;
+}
+.mb-verdict {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  font-size: 11px; line-height: 1.6; color: var(--text);
+}
+.mb-verdict strong { color: var(--amber); }
+.mb-verdict .good  { color: var(--green); }
+.mb-verdict .bad   { color: var(--red); }
+/* Scrollbars */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Floating Tree Catalog button ── */
+.fab-tree-catalog {
+  position: fixed; bottom: 52px; right: 20px; z-index: 9999;
+  display: flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #000; border: none; border-radius: 28px;
+  padding: 10px 18px 10px 14px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  cursor: pointer; text-decoration: none;
+  box-shadow: 0 4px 20px rgba(34,197,94,0.35), 0 2px 8px rgba(0,0,0,0.5);
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.fab-tree-catalog:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(34,197,94,0.5), 0 3px 12px rgba(0,0,0,0.5);
+}
+.fab-tree-catalog:active { transform: scale(0.97); }
+.fab-icon { font-size: 16px; line-height: 1; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌳</div>
+    <div>
+      <div class="logo-text">CCS Active Tree Catalog</div>
+      <div class="logo-sub">Field · Spatial · Allocation</div>
+    </div>
+  </div>
+  <div class="header-divider"></div>
+  <div class="kpi-strip" id="kpiStrip">
+    <div class="kpi-chip blue"><span class="kv" id="kpiFields">—</span><span class="kl">Fields</span></div>
+    <div class="kpi-chip blue"><span class="kv" id="kpiTrees">—</span><span class="kl">Trees</span></div>
+    <div class="kpi-chip green"><span class="kv" id="kpiInside">—</span><span class="kl">Allocated</span></div>
+    <div class="kpi-chip red"><span class="kv" id="kpiOutside">—</span><span class="kl">Outside</span></div>
+    <div class="kpi-chip amber"><span class="kv" id="kpiMismatch">—</span><span class="kl">Mismatches</span></div>
+    <div class="kpi-chip amber"><span class="kv" id="kpiReview">—</span><span class="kl">Review</span></div>
+  </div>
+  <div class="header-spacer"></div>
+  <button class="btn btn-amber" id="btnExport" onclick="exportCSV()" disabled>⬇ Export CSV</button>
+  <button class="btn btn-blue" id="btnSaveDV" onclick="saveToFieldforce()" disabled
+    style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b)">
+    ☁ Save to Fieldforce
+  </button>
+  <button class="btn btn-secondary" id="btnReport" onclick="showReportModal()" disabled>
+    📄 Compliance Report
+  </button>
+</header>
+
+
+
+<!-- ── COMPLIANCE REPORT MODAL ──────────────────────────────────────────── -->
+<div id="reportModal" style="display:none;position:fixed;inset:0;z-index:10000;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    width:480px;max-width:95vw;padding:24px;font-family:var(--font-sans)">
+    <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;
+      letter-spacing:2px;color:var(--green);text-transform:uppercase;margin-bottom:16px">
+      📄 Verra Compliance Report
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono);letter-spacing:1px">INCLUDE SECTIONS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rpt_summary" checked> Executive Summary</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rpt_allocation" checked> Allocation Overview</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rpt_species" checked> Species Breakdown</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rpt_fields" checked> Field Summary</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rpt_exceptions" checked> Exceptions</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rpt_polygon" checked> Polygon Quality</label>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono);letter-spacing:1px">SCOPE</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="radio" name="rptScope" id="rpt_all" checked> All trees</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="radio" name="rptScope" id="rpt_filtered"> Current filter only</label>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono);letter-spacing:1px">FORMAT</div>
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="radio" name="rptFmt" id="fmt_pdf" checked> PDF (Verra submission)</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="radio" name="rptFmt" id="fmt_csv"> CSV (data export)</label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeReportModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="generateReport()">Generate Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB BAR ───────────────────────────────────────────────────────────── -->
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('catalog')"   id="tab-catalog">📋 Tree Catalog</div>
+  <div class="tab"         onclick="switchTab('map')"      id="tab-map">🗺 Field Map</div>
+  <div class="tab"         onclick="switchTab('exceptions')" id="tab-exceptions">⚠ Exceptions</div>
+</div>
+
+<!-- ── MAIN ──────────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Upload Fields -->
+    <div class="sb-section">
+      <span class="sb-label">Active Fields — Excel export</span>
+      <div class="upload-zone" id="zoneFields">
+        <input type="file" id="fileFields" accept=".xlsx,.xls,.csv" onchange="loadFields(this.files[0])"/>
+        <div class="upload-icon">🏞</div>
+        <div class="upload-text">Drop Active Fields .xlsx<br><span style="font-size:9px;opacity:.5">Needs CCS Field ID, Field GeoJSON, Field Owner</span></div>
+      </div>
+      <div class="upload-status" id="statusFields"></div>
+    </div>
+
+    <!-- Active Trees — Fieldforce Live or Excel fallback -->
+    <div class="sb-section">
+      <span class="sb-label">Active Trees</span>
+      <!-- Primary: Fieldforce live connection -->
+      <div class="btn-row" style="margin-bottom:5px">
+        <button class="btn btn-primary" id="btnFieldforce" onclick="connectFieldforce()"
+          style="flex:1;background:linear-gradient(135deg,#0078d4,#005a9e);display:flex;align-items:center;justify-content:center;gap:6px">
+          <span style="font-size:13px">☁</span> Connect to Fieldforce
+        </button>
+        <button class="btn btn-secondary" onclick="forceRefresh()" title="Clear cache and fetch fresh data" style="width:36px;font-size:14px">↺</button>
+      </div>
+      <div class="upload-status" id="statusFieldforce"></div>
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:6px;margin:6px 0">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">OR</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <!-- Fallback: Excel upload -->
+      <div class="upload-zone" id="zoneTrees">
+        <input type="file" id="fileTrees" accept=".xlsx,.xls,.csv" onchange="loadTrees(this.files[0])"/>
+        <div class="upload-icon">🌱</div>
+        <div class="upload-text">Drop Active Trees .xlsx<br><span style="font-size:9px;opacity:.5">Fallback — Excel export</span></div>
+      </div>
+      <div class="upload-status" id="statusTrees"></div>
+    </div>
+
+    <!-- Run -->
+    <div class="sb-section">
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnRun" onclick="runAllocation()" disabled>▶ Run Allocation</button>
+        <button class="btn btn-secondary" onclick="clearAll()" style="width:36px">✕</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="sb-section" id="filterSection" style="display:none">
+      <span class="sb-label">Filters</span>
+      <div class="filter-row">
+        <select id="fltStatus" onchange="debouncedFilter()">
+          <option value="">All statuses</option>
+          <option value="Allocated">Allocated</option>
+          <option value="Allocated - Field mismatch">Field mismatch</option>
+          <option value="Outside polygon">Outside polygon</option>
+          <option value="Outside polygon but field tagged">Outside + field tagged</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <select id="fltField" onchange="debouncedFilter()">
+          <option value="">All fields</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <select id="fltOwner" onchange="debouncedFilter()">
+          <option value="">All field owners</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <select id="fltSpecies" onchange="debouncedFilter()">
+          <option value="">All species</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <select id="fltZone" onchange="debouncedFilter()">
+          <option value="">All zones</option>
+        </select>
+      </div>
+      <div style="margin-top:5px">
+        <button class="btn btn-secondary" onclick="clearFilters()" style="width:100%;font-size:9px">Clear filters</button>
+      </div>
+    </div>
+
+    <!-- Field list (for map view) -->
+    <div class="sb-section" style="padding-bottom:4px">
+      <span class="sb-label">Fields <span id="fieldListCount" style="color:var(--green)"></span></span>
+    </div>
+    <div class="field-list" id="fieldList">
+      <div class="empty-state" style="padding:20px 12px">Upload files and run allocation to see fields</div>
+    </div>
+
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- Progress bar -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-header">
+      <span class="progress-label" id="progressLabel">Running allocation…</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-detail" id="progressDetail">Preparing…</div>
+  </div>
+
+  <!-- ── CATALOG VIEW ──────────────────────────────────────────────────── -->
+    <div class="view active" id="view-catalog">
+      <div class="catalog-toolbar">
+        <input type="text" class="catalog-search" id="catalogSearch"
+          placeholder="Search tree code, species, field, owner…"
+          oninput="debouncedFilter()"/>
+        <span id="catalogCount" style="font-family:var(--font-mono);font-size:10px;color:var(--muted)"></span>
+        <span id="filterSpinner" style="display:none;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;color:var(--amber)">
+          <span style="display:inline-block;width:10px;height:10px;border:2px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin 0.6s linear infinite"></span>
+          Filtering…
+        </span>
+        <div style="flex:1"></div>
+        <button class="btn btn-secondary" onclick="sortBy('status')" style="font-size:9px">Sort: Status</button>
+        <button class="btn btn-secondary" onclick="sortBy('field')"  style="font-size:9px">Sort: Field</button>
+      </div>
+      <div class="catalog-table-wrap">
+        <table class="catalog" id="catalogTable">
+          <thead>
+            <tr>
+              <th onclick="sortBy('treeCode')">#  Tree Code</th>
+              <th onclick="sortBy('species')">Species</th>
+              <th onclick="sortBy('treeField')">Tree Field</th>
+              <th onclick="sortBy('matchedField')">Matched Field</th>
+              <th onclick="sortBy('fieldMatch')">Field ✓</th>
+              <th onclick="sortBy('ownerMatch')">Owner ✓</th>
+              <th onclick="sortBy('status')">Status</th>
+              <th>Coordinates</th>
+              <th onclick="sortBy('accuracy')">Accuracy</th>
+              <th onclick="sortBy('createdOn')">Created</th>
+            </tr>
+          </thead>
+          <tbody id="catalogBody">
+            <tr><td colspan="10"><div class="empty-state">Upload <strong>Active Fields</strong> and <strong>Active Trees</strong> files<br>then click <strong>▶ Run Allocation</strong></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="pageInfo">—</span>
+        <div class="spacer"></div>
+        <button class="page-btn" onclick="changePage(-1)" id="btnPrev">← Prev</button>
+        <button class="page-btn" onclick="changePage(1)"  id="btnNext">Next →</button>
+      </div>
+    </div>
+
+    <!-- ── MAP VIEW ──────────────────────────────────────────────────────── -->
+    <div class="view" id="view-map">
+      <div class="map-view-wrap">
+        <div class="map-placeholder" id="mapPlaceholder">
+          Run allocation, then select a field<br>from the left panel to view its polygon and trees
+        </div>
+        <div id="map" style="display:none"></div>
+        <!-- Stats overlay -->
+        <div class="map-overlay-panel" id="mapOverlay" style="display:none">
+          <div class="mop-title">Field Summary</div>
+          <div class="mop-row"><span class="mop-label">Field ID</span><span class="mop-value" id="mopFieldId">—</span></div>
+          <div class="mop-row"><span class="mop-label">Owner</span><span class="mop-value" id="mopOwner">—</span></div>
+          <div class="mop-row"><span class="mop-label">Zone</span><span class="mop-value" id="mopZone">—</span></div>
+          <div class="mop-row"><span class="mop-label">Inside</span><span class="mop-value green" id="mopInside">0</span></div>
+          <div class="mop-row"><span class="mop-label">Outside</span><span class="mop-value red" id="mopOutside">0</span></div>
+          <div class="mop-row"><span class="mop-label">Mismatches</span><span class="mop-value amber" id="mopMismatch">0</span></div>
+        </div>
+        <!-- Legend -->
+        <div class="map-legend" id="mapLegend" style="display:none">
+          <div class="ml-row"><div class="ml-dot" style="background:#22c55e"></div><span style="font-size:10px;color:var(--muted)">Allocated (inside)</span></div>
+          <div class="ml-row"><div class="ml-dot" style="background:#ef4444"></div><span style="font-size:10px;color:var(--muted)">Outside polygon</span></div>
+          <div class="ml-row"><div class="ml-dot" style="background:#f59e0b"></div><span style="font-size:10px;color:var(--muted)">Mismatch</span></div>
+          <div class="ml-row"><div class="ml-dot" style="background:#38bdf8"></div><span style="font-size:10px;color:var(--muted)">Field boundary</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EXCEPTIONS VIEW ───────────────────────────────────────────────── -->
+    <div class="view" id="view-exceptions">
+      <div class="exc-grid" id="excGrid">
+        <div class="exc-card red"    id="exc-outside"      onclick="filterException('Outside polygon')">
+          <div class="ec-num" id="excN1">—</div>
+          <div class="ec-label">Outside polygon</div>
+        </div>
+        <div class="exc-card purple" id="exc-tagged"       onclick="filterException('Outside polygon but field tagged')">
+          <div class="ec-num" id="excN2">—</div>
+          <div class="ec-label">Outside but field tagged</div>
+        </div>
+        <div class="exc-card amber"  id="exc-fieldmismatch" onclick="filterException('Allocated - Field mismatch')">
+          <div class="ec-num" id="excN3">—</div>
+          <div class="ec-label">Field mismatch</div>
+        </div>
+      </div>
+      <!-- Mismatch breakdown panel -->
+      <div class="mismatch-breakdown" id="mismatchBreakdown" style="display:none">
+        <div class="mb-title">
+          <span>🔍 Field Mismatch Breakdown — What is actually causing them?</span>
+        </div>
+        <div class="mb-grid" id="mbGrid"></div>
+        <div class="mb-verdict" id="mbVerdict"></div>
+      </div>
+
+      <!-- Exceptions table reuses catalog logic with exception filter -->
+      <div class="catalog-table-wrap" style="flex:1">
+        <table class="catalog" id="excTable">
+          <thead>
+            <tr>
+              <th>Tree Code</th>
+              <th>Species</th>
+              <th>Tree Field</th>
+              <th>Matched Field</th>
+              <th>Field ✓</th>
+              <th>Owner ✓</th>
+              <th>Status</th>
+              <th>Coordinates</th>
+              <th>Tree Owner</th>
+            </tr>
+          </thead>
+          <tbody id="excBody">
+            <tr><td colspan="9"><div class="empty-state">Run allocation to see exceptions</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// INDEXEDDB CACHE
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DB_NAME    = 'ccs_tree_catalog';
+const DB_VERSION = 1;
+const CACHE_TTL  = 6 * 60 * 60 * 1000; // 6 hours in ms
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('cache')) {
+        db.createObjectStore('cache', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function cacheSet(key, value) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx   = db.transaction('cache', 'readwrite');
+      const store = tx.objectStore('cache');
+      store.put({ key, value, ts: Date.now() });
+      tx.oncomplete = () => resolve();
+      tx.onerror    = e => reject(e.target.error);
+    });
+  } catch(e) { console.warn('Cache write failed:', e); }
+}
+
+async function cacheGet(key) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction('cache', 'readonly');
+      const store = tx.objectStore('cache');
+      const req   = store.get(key);
+      req.onsuccess = e => {
+        const rec = e.target.result;
+        if (!rec) return resolve(null);
+        if (Date.now() - rec.ts > CACHE_TTL) return resolve(null); // expired
+        resolve(rec.value);
+      };
+      req.onerror = e => reject(e.target.error);
+    });
+  } catch(e) { return null; }
+}
+
+async function cacheClear() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('cache', 'readwrite');
+      tx.objectStore('cache').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror    = e => reject(e.target.error);
+    });
+  } catch(e) {}
+}
+
+async function tryLoadFromCache() {
+  const cached = await cacheGet('allocation_run');
+  if (!cached) return false;
+  const ageHours = ((Date.now() - cached.ts) / 3600000).toFixed(1);
+  const useCache = confirm(
+    `Cached data available from ${ageHours} hours ago.\n` +
+    `Fields: ${cached.fieldsCount.toLocaleString()} · Trees: ${cached.treesCount.toLocaleString()}\n\n` +
+    `Click OK to load from cache (instant)\nClick Cancel to fetch fresh data from Fieldforce`
+  );
+  if (!useCache) return false;
+
+  fieldsData = cached.fields;
+  treesData  = cached.trees;
+  // Re-parse rings (they don't survive JSON serialisation)
+  fieldsData.forEach(f => { f.ring = f.ring || parseGeoJSON(f.geoJSON); });
+  const valid = fieldsData.filter(f => f.ring).length;
+  setStatus('statusFields', `✓ ${fieldsData.length.toLocaleString()} fields (cached ${ageHours}h ago)`, true);
+  setStatus('statusTrees',  `✓ ${treesData.length.toLocaleString()} trees (cached ${ageHours}h ago)`, true);
+
+  const btn = document.getElementById('btnFieldforce');
+  btn.innerHTML = `<span style="font-size:13px">✓</span> Cache (${ageHours}h ago)`;
+  btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+  checkReady();
+  return true;
+}
+
+async function saveToCache(fields, trees) {
+  // Strip rings before storing (can be re-parsed from geoJSON)
+  const fieldsToStore = fields.map(f => ({ ...f, ring: null }));
+  await cacheSet('allocation_run', {
+    fields:      fieldsToStore,
+    trees,
+    fieldsCount: fields.length,
+    treesCount:  trees.length,
+    ts:          Date.now()
+  });
+  console.log('✓ Data cached to IndexedDB');
+}
+
+async function forceRefresh() {
+  await cacheClear();
+  setStatusDV('Cache cleared — connecting to Fieldforce…', 'ok');
+  const btn = document.getElementById('btnFieldforce');
+  btn.innerHTML = '<span style="font-size:13px">☁</span> Connect to Fieldforce';
+  btn.style.background = 'linear-gradient(135deg,#0078d4,#005a9e)';
+  btn.disabled = false;
+  connectFieldforce();
+}
+
+const MSAL_CONFIG = {
+  auth: {
+    clientId:    '3d61678f-e900-426f-a05c-4a765736f9c7',
+    authority:   'https://login.microsoftonline.com/f9198cfe-2489-4324-b66f-e27f00e3f667',
+    redirectUri: window.location.href.split('?')[0]
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+
+const DV_ENV     = 'https://fieldforce.crm14.dynamics.com';
+const DV_API     = `${DV_ENV}/api/data/v9.2`;
+const DV_SCOPE   = [`${DV_ENV}/user_impersonation`];
+
+
+let msalInstance = null;
+let dvAccount    = null;
+
+function getMSAL() {
+  if (!msalInstance) msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+  return msalInstance;
+}
+
+async function getToken() {
+  const app = getMSAL();
+  const accounts = app.getAllAccounts();
+  if (accounts.length > 0) dvAccount = accounts[0];
+
+  const req = { scopes: DV_SCOPE, account: dvAccount || undefined };
+  try {
+    const res = await app.acquireTokenSilent(req);
+    dvAccount = res.account;
+    return res.accessToken;
+  } catch(e) {
+    // Silent failed — show popup
+    const res = await app.acquireTokenPopup(req);
+    dvAccount = res.account;
+    return res.accessToken;
+  }
+}
+
+async function connectFieldforce() {
+  const btn = document.getElementById('btnFieldforce');
+
+  // Try cache first
+  const loadedFromCache = await tryLoadFromCache();
+  if (loadedFromCache) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span style="font-size:13px">⏳</span> Signing in…';
+  setStatusDV('Authenticating with Microsoft…', 'ok');
+
+  try {
+    const token = await getToken();
+    const name  = dvAccount?.name || dvAccount?.username || 'Signed in';
+    btn.innerHTML = `<span style="font-size:13px">✓</span> ${name}`;
+    btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+
+    setStatusDV('✓ Authenticated — fetching fields & trees…', 'ok');
+    // Fields must complete first — tree mapping uses fieldsData GUID lookup
+    await fetchAllFields(token);
+    await fetchAllTrees(token);
+
+    // Save to IndexedDB cache after both fetches complete
+    await saveToCache(fieldsData, treesData);
+    setStatusDV('✓ Data cached — next session will load instantly', 'ok');
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span style="font-size:13px">☁</span> Connect to Fieldforce';
+    btn.style.background = '';
+    setStatusDV('Auth failed: ' + (e.message || e), 'err');
+  }
+}
+
+function setStatusDV(msg, cls) {
+  const el = document.getElementById('statusFieldforce');
+  el.textContent = msg;
+  el.className   = 'upload-status ' + (cls === 'ok' ? 'ok' : 'err');
+}
+
+async function dvFetchAll(token, url, label, includeAnnotations = false) {
+  const rows = [];
+  let page = 0;
+  while (url) {
+    page++;
+    setStatusDV(`⬇ ${label}: page ${page} (${rows.length.toLocaleString()} so far)…`, 'ok');
+    const prefer = 'odata.maxpagesize=5000' + (includeAnnotations ? ',odata.include-annotations="OData.Community.Display.V1.FormattedValue"' : '');
+    let res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
+        'Prefer': prefer
+      }
+    });
+    if (res.status === 401) { token = await getToken(); continue; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).substring(0,200)}`);
+    const data = await res.json();
+    rows.push(...(data.value || []));
+    url = data['@odata.nextLink'] || null;
+  }
+  return rows;
+}
+
+async function fetchAllFields(token) {
+  // Confirmed column names — include ccs_fieldowner_field (plain text) alongside contact lookup
+  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldsizem2_field,createdon';
+  const rows = await dvFetchAll(token,
+    `${DV_API}/ccs_fields?$select=${select}&$filter=statecode eq 0`,
+    'Fields',
+    true
+  );
+
+  fieldsData = rows.map((r, i) => ({
+    guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
+    fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
+    geoJSON: String(r.ccs_fieldgeojson_field || ''),
+    owner:   String(r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
+      || r.ccs_contactid_field || ''),
+    zone:    '',
+    size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
+    ring:    null
+  })).map(f => { f.ring = parseGeoJSON(f.geoJSON); return f; });
+
+  const valid = fieldsData.filter(f => f.ring).length;
+  setStatus('statusFields', `✓ ${fieldsData.length.toLocaleString()} fields from Fieldforce — ${valid} with geometry`, true);
+  checkReady();
+}
+
+async function fetchAllTrees(token) {
+  // All column names confirmed from live Dataverse API response 2026-04-01
+  const latCol    = 'ccs_treelatitude_tree';
+  const lngCol    = 'ccs_treelongitude_tree';
+  const codeCol   = 'ccs_treecode';
+  const ownerCol  = 'ccs_fieldowner_tree';
+  const nrcCol    = 'ccs_fieldownernrc_tree';
+  const accCol    = 'ccs_accuracyreading';
+  // Species is an option set (integer) — we request formatted values via header
+  // Field is a lookup — we expand to get FLD-xxx from the related ccs_field record
+
+  const selectCols = [codeCol, latCol, lngCol, ownerCol, nrcCol, accCol, 'createdon', '_ccs_field_tree_value', 'ccs_species_tree'].join(',');
+
+  const rows = await dvFetchAll(token,
+    `${DV_API}/ccs_trees?$select=${selectCols}&$filter=statecode eq 0`,
+    'Trees',
+    true  // request formatted values for option sets
+  );
+
+  // Build a GUID → fieldId lookup from already-loaded fieldsData
+  const guidToFieldId = {};
+  fieldsData.forEach(f => { if (f.guid) guidToFieldId[f.guid.toLowerCase()] = f.fieldId; });
+
+  treesData = rows.map((r, i) => {
+    const lat = parseFloat(r[latCol]);
+    const lng = parseFloat(r[lngCol]);
+    const coords = (!isNaN(lat) && !isNaN(lng)) ? autoLatLng(lat, lng) : null;
+    const species = r['ccs_species_tree@OData.Community.Display.V1.FormattedValue']
+      || String(r['ccs_species_tree'] || '');
+    // Resolve field GUID → FLD-xxx using our loaded fieldsData
+    const fieldGuid = (r['_ccs_field_tree_value'] || '').toLowerCase();
+    const treeFieldVal = guidToFieldId[fieldGuid] || '';
+    return {
+      guid:          r.ccs_treeid || `T${i}`,
+      treeCode:      String(r[codeCol] || `T${i}`),
+      species,
+      lat:           coords ? coords.lat : null,
+      lng:           coords ? coords.lng : null,
+      treeField:     treeFieldVal.trim(),
+      fieldOwner:    String(r[ownerCol] || ''),
+      fieldOwnerNRC: String(r[nrcCol]   || ''),
+      treeOwner:     String(r[ownerCol] || ''),
+      accuracy:      parseFloat(r[accCol]) || null,
+      createdOn:     r.createdon ? r.createdon.split('T')[0] : '',
+    };
+  });
+
+  const withCoords = treesData.filter(t => t.lat !== null).length;
+  setStatus('statusTrees',
+    `✓ ${treesData.length.toLocaleString()} trees from Fieldforce — ${withCoords.toLocaleString()} with coordinates`, true);
+  checkReady();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED SPATIAL ENGINE (same logic as Plot Tree Reviewer)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pip(lat, lng, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) &&
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+function parseGeoJSON(raw) {
+  if (!raw || String(raw).trim() === '') return null;
+  const s = String(raw).trim();
+  function validRing(r) {
+    return Array.isArray(r) && r.length >= 3 &&
+      Array.isArray(r[0]) && r[0].length === 2 &&
+      typeof r[0][0] === 'number' && !isNaN(r[0][0]);
+  }
+  function tryParse(str) {
+    try {
+      const obj = JSON.parse(str);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        const geo = obj.geometry || obj;
+        if (geo && geo.type === 'Polygon')      return geo.coordinates[0];
+        if (geo && geo.type === 'MultiPolygon') return geo.coordinates[0][0];
+      }
+      if (Array.isArray(obj)) {
+        if (Array.isArray(obj[0]) && Array.isArray(obj[0][0])) return obj[0];
+        if (Array.isArray(obj[0]) && typeof obj[0][0] === 'number') return obj;
+      }
+    } catch(e) {}
+    return null;
+  }
+  let result = tryParse(s);
+  if (result && validRing(result)) return result;
+  // Strip trailing garbage
+  const cleaned = s.replace(/[}\]]+$/, '');
+  const lb = cleaned.lastIndexOf(']');
+  if (lb > 0) {
+    result = tryParse(cleaned.substring(0, lb + 1));
+    if (result && validRing(result)) return result;
+  }
+  // Regex fallback
+  const pairs = [];
+  const re = /\[\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\]/g;
+  let m;
+  while ((m = re.exec(s)) !== null)
+    pairs.push([parseFloat(m[1]), parseFloat(m[2])]);
+  if (pairs.length >= 3) return pairs;
+  return null;
+}
+
+function autoLatLng(a, b) {
+  // Returns {lat, lng} auto-detecting order (Africa: lat < 0, lng 25-40)
+  if (a < 0 && b > 0) return { lat: a, lng: b };
+  if (b < 0 && a > 0) return { lat: b, lng: a };
+  if (Math.abs(a) < 90) return { lat: a, lng: b };
+  return { lat: b, lng: a };
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA STATE
+// ═══════════════════════════════════════════════════════════════════════════
+
+let fieldsData  = [];   // raw parsed field rows
+let treesData   = [];   // raw parsed tree rows
+let allocation  = [];   // computed allocation result rows
+let filtered    = [];   // current filtered view
+let sortCol     = 'status';
+let sortDir     = 1;
+let currentPage = 1;
+const PAGE_SIZE = 100;
+let selectedFieldId = null;
+let map = null, mapLayers = [];
+let excActiveFilter = null;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILE LOADING
+// ═══════════════════════════════════════════════════════════════════════════
+
+function readExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        let best = null, bestLen = 0;
+        wb.SheetNames.forEach(name => {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '' });
+          if (rows.length > bestLen) { bestLen = rows.length; best = rows; }
+        });
+        resolve(best || []);
+      } catch(e) { reject(e); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function findCol(keys, names) {
+  return keys.find(k => names.some(n =>
+    k.toLowerCase().replace(/[\s_()]/g, '').includes(n.toLowerCase().replace(/[\s_()]/g, ''))
+  ));
+}
+
+function setStatus(id, msg, ok) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'upload-status ' + (ok ? 'ok' : 'err');
+}
+
+async function loadFields(file) {
+  if (!file) return;
+  try {
+    const rows = await readExcel(file);
+    if (!rows.length) { setStatus('statusFields', 'No data found', false); return; }
+    const keys = Object.keys(rows[0]);
+    const cidCol   = findCol(keys, ['ccsfieldid', 'fieldid', 'field_id']);
+    const geoCol   = findCol(keys, ['fieldgeojson', 'geojson', 'geo']);
+    const ownerCol = findCol(keys, ['fieldowner', 'owner']);
+    const zoneCol  = findCol(keys, ['zone']);
+    const sizeCol  = findCol(keys, ['fieldsize', 'size']);
+    const guidCol  = findCol(keys, ['donotmodify', 'guid', 'field']);
+
+    if (!geoCol) {
+      setStatus('statusFields', `No GeoJSON column found. Got: ${keys.slice(0,6).join(', ')}…`, false);
+      return;
+    }
+
+    fieldsData = rows.map((r, i) => ({
+      guid:     guidCol ? String(r[guidCol]) : `F${i}`,
+      fieldId:  cidCol  ? String(r[cidCol]).trim()  : `Field-${i}`,
+      geoJSON:  String(r[geoCol] || ''),
+      owner:    ownerCol ? String(r[ownerCol] || '') : '',
+      zone:     zoneCol  ? String(r[zoneCol]  || '') : '',
+      size:     sizeCol  ? parseFloat(r[sizeCol]) || 0 : 0,
+      ring:     null   // parsed later
+    })).map(f => {
+      f.ring = parseGeoJSON(f.geoJSON);
+      return f;
+    });
+
+    const valid = fieldsData.filter(f => f.ring).length;
+    setStatus('statusFields', `✓ ${fieldsData.length} fields loaded — ${valid} with valid geometry`, true);
+    checkReady();
+  } catch(e) {
+    setStatus('statusFields', 'Error: ' + e.message, false);
+  }
+}
+
+async function loadTrees(file) {
+  if (!file) return;
+  try {
+    const rows = await readExcel(file);
+    if (!rows.length) { setStatus('statusTrees', 'No data found', false); return; }
+    const keys = Object.keys(rows[0]);
+    const latCol     = findCol(keys, ['treelat', 'latitude', 'lat']);
+    const lngCol     = findCol(keys, ['treelong', 'longitude', 'lng', 'lon']);
+    const codeCol    = findCol(keys, ['treecode', 'code']);
+    const specCol    = findCol(keys, ['species']);
+    const fieldCol   = findCol(keys, ['field']);
+    const ownerCol   = findCol(keys, ['fieldowner', 'owner']);
+    const ownNrcCol  = findCol(keys, ['fieldownernrc', 'nrc']);
+    const accCol     = findCol(keys, ['accuracy']);
+    const dateCol    = findCol(keys, ['createdon', 'created']);
+    const guidCol    = findCol(keys, ['donotmodify', 'tree', 'guid']);
+    const treeOwner  = findCol(keys, ['owner']);
+
+    if (!latCol || !lngCol) {
+      setStatus('statusTrees', `Lat/Lng cols not found. Got: ${keys.slice(0,6).join(', ')}…`, false);
+      return;
+    }
+
+    treesData = rows.map((r, i) => {
+      const a = parseFloat(r[latCol]), b = parseFloat(r[lngCol]);
+      const coords = (!isNaN(a) && !isNaN(b)) ? autoLatLng(a, b) : null;
+      return {
+        guid:       guidCol   ? String(r[guidCol])   : `T${i}`,
+        treeCode:   codeCol   ? String(r[codeCol] || `T${i}`)  : `T${i}`,
+        species:    specCol   ? String(r[specCol]  || '') : '',
+        lat:        coords ? coords.lat : null,
+        lng:        coords ? coords.lng : null,
+        treeField:  fieldCol  ? String(r[fieldCol]  || '') : '',
+        fieldOwner: ownerCol  ? String(r[ownerCol]  || '') : '',
+        fieldOwnerNRC: ownNrcCol ? String(r[ownNrcCol] || '') : '',
+        treeOwner:  treeOwner ? String(r[treeOwner] || '') : '',
+        accuracy:   accCol    ? parseFloat(r[accCol]) || null : null,
+        createdOn:  dateCol   ? String(r[dateCol]   || '') : '',
+      };
+    });
+
+    const withCoords = treesData.filter(t => t.lat !== null).length;
+    setStatus('statusTrees', `✓ ${treesData.length} trees loaded — ${withCoords} with coordinates`, true);
+    checkReady();
+  } catch(e) {
+    setStatus('statusTrees', 'Error: ' + e.message, false);
+  }
+}
+
+function checkReady() {
+  const ready = fieldsData.length > 0 && treesData.length > 0;
+  document.getElementById('btnRun').disabled = !ready;
+}
+
+// Drag-drop
+['zoneFields','zoneTrees'].forEach(id => {
+  const z = document.getElementById(id);
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('drag'); });
+  z.addEventListener('dragleave', () => z.classList.remove('drag'));
+  z.addEventListener('drop', e => {
+    e.preventDefault(); z.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (id === 'zoneFields') loadFields(f); else loadTrees(f);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ALLOCATION ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function determineStatus(tree, matchedField, insideFlag) {
+  if (tree.lat === null || tree.lng === null) return 'Missing coordinates';
+  if (!matchedField && !insideFlag) {
+    return tree.treeField ? 'Outside polygon but field tagged' : 'Outside polygon';
+  }
+  if (insideFlag) {
+    // Status is determined solely by field ID match
+    // Owner is shown as an informational column but does not affect status
+    // because field owner is stored as a contact record name which rarely
+    // matches the plain text on the tree record
+    const fieldMatch = matchedField &&
+      tree.treeField.toLowerCase().trim() === matchedField.fieldId.toLowerCase().trim();
+    return fieldMatch ? 'Allocated' : 'Allocated - Field mismatch';
+  }
+  return 'Outside polygon';
+}
+
+// ── Progress helpers ─────────────────────────────────────────────────────────
+function showProgress(show) {
+  document.getElementById('progressWrap').style.display = show ? 'flex' : 'none';
+}
+function setProgress(pct, label, detail) {
+  const bar = document.getElementById('progressBar');
+  bar.style.width = pct + '%';
+  bar.classList.toggle('complete', pct >= 100);
+  document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+  if (label)  document.getElementById('progressLabel').textContent  = label;
+  if (detail) document.getElementById('progressDetail').textContent = detail;
+}
+
+async function runAllocation() {
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running…';
+
+  showProgress(true);
+  setProgress(0, 'Building spatial index…', `${fieldsData.length.toLocaleString()} fields`);
+  allocation = [];
+
+  const validFields = fieldsData.filter(f => f.ring);
+
+  // ── Build bounding-box spatial grid index ──────────────────────────────
+  // Compute bbox for every field ring
+  const CELL = 0.1; // ~11km grid cells in degrees
+  const grid  = {};  // key: "row:col" → array of field indices
+
+  validFields.forEach((field, idx) => {
+    let minLat = Infinity, maxLat = -Infinity;
+    let minLng = Infinity, maxLng = -Infinity;
+    for (const [lng, lat] of field.ring) {
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+    }
+    field._bbox = { minLat, maxLat, minLng, maxLng };
+
+    // Register field in all grid cells it overlaps
+    const r0 = Math.floor(minLat / CELL), r1 = Math.floor(maxLat / CELL);
+    const c0 = Math.floor(minLng / CELL), c1 = Math.floor(maxLng / CELL);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const key = `${r}:${c}`;
+        if (!grid[key]) grid[key] = [];
+        grid[key].push(idx);
+      }
+    }
+  });
+
+  setProgress(5, 'Spatial index ready — allocating trees…',
+    `${validFields.length.toLocaleString()} fields indexed · ${treesData.length.toLocaleString()} trees to process`);
+  await new Promise(r => requestAnimationFrame(r));
+
+  const total = treesData.length;
+  const CHUNK = 500; // larger chunks — index makes each tree fast
+
+  for (let start = 0; start < total; start += CHUNK) {
+    const end   = Math.min(start + CHUNK, total);
+    const chunk = treesData.slice(start, end);
+
+    for (const tree of chunk) {
+      let matchedField = null;
+      let insideFlag   = false;
+      let matchCount   = 0;
+
+      if (tree.lat !== null && tree.lng !== null) {
+        // Look up only fields in the same grid cell
+        const key = `${Math.floor(tree.lat / CELL)}:${Math.floor(tree.lng / CELL)}`;
+        const candidates = grid[key] || [];
+
+        let spatialMatches = [];
+        for (const idx of candidates) {
+          const field = validFields[idx];
+          // Quick bbox pre-filter before expensive pip
+          const b = field._bbox;
+          if (tree.lat < b.minLat || tree.lat > b.maxLat ||
+              tree.lng < b.minLng || tree.lng > b.maxLng) continue;
+          if (pip(tree.lat, tree.lng, field.ring)) {
+            spatialMatches.push(field);
+          }
+        }
+
+        matchCount = spatialMatches.length;
+        if (matchCount > 0) {
+          insideFlag = true;
+          // Priority 1: admin match — tree's treeField matches field ID
+          const adminMatch = spatialMatches.find(f =>
+            tree.treeField && f.fieldId.toLowerCase().trim() === tree.treeField.toLowerCase().trim()
+          );
+          // Priority 2: owner match
+          const ownerMatch = !adminMatch && spatialMatches.find(f =>
+            tree.fieldOwner && f.owner.toLowerCase().trim() === tree.fieldOwner.toLowerCase().trim()
+          );
+          // Priority 3: first spatial hit
+          matchedField = adminMatch || ownerMatch || spatialMatches[0];
+        }
+      }
+
+      const status = determineStatus(tree, matchedField, insideFlag);
+
+      allocation.push({
+        ...tree,
+        matchedFieldId:    matchedField ? matchedField.fieldId : '',
+        matchedFieldGuid:  matchedField ? matchedField.guid    : '',
+        matchedFieldOwner: matchedField ? matchedField.owner   : '',
+        matchedFieldZone:  matchedField ? matchedField.zone    : '',
+        insidePolygon:     insideFlag,
+        matchCount,
+        fieldMatch:  matchedField
+          ? tree.treeField.toLowerCase().trim() === matchedField.fieldId.toLowerCase().trim()
+          : null,
+        ownerMatch:  matchedField
+          ? tree.fieldOwner.toLowerCase().trim() === matchedField.owner.toLowerCase().trim()
+          : null,
+        status,
+      });
+    }
+
+    // Update progress and yield to browser
+    const pct     = (end / total) * 100;
+    const inside  = allocation.filter(r => r.insidePolygon).length;
+    setProgress(
+      pct,
+      `Processing trees… (${end.toLocaleString()} / ${total.toLocaleString()})`,
+      `✓ ${inside.toLocaleString()} allocated so far — ${(allocation.length - inside).toLocaleString()} outside`
+    );
+    await new Promise(r => requestAnimationFrame(r));
+  }
+
+  // Finalise
+  setProgress(100, 'Finalising results…', 'Building catalog and field list…');
+  await new Promise(r => requestAnimationFrame(r));
+
+  updateKPIs();
+  populateFilters();
+  buildFieldList();
+  buildSearchIndex();
+  applyFilters();
+  updateExceptions();
+  document.getElementById('filterSection').style.display = '';
+  document.getElementById('btnExport').disabled = false;
+  document.getElementById('btnSaveDV').disabled = false;
+  document.getElementById('btnReport').disabled = false;
+
+  const inside  = allocation.filter(r => r.insidePolygon).length;
+  const outside = allocation.length - inside;
+  setProgress(100,
+    '✓ Allocation complete',
+    `${inside.toLocaleString()} allocated · ${outside.toLocaleString()} outside · ${allocation.length.toLocaleString()} total`
+  );
+
+  btn.textContent = '▶ Run Allocation';
+  btn.disabled = false;
+
+  // Auto-hide after 3 seconds
+  setTimeout(() => showProgress(false), 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KPIs
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateKPIs() {
+  const inside   = allocation.filter(r => r.insidePolygon).length;
+  const outside  = allocation.filter(r => !r.insidePolygon).length;
+  const mismatch = allocation.filter(r => r.status && r.status.includes('mismatch')).length;
+  const review   = allocation.filter(r => r.status && (r.status.includes('mismatch') || r.status === 'Outside polygon but field tagged')).length;
+
+  document.getElementById('kpiFields').textContent  = fieldsData.length;
+  document.getElementById('kpiTrees').textContent   = treesData.length;
+  document.getElementById('kpiInside').textContent  = inside;
+  document.getElementById('kpiOutside').textContent = outside;
+  document.getElementById('kpiMismatch').textContent = mismatch;
+  document.getElementById('kpiReview').textContent  = review;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILTERS & CATALOG TABLE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Pre-built search index — generated once after allocation ─────────────────
+let searchIndex = []; // pre-lowercased haystack per row
+
+function buildSearchIndex() {
+  searchIndex = allocation.map(r =>
+    [r.treeCode, r.species, r.treeField, r.matchedFieldId,
+     r.fieldOwner, r.matchedFieldOwner, r.treeOwner, r.status]
+    .join(' ').toLowerCase()
+  );
+}
+
+function populateFilters() {
+  function populate(selectId, values) {
+    const sel = document.getElementById(selectId);
+    const first = sel.options[0];
+    sel.innerHTML = '';
+    sel.appendChild(first);
+    [...new Set(values.filter(Boolean).sort())].forEach(v => {
+      const o = document.createElement('option');
+      o.value = o.textContent = v;
+      sel.appendChild(o);
+    });
+  }
+  populate('fltField',   allocation.map(r => r.matchedFieldId || r.treeField));
+  populate('fltOwner',   allocation.map(r => r.matchedFieldOwner || r.fieldOwner));
+  populate('fltSpecies', allocation.map(r => r.species));
+  populate('fltZone',    allocation.map(r => r.matchedFieldZone));
+  buildSearchIndex();
+}
+
+// Debounce timer
+let filterTimer = null;
+function debouncedFilter() {
+  clearTimeout(filterTimer);
+  // Show spinner immediately so user gets instant feedback
+  document.getElementById('filterSpinner').style.display = 'flex';
+  filterTimer = setTimeout(() => applyFilters(), 220);
+}
+
+function applyFilters() {
+  clearTimeout(filterTimer);
+  const q       = (document.getElementById('catalogSearch').value || '').toLowerCase().trim();
+  const status  = document.getElementById('fltStatus').value;
+  const field   = document.getElementById('fltField').value;
+  const owner   = document.getElementById('fltOwner').value;
+  const species = document.getElementById('fltSpecies').value;
+  const zone    = document.getElementById('fltZone').value;
+
+  const hasFilters = q || status || field || owner || species || zone;
+
+  // Fast path — no filters: show all, skip expensive loop
+  if (!hasFilters) {
+    filtered = allocation.slice();
+  } else {
+    filtered = [];
+    for (let i = 0; i < allocation.length; i++) {
+      const r = allocation[i];
+      if (status  && r.status !== status)                                        continue;
+      if (field   && r.matchedFieldId !== field && r.treeField !== field)        continue;
+      if (owner   && r.matchedFieldOwner !== owner && r.fieldOwner !== owner)    continue;
+      if (species && r.species !== species)                                       continue;
+      if (zone    && r.matchedFieldZone !== zone)                                continue;
+      if (q && !searchIndex[i].includes(q))                                      continue;
+      filtered.push(r);
+    }
+  }
+
+  // Sort — only sort filtered subset, not full 100k array
+  if (filtered.length < allocation.length || sortCol !== 'status') {
+    filtered.sort((a, b) => {
+      let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+  }
+
+  currentPage = 1;
+  document.getElementById('filterSpinner').style.display = 'none';
+  // Update field list to show only fields present in current filtered results
+  buildFieldList(filtered.length < allocation.length ? filtered : null);
+  renderCatalog();
+}
+
+function renderCatalog() {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+  const tbody = document.getElementById('catalogBody');
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  document.getElementById('pageInfo').textContent =
+    total === 0 ? 'No results' :
+    `${start + 1}–${Math.min(start + PAGE_SIZE, total)} of ${total}`;
+  document.getElementById('catalogCount').textContent =
+    `${total.toLocaleString()} trees`;
+  document.getElementById('btnPrev').disabled = currentPage <= 1;
+  document.getElementById('btnNext').disabled = currentPage >= totalPages;
+
+  if (page.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">No trees match the current filters</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = page.map(r => `
+    <tr>
+      <td style="font-family:var(--font-mono);color:var(--blue)">${esc(r.treeCode)}</td>
+      <td>${esc(r.species)}</td>
+      <td style="font-family:var(--font-mono);font-size:10px">${esc(r.treeField) || '<span style="color:var(--muted)">—</span>'}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--green)">${esc(r.matchedFieldId) || '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="${r.fieldMatch === true ? 'flag-yes' : r.fieldMatch === false ? 'flag-no' : 'flag-na'}">${r.fieldMatch === true ? '✓' : r.fieldMatch === false ? '✗' : '—'}</td>
+      <td class="${r.ownerMatch === true ? 'flag-yes' : r.ownerMatch === false ? 'flag-no' : 'flag-na'}">${r.ownerMatch === true ? '✓' : r.ownerMatch === false ? '✗' : '—'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.lat !== null ? `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}` : '<span style="color:var(--red)">Missing</span>'}</td>
+      <td style="font-family:var(--font-mono)">${r.accuracy !== null ? r.accuracy.toFixed(1) + 'm' : '—'}</td>
+      <td style="color:var(--muted);font-size:10px">${esc(r.createdOn).split(' ')[0] || '—'}</td>
+    </tr>`).join('');
+}
+
+function statusBadge(s) {
+  if (!s) return '<span class="badge missing">—</span>';
+  const cls = s === 'Allocated' ? 'allocated' :
+    s.includes('mismatch') || s.includes('Mismatch') ? 'mismatch' :
+    s === 'Outside polygon but field tagged' ? 'outside-tagged' :
+    s.includes('Outside') ? 'outside' : 'missing';
+  return `<span class="badge ${cls}">${esc(s)}</span>`;
+}
+
+function esc(s) {
+  if (s === undefined || s === null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir = -sortDir;
+  else { sortCol = col; sortDir = 1; }
+  applyFilters();
+}
+
+function changePage(d) {
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(totalPages, currentPage + d));
+  renderCatalog();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIELD LIST (sidebar)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildFieldList(sourceRows) {
+  // sourceRows: use filtered when filters are active, allocation when not
+  const rows = sourceRows || allocation;
+  const container = document.getElementById('fieldList');
+  if (!rows.length && !allocation.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:16px 12px">No allocation data</div>';
+    return;
+  }
+
+  // Build a lookup of fields that appear in the current rows
+  const byField = {};
+  rows.forEach(r => {
+    const key = r.matchedFieldId || r.treeField || '__none__';
+    if (key === '__none__') return;
+    if (!byField[key]) {
+      // Find the field object
+      const fieldObj = fieldsData.find(f => f.fieldId === key)
+        || { fieldId: key, owner: r.matchedFieldOwner || r.fieldOwner || 'Unknown', zone: '' };
+      byField[key] = { field: fieldObj, inside: 0, outside: 0, mismatch: 0 };
+    }
+    if (r.insidePolygon) byField[key].inside++;
+    else byField[key].outside++;
+    if (r.status && r.status.includes('mismatch')) byField[key].mismatch++;
+  });
+
+  const entries = Object.values(byField).sort((a, b) =>
+    (a.field.fieldId || '').localeCompare(b.field.fieldId || ''));
+
+  document.getElementById('fieldListCount').textContent = `(${entries.length})`;
+
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:16px 12px;font-size:10px">No fields match current filters</div>';
+    return;
+  }
+
+  container.innerHTML = entries.map(e => `
+    <div class="field-item ${selectedFieldId === e.field.fieldId ? 'active' : ''}"
+         onclick="selectField('${esc(e.field.fieldId)}')">
+      <div>
+        <div class="fi-id">${esc(e.field.fieldId)}</div>
+        <div class="fi-owner">${esc(e.field.owner) || 'Unknown owner'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+        <span class="fi-count ${e.inside === 0 ? 'zero' : ''}">${e.inside} in</span>
+        ${e.outside > 0 ? `<span class="fi-count zero" style="font-size:9px">${e.outside} out</span>` : ''}
+        ${e.mismatch > 0 ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber)">${e.mismatch} ⚠</span>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAP VIEW
+// ═══════════════════════════════════════════════════════════════════════════
+
+function selectField(fieldId) {
+  selectedFieldId = fieldId;
+  // Sync the field filter dropdown so body catalog updates too
+  const fltField = document.getElementById('fltField');
+  if (fltField) {
+    fltField.value = fieldId;
+    applyFilters();
+  }
+  buildFieldList();
+  switchTab('map');
+  renderFieldMap(fieldId);
+}
+
+function renderFieldMap(fieldId) {
+  const fieldObj = fieldsData.find(f => f.fieldId === fieldId);
+  if (!fieldObj || !fieldObj.ring) return;
+
+  document.getElementById('mapPlaceholder').style.display = 'none';
+  const mapDiv = document.getElementById('map');
+  mapDiv.style.display = 'block';
+
+  if (!map) {
+    map = L.map('map', { zoomControl: true });
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      subdomains: ['mt0','mt1','mt2','mt3'], maxZoom: 21, attribution: '© Google Maps'
+    }).addTo(map);
+  }
+  mapLayers.forEach(l => map.removeLayer(l)); mapLayers = [];
+
+  // Draw polygon
+  const ring = fieldObj.ring;
+  const latLngs = ring.map(c => [c[1], c[0]]);
+  const poly = L.polygon(latLngs, {
+    color: '#38bdf8', weight: 2.5, fillColor: '#38bdf8',
+    fillOpacity: 0.08, dashArray: '7,5'
+  }).addTo(map).bindPopup(`<strong>${fieldId}</strong><br>Owner: ${fieldObj.owner}<br>Zone: ${fieldObj.zone}`);
+  mapLayers.push(poly);
+
+  // Get trees for this field
+  const fieldTrees = allocation.filter(r =>
+    r.matchedFieldId === fieldId || r.treeField === fieldId
+  );
+  let inside = 0, outside = 0, mismatch = 0;
+
+  fieldTrees.forEach((r, i) => {
+    if (r.lat === null || r.lng === null) return;
+    const isMismatch = r.status && r.status.includes('mismatch');
+    const color = isMismatch ? '#f59e0b' : r.insidePolygon ? '#22c55e' : '#ef4444';
+    if (r.insidePolygon) inside++; else outside++;
+    if (isMismatch) mismatch++;
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:${color};color:#000;width:20px;height:20px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        font-weight:800;font-size:9px;border:2px solid white;
+        box-shadow:0 2px 6px rgba(0,0,0,0.7);font-family:monospace">${(i+1) > 99 ? '•' : i+1}</div>`,
+      iconSize: [20,20], iconAnchor: [10,10]
+    });
+    const marker = L.marker([r.lat, r.lng], { icon }).addTo(map)
+      .bindPopup(`<strong>${r.treeCode}</strong><br>
+        Species: ${r.species}<br>
+        Status: <strong>${r.status}</strong><br>
+        Tree field: ${r.treeField || '—'}<br>
+        Matched field: ${r.matchedFieldId || '—'}<br>
+        <code style="font-size:10px">${r.lat?.toFixed(7)}, ${r.lng?.toFixed(7)}</code>`);
+    mapLayers.push(marker);
+  });
+
+  // Update overlay
+  document.getElementById('mapOverlay').style.display = '';
+  document.getElementById('mapLegend').style.display  = '';
+  document.getElementById('mopFieldId').textContent   = fieldId;
+  document.getElementById('mopOwner').textContent     = fieldObj.owner || '—';
+  document.getElementById('mopZone').textContent      = fieldObj.zone  || '—';
+  document.getElementById('mopInside').textContent    = inside;
+  document.getElementById('mopOutside').textContent   = outside;
+  document.getElementById('mopMismatch').textContent  = mismatch;
+
+  // Fit bounds
+  const allPts = [...latLngs, ...fieldTrees.filter(r => r.lat !== null).map(r => [r.lat, r.lng])];
+  if (allPts.length) map.fitBounds(allPts, { padding: [40, 40] });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXCEPTIONS VIEW
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateExceptions() {
+  const fieldMismatches = allocation.filter(r => r.status === 'Allocated - Field mismatch');
+  const total = allocation.length;
+
+  const counts = {
+    'Outside polygon':                  allocation.filter(r => r.status === 'Outside polygon').length,
+    'Outside polygon but field tagged': allocation.filter(r => r.status === 'Outside polygon but field tagged').length,
+    'Allocated - Field mismatch':       fieldMismatches.length,
+  };
+  document.getElementById('excN1').textContent = counts['Outside polygon'].toLocaleString();
+  document.getElementById('excN2').textContent = counts['Outside polygon but field tagged'].toLocaleString();
+  document.getElementById('excN3').textContent = counts['Allocated - Field mismatch'].toLocaleString();
+
+  buildMismatchBreakdown(fieldMismatches, total);
+  renderExceptionsTable(null);
+}
+
+function buildMismatchBreakdown(fieldMismatches, total) {
+  const panel = document.getElementById('mismatchBreakdown');
+  if (!fieldMismatches.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+
+  const fm = fieldMismatches.length;
+
+  // Category 1: blank/empty treeField — tool fell back to spatial match
+  const blankField = fieldMismatches.filter(r => !r.treeField || r.treeField.trim() === '');
+
+  // Category 2: treeField populated but does not match — genuine data conflict
+  const conflictField = fieldMismatches.filter(r =>
+    r.treeField && r.treeField.trim() !== '' && r.matchedFieldId && r.matchedFieldId.trim() !== ''
+  );
+
+  // Category 3: treeField populated but matchedField is empty (outside all polygons but status=mismatch edge case)
+  const noMatchField = fieldMismatches.filter(r =>
+    r.treeField && r.treeField.trim() !== '' && (!r.matchedFieldId || r.matchedFieldId.trim() === '')
+  );
+
+  const pct = n => total > 0 ? ((n / total) * 100).toFixed(1) + '%' : '—';
+  const fmPct = n => fm > 0 ? ((n / fm) * 100).toFixed(1) + '%' : '—';
+
+  document.getElementById('mbGrid').innerHTML = `
+    <div class="mb-cell ${blankField.length > fm * 0.5 ? 'highlight-warn' : ''}">
+      <div class="mb-num ${blankField.length > fm * 0.5 ? 'amber' : 'muted'}">${blankField.length.toLocaleString()}</div>
+      <div class="mb-lbl">Blank Tree Field<br>(no admin data — spatial fallback used)</div>
+      <div class="mb-pct">${fmPct(blankField.length)} of mismatches · ${pct(blankField.length)} of all trees</div>
+    </div>
+    <div class="mb-cell ${conflictField.length > 0 ? 'highlight-bad' : 'highlight-ok'}">
+      <div class="mb-num ${conflictField.length > 0 ? 'red' : 'green'}">${conflictField.length.toLocaleString()}</div>
+      <div class="mb-lbl">Genuine Field Conflict<br>(tree says Field A, lands in Field B)</div>
+      <div class="mb-pct">${fmPct(conflictField.length)} of mismatches · ${pct(conflictField.length)} of all trees</div>
+    </div>
+    <div class="mb-cell">
+      <div class="mb-num muted">${noMatchField.length.toLocaleString()}</div>
+      <div class="mb-lbl">Field Tagged but No Spatial Match<br>(possible coordinate or polygon error)</div>
+      <div class="mb-pct">${fmPct(noMatchField.length)} of mismatches · ${pct(noMatchField.length)} of all trees</div>
+    </div>
+  `;
+
+  // Verdict
+  let verdict = '';
+  if (blankField.length > fm * 0.7) {
+    verdict = `<span class="good">✓ Good news:</span> <strong>${fmPct(blankField.length)}</strong> of field mismatches are caused by <strong>blank Tree Field values</strong> — the tree record has no field text, so the tool assigned the nearest polygon spatially. These are <em>not genuine data errors</em>. They indicate that <strong>the Field column is not being populated</strong> when trees are submitted in Fieldforce. Fixing the data entry process going forward will resolve these automatically.`;
+  } else if (conflictField.length > fm * 0.5) {
+    verdict = `<span class="bad">⚠ Attention needed:</span> <strong>${fmPct(conflictField.length)}</strong> of field mismatches are <strong>genuine conflicts</strong> — the tree record says one field, but the GPS coordinate lands in a different one. These require individual review to determine whether the coordinate or the field tag is correct.`;
+  } else {
+    verdict = `Mixed causes detected. <strong>${blankField.length.toLocaleString()} blank field</strong> mismatches (data entry gap) and <strong>${conflictField.length.toLocaleString()} genuine conflicts</strong> (coordinate vs field tag disagreement). Address the blank field issue first as it is the larger and more easily resolved category.`;
+  }
+
+  // Add recommendation
+  const allocated = allocation.filter(r => r.status === 'Allocated').length;
+  const trueAllocPct = total > 0 ? ((allocated / total) * 100).toFixed(1) : 0;
+  verdict += `<br><br>Of <strong>${total.toLocaleString()}</strong> total trees: <span class="good"><strong>${allocated.toLocaleString()}</strong> cleanly allocated (${trueAllocPct}%)</span> · <strong>${fm.toLocaleString()}</strong> flagged for review.`;
+
+  document.getElementById('mbVerdict').innerHTML = verdict;
+}
+
+function filterException(status) {
+  excActiveFilter = excActiveFilter === status ? null : status;
+  ['outside','tagged','fieldmismatch'].forEach((id, i) => {
+    const statuses = ['Outside polygon','Outside polygon but field tagged','Allocated - Field mismatch'];
+    document.getElementById('exc-' + id).classList.toggle('active-filter', excActiveFilter === statuses[i]);
+  });
+  renderExceptionsTable(excActiveFilter);
+}
+
+function renderExceptionsTable(statusFilter) {
+  const rows = allocation.filter(r => {
+    if (statusFilter) return r.status === statusFilter;
+    return ['Outside polygon','Outside polygon but field tagged',
+            'Allocated - Field mismatch'].includes(r.status);
+  });
+
+  const tbody = document.getElementById('excBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="color:var(--green)">✓ No exceptions${statusFilter ? ' for this filter' : ''}</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td style="font-family:var(--font-mono);color:var(--blue)">${esc(r.treeCode)}</td>
+      <td>${esc(r.species)}</td>
+      <td style="font-family:var(--font-mono);font-size:10px">${esc(r.treeField) || '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--green)">${esc(r.matchedFieldId) || '—'}</td>
+      <td class="${r.fieldMatch === true ? 'flag-yes' : r.fieldMatch === false ? 'flag-no' : 'flag-na'}">${r.fieldMatch === true ? '✓' : r.fieldMatch === false ? '✗' : '—'}</td>
+      <td class="${r.ownerMatch === true ? 'flag-yes' : r.ownerMatch === false ? 'flag-no' : 'flag-na'}">${r.ownerMatch === true ? '✓' : r.ownerMatch === false ? '✗' : '—'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.lat !== null ? `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}` : '<span style="color:var(--red)">Missing</span>'}</td>
+      <td style="font-size:10px;color:var(--muted)">${esc(r.treeOwner) || '—'}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function exportCSV() {
+  const cols = ['treeCode','species','lat','lng','treeField','treeOwner','fieldOwner',
+                'matchedFieldId','matchedFieldOwner','matchedFieldZone',
+                'insidePolygon','fieldMatch','ownerMatch','matchCount','status',
+                'accuracy','createdOn'];
+  const header = ['Tree Code','Species','Latitude','Longitude','Tree Field','Tree Owner','Field Owner',
+                  'Matched Field ID','Matched Field Owner','Zone',
+                  'Inside Polygon','Field Match','Owner Match','Match Count','Status',
+                  'Accuracy','Created On'];
+  const rows = [header, ...allocation.map(r => cols.map(c => {
+    const v = r[c];
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    return String(v);
+  }))];
+  const csv = rows.map(r => r.map(v => `"${v.replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `CCS_Active_Tree_Catalog_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABS & UI UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function switchTab(tab) {
+  ['catalog','map','exceptions'].forEach(t => {
+    document.getElementById(`view-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'map' && map) {
+    setTimeout(() => map.invalidateSize(), 100);
+  }
+}
+
+function clearFilters() {
+  ['fltStatus','fltField','fltOwner','fltSpecies','fltZone'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('catalogSearch').value = '';
+  applyFilters();
+}
+
+
+function openTreeCatalog() {
+  // Use allocation if available, fall back to raw treesData mapped to basic shape
+  let data = allocation;
+  if (!data.length && treesData.length) {
+    data = treesData.map(t => ({ ...t, status: '', matchedFieldId: t.treeField, insidePolygon: false }));
+  }
+  if (!data.length) { alert("Connect to Fieldforce and run allocation first."); return; }
+  try { localStorage.setItem("ccs_tree_allocation", JSON.stringify(data)); } catch(e) {}
+  window.open("tree-catalog.html", "_blank");
+}
+
+function clearAll() {
+  fieldsData = []; treesData = []; allocation = []; filtered = []; searchIndex = [];
+  selectedFieldId = null; excActiveFilter = null;
+  ['statusFields','statusTrees'].forEach(id => {
+    document.getElementById(id).textContent = '';
+    document.getElementById(id).className = 'upload-status';
+  });
+  ['fileFields','fileTrees'].forEach(id => document.getElementById(id).value = '');
+  ['kpiFields','kpiTrees','kpiInside','kpiOutside','kpiMismatch','kpiReview']
+    .forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnExport').disabled = true;
+  document.getElementById('filterSection').style.display = 'none';
+  document.getElementById('fieldList').innerHTML =
+    '<div class="empty-state" style="padding:20px 12px">Upload files and run allocation to see fields</div>';
+  document.getElementById('catalogBody').innerHTML =
+    `<tr><td colspan="10"><div class="empty-state">Upload <strong>Active Fields</strong> and <strong>Active Trees</strong> files<br>then click <strong>▶ Run Allocation</strong></div></td></tr>`;
+  document.getElementById('excBody').innerHTML =
+    `<tr><td colspan="9"><div class="empty-state">Run allocation to see exceptions</div></td></tr>`;
+  ['excN1','excN2','excN3'].forEach(id => document.getElementById(id).textContent = '—');
+  if (map) { mapLayers.forEach(l => map.removeLayer(l)); mapLayers = []; }
+  document.getElementById('mapOverlay').style.display = 'none';
+  document.getElementById('mapLegend').style.display  = 'none';
+  document.getElementById('fieldListCount').textContent = '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WRITE-BACK TO FIELDFORCE (DATAVERSE)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function saveToFieldforce() {
+  if (!allocation.length) return;
+  const BATCH_SIZE = 100;
+  const btn = document.getElementById('btnSaveDV');
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving…';
+
+  try {
+    let token = await getToken(); // let (not const) so we can refresh on 401
+    let saved = 0, errors = 0;
+    const total = allocation.length;
+
+    for (let i = 0; i < total; i += BATCH_SIZE) {
+      const batch = allocation.slice(i, i + BATCH_SIZE);
+      btn.textContent = `⏳ ${saved.toLocaleString()} / ${total.toLocaleString()} saved…`;
+
+      const batchBody = batch.map(r => {
+        const body = JSON.stringify({
+          ccs_matchedfield_computed:     r.matchedFieldId || '',
+          ccs_allocationstatus_computed: r.status         || '',
+          ccs_fieldmatch_computed:       r.fieldMatch === true
+        });
+        return [
+          '--batch_ccs',
+          'Content-Type: application/http',
+          'Content-Transfer-Encoding: binary',
+          '',
+          `PATCH ${DV_API}/ccs_trees(${r.guid}) HTTP/1.1`,
+          'Content-Type: application/json',
+          '',
+          body
+        ].join('\r\n');
+      }).join('\r\n') + '\r\n--batch_ccs--';
+
+      const res = await fetch(`${DV_API}/$batch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/mixed;boundary=batch_ccs',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        },
+        body: batchBody
+      });
+
+      if (res.status === 401) {
+        token = await getToken(); // refresh token and retry this batch
+        i -= BATCH_SIZE;
+        continue;
+      }
+      if (!res.ok) { errors++; } else { saved += batch.length; }
+      await new Promise(r => requestAnimationFrame(r));
+    }
+
+    btn.textContent = errors
+      ? `⚠ ${saved.toLocaleString()} saved · ${errors} batch errors`
+      : `✓ ${saved.toLocaleString()} saved to Fieldforce`;
+    btn.style.background   = errors ? 'var(--amber-bg)' : 'var(--green-bg)';
+    btn.style.color        = errors ? 'var(--amber)'    : 'var(--green)';
+    btn.style.borderColor  = errors ? 'var(--amber-b)'  : 'var(--green-b)';
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '☁ Save to Fieldforce';
+      btn.style.cssText = '';
+    }, 5000);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '☁ Save to Fieldforce';
+    alert(
+      'Write-back failed: ' + e.message +
+      '\n\nThe following columns must exist on ccs_tree in Dataverse:\n' +
+      '  • ccs_matchedfield_computed (Text)\n' +
+      '  • ccs_allocationstatus_computed (Text)\n' +
+      '  • ccs_fieldmatch_computed (Yes/No)'
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPLIANCE REPORT MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+function showReportModal() {
+  const modal = document.getElementById('reportModal');
+  modal.style.display = 'flex';
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').style.display = 'none';
+}
+
+function generateReport() {
+  const usePDF      = document.getElementById('fmt_pdf').checked;
+  const useFiltered = document.getElementById('rpt_filtered').checked;
+  const data        = useFiltered ? filtered : allocation;
+  if (!data.length) { alert('No data to report — run allocation first.'); return; }
+  closeReportModal();
+  if (usePDF) generatePDF(data);
+  else        generateReportCSV(data);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PDF COMPLIANCE REPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generatePDF(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, M = 14;
+  let y = 20;
+
+  const GREEN = [34,197,94], AMBER = [245,158,11], RED = [239,68,68];
+  const DARK  = [8,12,16],   MID   = [20,29,43],   LIGHT = [212,228,247];
+
+  const ln  = (x1,y1,x2,y2,col=[31,46,66]) => { doc.setDrawColor(...col); doc.line(x1,y1,x2,y2); };
+  const rct = (x,yy,w,h,fill) => { doc.setFillColor(...fill); doc.rect(x,yy,w,h,'F'); };
+  const txt = (s,x,yy,sz=9,col=LIGHT,bold=false) => {
+    doc.setFontSize(sz); doc.setTextColor(...col);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.text(String(s), x, yy);
+  };
+  const newPage = () => {
+    doc.addPage(); y = 20;
+    rct(0,0,W,12,DARK);
+    txt('CCS ACTIVE TREE CATALOG — VERRA COMPLIANCE REPORT', M, 8, 7, GREEN, true);
+    txt(`Page ${doc.internal.getNumberOfPages()}`, W-M-10, 8, 7, [74,100,128]);
+    y = 22;
+  };
+  const chk = (need=20) => { if (y + need > 275) newPage(); };
+
+  const total     = data.length;
+  const allocated = data.filter(r => r.status === 'Allocated').length;
+  const mismatch  = data.filter(r => r.status === 'Allocated - Field mismatch').length;
+  const outside   = data.filter(r => r.status && r.status.includes('Outside')).length;
+  const allocPct  = total ? Math.round(allocated / total * 100) : 0;
+  const date      = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'long',year:'numeric'});
+
+  // ── Cover ──
+  rct(0,0,W,40,DARK); rct(0,40,W,2,GREEN);
+  doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(...GREEN);
+  doc.text('CCS ACTIVE TREE CATALOG', M, 18);
+  txt('Verra Compliance Report', M, 27, 11, LIGHT);
+  txt(`Generated: ${date}`, M, 34, 8, [74,100,128]);
+  doc.setFont('helvetica','normal'); doc.setTextColor(...[74,100,128]);
+  doc.text('Community Climate Solutions AG', W-M, 34, {align:'right'});
+  y = 52;
+
+  // ── Executive Summary ──
+  if (document.getElementById('rpt_summary').checked) {
+    chk(50);
+    txt('EXECUTIVE SUMMARY', M, y, 9, [74,100,128], true); y += 6;
+    ln(M,y,W-M,y); y += 5;
+
+    rct(M,y,50,24,MID);
+    doc.setFontSize(22); doc.setFont('helvetica','bold');
+    doc.setTextColor(...(allocPct>=90?GREEN:allocPct>=70?AMBER:RED));
+    doc.text(`${allocPct}%`, M+25, y+13, {align:'center'});
+    txt('VERRA COMPLIANCE', M+25, y+20, 7, [74,100,128], true);
+    doc.setFont('helvetica','normal');
+
+    [{label:'Total Trees',val:total.toLocaleString(),col:LIGHT},
+     {label:'Allocated',val:allocated.toLocaleString(),col:GREEN},
+     {label:'Field Mismatch',val:mismatch.toLocaleString(),col:AMBER},
+     {label:'Outside',val:outside.toLocaleString(),col:RED}
+    ].forEach((s,i) => {
+      const bx = M+55+i*34;
+      rct(bx,y,32,24,MID);
+      doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(...s.col);
+      doc.text(s.val, bx+16, y+12, {align:'center'});
+      txt(s.label, bx+16, y+20, 6, [74,100,128]);
+      doc.setFont('helvetica','normal');
+    });
+    y += 30;
+
+    const verdict = allocPct>=95
+      ? `✓ ${allocPct}% of trees correctly allocated within registered field polygons. Dataset meets Verra spatial compliance threshold.`
+      : allocPct>=80
+      ? `⚠ ${allocPct}% compliance. ${mismatch.toLocaleString()} field mismatches require review before Verra submission.`
+      : `✗ ${allocPct}% compliance is below the recommended Verra threshold. Significant data quality work is required.`;
+    doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(...LIGHT);
+    const lines = doc.splitTextToSize(verdict, W-M*2);
+    doc.text(lines, M, y); y += lines.length * 5 + 6;
+    doc.setFont('helvetica','normal');
+  }
+
+  // ── Allocation Overview ──
+  if (document.getElementById('rpt_allocation').checked) {
+    chk(60);
+    txt('ALLOCATION OVERVIEW', M, y, 9, [74,100,128], true); y += 6;
+    ln(M,y,W-M,y); y += 5;
+
+    const rows = [
+      ['Status','Count','%'],
+      ['Allocated (correct field)', allocated.toLocaleString(), allocPct+'%'],
+      ['Allocated — Field mismatch', mismatch.toLocaleString(), total?Math.round(mismatch/total*100)+'%':'0%'],
+      ['Outside polygon', outside.toLocaleString(), total?Math.round(outside/total*100)+'%':'0%'],
+      ['Total', total.toLocaleString(), '100%'],
+    ];
+    rows.forEach((row,i) => {
+      if (i===0||i===rows.length-1) rct(M,y-4,W-M*2,8,MID);
+      else if (i%2===0) rct(M,y-4,W-M*2,8,[14,29,43]);
+      const cols = [74,100,i===0?62:140,i===0?165:165];
+      row.forEach((cell,j) => {
+        const col = i===0?[74,100,128]:j===0?LIGHT:j===1&&i===1?GREEN:j===1&&i===2?AMBER:j===1&&i===3?RED:LIGHT;
+        txt(cell, cols[j], y, 9, col, i===0||i===rows.length-1);
+      });
+      y += 8;
+    });
+    y += 4;
+  }
+
+  // ── Species Breakdown ──
+  if (document.getElementById('rpt_species').checked) {
+    chk(50);
+    txt('SPECIES BREAKDOWN', M, y, 9, [74,100,128], true); y += 6;
+    ln(M,y,W-M,y); y += 5;
+
+    const specMap = {};
+    data.forEach(r => {
+      const s = r.species || 'Unknown';
+      if (!specMap[s]) specMap[s] = {total:0,allocated:0};
+      specMap[s].total++;
+      if (r.status==='Allocated') specMap[s].allocated++;
+    });
+    const specRows = Object.entries(specMap).sort((a,b)=>b[1].total-a[1].total).slice(0,20);
+
+    rct(M,y-4,W-M*2,8,MID);
+    ['Species','Total Trees','Allocated','Compliance %'].forEach((h,i)=>
+      txt(h,[M,M+50,M+95,M+140][i],y,8,[74,100,128],true));
+    y += 8;
+    specRows.forEach(([sp,s],i) => {
+      chk(8);
+      if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+      const pct = s.total ? Math.round(s.allocated/s.total*100) : 0;
+      txt(sp,M,y,8,LIGHT);
+      txt(s.total.toLocaleString(),M+50,y,8,LIGHT);
+      txt(s.allocated.toLocaleString(),M+95,y,8,GREEN);
+      txt(pct+'%',M+140,y,8,pct>=90?GREEN:pct>=70?AMBER:RED,true);
+      y += 8;
+    });
+    y += 4;
+  }
+
+  // ── Field Summary ──
+  if (document.getElementById('rpt_fields').checked) {
+    chk(50);
+    txt('FIELD SUMMARY (Top 20 by tree count)', M, y, 9, [74,100,128], true); y += 6;
+    ln(M,y,W-M,y); y += 5;
+
+    const fieldMap = {};
+    data.forEach(r => {
+      const f = r.matchedFieldId || r.treeField || 'Unassigned';
+      if (!fieldMap[f]) fieldMap[f] = {total:0,allocated:0,mismatch:0};
+      fieldMap[f].total++;
+      if (r.status==='Allocated') fieldMap[f].allocated++;
+      if (r.status==='Allocated - Field mismatch') fieldMap[f].mismatch++;
+    });
+    const fieldRows = Object.entries(fieldMap).sort((a,b)=>b[1].total-a[1].total).slice(0,20);
+
+    rct(M,y-4,W-M*2,8,MID);
+    ['Field ID','Total','Allocated','Mismatch','Status %'].forEach((h,i)=>
+      txt(h,[M,M+55,M+90,M+125,M+155][i],y,8,[74,100,128],true));
+    y += 8;
+    fieldRows.forEach(([fid,s],i) => {
+      chk(8);
+      if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+      const pct = s.total ? Math.round(s.allocated/s.total*100) : 0;
+      txt(fid.length>22?fid.slice(0,20)+'…':fid, M,y,7,LIGHT);
+      txt(s.total.toLocaleString(),M+55,y,8,LIGHT);
+      txt(s.allocated.toLocaleString(),M+90,y,8,GREEN);
+      txt(s.mismatch.toLocaleString(),M+125,y,8,s.mismatch>0?AMBER:LIGHT);
+      txt(pct+'%',M+155,y,8,pct>=90?GREEN:pct>=70?AMBER:RED,true);
+      y += 8;
+    });
+    y += 4;
+  }
+
+  // ── Exceptions ──
+  if (document.getElementById('rpt_exceptions').checked) {
+    chk(50);
+    txt('EXCEPTIONS — TREES REQUIRING REVIEW', M, y, 9, [74,100,128], true); y += 6;
+    ln(M,y,W-M,y); y += 5;
+
+    const exceptions = data.filter(r => r.status && r.status !== 'Allocated').slice(0,50);
+    if (!exceptions.length) {
+      txt('✓ No exceptions found.', M, y, 9, GREEN); y += 10;
+    } else {
+      txt(`Showing first ${Math.min(50,exceptions.length)} of ${data.filter(r=>r.status&&r.status!=='Allocated').length.toLocaleString()} exceptions`,M,y,8,[74,100,128]);
+      y += 6;
+      rct(M,y-4,W-M*2,8,MID);
+      ['Tree Code','Species','Tree Field','Matched Field','Status'].forEach((h,i)=>
+        txt(h,[M,M+40,M+80,M+120,M+155][i],y,8,[74,100,128],true));
+      y += 8;
+      exceptions.forEach((r,i) => {
+        chk(8);
+        if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+        const sc = r.status==='Allocated - Field mismatch'?AMBER:RED;
+        txt((r.treeCode||'').slice(0,18),M,y,7,LIGHT);
+        txt((r.species||'—').slice(0,14),M+40,y,7,LIGHT);
+        txt((r.treeField||'—').slice(0,16),M+80,y,7,LIGHT);
+        txt((r.matchedFieldId||'—').slice(0,16),M+120,y,7,GREEN);
+        txt((r.status||'').replace('Allocated - ',''),M+155,y,7,sc);
+        y += 8;
+      });
+    }
+    y += 4;
+  }
+
+  // ── Polygon Quality ──
+  if (document.getElementById('rpt_polygon').checked) {
+    chk(50);
+    txt('POLYGON QUALITY — SUSPECT BOUNDARIES', M, y, 9, [74,100,128], true); y += 6;
+    ln(M,y,W-M,y); y += 5;
+
+    const fStats = {};
+    data.forEach(r => {
+      const f = r.matchedFieldId; if (!f) return;
+      if (!fStats[f]) fStats[f] = {inside:0,mismatch:0};
+      if (r.insidePolygon) fStats[f].inside++;
+      if (r.status==='Allocated - Field mismatch') fStats[f].mismatch++;
+    });
+    const suspects = Object.entries(fStats)
+      .filter(([,s])=>s.inside>=3&&s.mismatch/s.inside>=0.8)
+      .sort((a,b)=>(b[1].mismatch/b[1].inside)-(a[1].mismatch/a[1].inside))
+      .slice(0,20);
+
+    if (!suspects.length) {
+      txt('✓ No suspect polygons detected (no field with ≥80% mismatch rate).', M, y, 9, GREEN); y += 10;
+    } else {
+      txt(`${suspects.length} field polygon(s) have ≥80% mismatch rate and likely require boundary correction:`,M,y,8,AMBER);
+      y += 7;
+      rct(M,y-4,W-M*2,8,MID);
+      ['Field ID','Trees Inside','Mismatched','Mismatch Rate'].forEach((h,i)=>
+        txt(h,[M,M+60,M+100,M+140][i],y,8,[74,100,128],true));
+      y += 8;
+      suspects.forEach(([fid,s],i) => {
+        chk(8);
+        if (i%2===0) rct(M,y-4,W-M*2,8,[14,21,33]);
+        const rate = Math.round(s.mismatch/s.inside*100);
+        txt(fid.slice(0,28),M,y,7,LIGHT);
+        txt(s.inside.toLocaleString(),M+60,y,8,LIGHT);
+        txt(s.mismatch.toLocaleString(),M+100,y,8,AMBER);
+        txt(rate+'%',M+140,y,8,RED,true);
+        y += 8;
+      });
+    }
+  }
+
+  // ── Footer on every page ──
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p=1; p<=pageCount; p++) {
+    doc.setPage(p);
+    rct(0,287,W,10,DARK);
+    txt(`CCS Active Tree Catalog · Verra Compliance Report · ${date}`,M,293,7,[74,100,128]);
+    txt(`Page ${p} of ${pageCount}`,W-M,293,7,[74,100,128]);
+    doc.setFont('helvetica','normal');
+  }
+
+  doc.save(`CCS_Verra_Compliance_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CSV COMPLIANCE EXPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateReportCSV(data) {
+  const cols    = ['treeCode','species','treeField','matchedFieldId','fieldMatch','status','lat','lng','accuracy','createdOn'];
+  const headers = ['Tree Code','Species','Tree Field','Matched Field','Field Match','Status','Latitude','Longitude','Accuracy','Created On'];
+  const rows = [headers, ...data.map(r => cols.map(c => {
+    const v = r[c];
+    if (v===null||v===undefined) return '';
+    if (typeof v==='boolean') return v?'Yes':'No';
+    return String(v);
+  }))];
+  const csv  = rows.map(r => r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `CCS_Compliance_Report_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },1000);
+}
+
+</script>
+
+<button class="fab-tree-catalog" onclick="openTreeCatalog()" title="Open Tree Catalog — grid view of all trees">
+  <span class="fab-icon">🌳</span> Tree Catalog
+</button>
+
+</body>
+</html>
