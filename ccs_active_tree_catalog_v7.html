@@ -2431,7 +2431,7 @@ function generatePDF(data) {
         txt((r.species||'-').slice(0,14),            M+48, y, 7, INK);
         txt((r.treeField||'-').slice(0,15),          M+88, y, 7, MUTED);
         txt((r.matchedFieldId||'-').slice(0,15),     M+128,y, 7, GREEN);
-        txt((r.status||'').replace('Allocated - ,''), M+162,y, 7, sc);
+        txt((r.status||'').replace('Allocated - ',''), M+162,y, 7, sc);
         y += 8;
       });
     }
