@@ -9,7 +9,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
-:root{--bg:#080c10;--surface:#0f1520;--panel:#141d2b;--card:#1a2538;--border:#1f2e42;--border2:#263548;--text:#d4e4f7;--muted:#4a6480;--faint:#1e3050;--green:#22c55e;--green-bg:rgba(34,197,94,0.08);--green-b:rgba(34,197,94,0.25);--red:#ef4444;--red-bg:rgba(239,68,68,0.08);--red-b:rgba(239,68,68,0.25);--amber:#f59e0b;--amber-bg:rgba(245,158,11,0.08);--amber-b:rgba(245,158,11,0.25);--blue:#38bdf8;--blue-bg:rgba(56,189,248,0.08);--blue-b:rgba(56,189,248,0.25);--purple:#a78bfa;--font-mono:'IBM Plex Mono',monospace;--font-sans:'IBM Plex Sans',sans-serif}
+:root{
+  --bg:#080c10;--surface:#0f1520;--panel:#141d2b;--card:#1a2538;
+  --border:#1f2e42;--border2:#263548;--text:#d4e4f7;--muted:#4a6480;--faint:#1e3050;
+  --green:#22c55e;--green-bg:rgba(34,197,94,0.08);--green-b:rgba(34,197,94,0.25);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.08);--red-b:rgba(239,68,68,0.25);
+  --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.08);--amber-b:rgba(245,158,11,0.25);
+  --blue:#38bdf8;--blue-bg:rgba(56,189,248,0.08);--blue-b:rgba(56,189,248,0.25);
+  --purple:#a78bfa;
+  --font-mono:'IBM Plex Mono',monospace;--font-sans:'IBM Plex Sans',sans-serif;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font-sans);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:48px;display:flex;align-items:center;gap:16px;flex-shrink:0}
@@ -17,188 +26,240 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .logo-icon{width:28px;height:28px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px}
 .logo-text{font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
 .logo-sub{font-size:10px;color:var(--muted);letter-spacing:1px;font-family:var(--font-mono)}
-.hd{width:1px;height:24px;background:var(--border)}
-.hs{flex:1}
+.hd{width:1px;height:24px;background:var(--border)}.hs{flex:1}
 .kpi-strip{display:flex;gap:8px;align-items:center}
 .kpi-chip{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:3px 10px;font-family:var(--font-mono);font-size:11px}
-.kpi-chip .kv{font-weight:700;font-size:13px}
-.kpi-chip .kl{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:1px}
+.kpi-chip .kv{font-weight:700;font-size:13px}.kpi-chip .kl{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:1px}
 .kpi-chip.green{border-color:var(--green-b);background:var(--green-bg)}.kpi-chip.green .kv{color:var(--green)}
 .kpi-chip.red{border-color:var(--red-b);background:var(--red-bg)}.kpi-chip.red .kv{color:var(--red)}
 .kpi-chip.amber{border-color:var(--amber-b);background:var(--amber-bg)}.kpi-chip.amber .kv{color:var(--amber)}
 .kpi-chip.blue{border-color:var(--blue-b);background:var(--blue-bg)}.kpi-chip.blue .kv{color:var(--blue)}
 .btn-back{display:flex;align-items:center;gap:6px;background:var(--blue-bg);border:1px solid var(--blue-b);color:var(--blue);border-radius:4px;padding:5px 12px;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:opacity .15s}
 .btn-back:hover{opacity:.8}
-.toolbar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.toolbar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
 .ts{background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:10px;padding:6px 8px;outline:none;cursor:pointer;transition:border-color .2s}
-.ts:focus{border-color:var(--green)}
-.ts option{background:var(--panel)}
-input.ts{width:200px}
-.tb-sp{flex:1}
+.ts:focus{border-color:var(--green)}.ts option{background:var(--panel)}
+input.ts{width:180px}.tb-sp{flex:1}
 .tb-ct{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
 .vtg{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden}
-.vb{background:var(--bg);border:none;color:var(--muted);font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 10px;cursor:pointer;transition:all .15s;border-right:1px solid var(--border)}
-.vb:last-child{border-right:none}
-.vb.active{background:var(--green);color:#000}
+.vb{background:var(--bg);border:none;color:var(--muted);font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;cursor:pointer;transition:all .15s;border-right:1px solid var(--border)}
+.vb:last-child{border-right:none}.vb.active{background:var(--green);color:#000}
 .vb:hover:not(.active){background:var(--card);color:var(--text)}
-.btn{border:none;border-radius:4px;cursor:pointer;font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:opacity .15s;padding:7px 12px;white-space:nowrap;font-family:var(--font-mono)}
-.btn:hover{opacity:.85}
-.btn-sec{background:var(--border);color:var(--text)}
+.btn{border:none;border-radius:4px;cursor:pointer;font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:opacity .15s;padding:6px 12px;white-space:nowrap;font-family:var(--font-mono)}
+.btn:hover{opacity:.85}.btn-sec{background:var(--border);color:var(--text)}
+#fsp{display:none;font-family:var(--font-mono);font-size:10px;color:var(--amber)}
+.cw{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.cs{flex:1;overflow-y:auto;padding:12px 16px}
 .upload-wrap{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
 .upload-zone{border:2px dashed var(--border2);border-radius:10px;padding:40px 56px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--faint);max-width:500px;width:100%}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--green);background:var(--green-bg)}
 .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.uz-icon{font-size:40px;margin-bottom:10px}
-.uz-title{font-family:var(--font-mono);font-size:13px;font-weight:700;margin-bottom:6px}
+.uz-icon{font-size:40px;margin-bottom:10px}.uz-title{font-family:var(--font-mono);font-size:13px;font-weight:700;margin-bottom:6px}
 .uz-sub{font-size:11px;color:var(--muted);line-height:1.7}
-.upload-hint{font-size:10px;color:var(--muted);font-family:var(--font-mono)}
-.cw{flex:1;overflow:hidden;display:none;flex-direction:column}
-.cw.show{display:flex}
-.cs{flex:1;overflow-y:auto;padding:12px 16px}
+#uploadStatus{font-family:var(--font-mono);font-size:11px;margin-top:8px}
+
+/* FIELD CARDS */
+.field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.fc{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s}
+.fc:hover{border-color:var(--border2);transform:translateY(-1px)}
+.fc.ph{border-top:3px solid var(--green)}.fc.pm{border-top:3px solid var(--amber)}.fc.pl{border-top:3px solid var(--red)}
+.fm{width:100%;height:170px;background:#0d1620;position:relative}
+.fm-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--font-mono);font-size:10px;flex-direction:column;gap:6px}
+.fno-geo{height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;font-family:var(--font-mono);background:var(--faint)}
+.fb{padding:10px 12px}
+.fid{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fowner{font-size:11px;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fzone{font-size:10px;color:var(--muted);margin-bottom:6px}
+.fpct{font-family:var(--font-mono);font-size:20px;font-weight:800;line-height:1}
+.fpct.high{color:var(--green)}.fpct.mid{color:var(--amber)}.fpct.low{color:var(--red)}
+.fpct-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px;font-family:var(--font-mono)}
+.fstat{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.fstat.g{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b)}
+.fstat.a{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b)}
+.fstat.r{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b)}
+
+/* TREE CARDS */
 .tree-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .tree-grid.gs{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
 .tree-grid.gl{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .tc{background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s}
 .tc:hover{border-color:var(--border2);transform:translateY(-1px)}
-.tc.sa{border-top:2px solid var(--green)}
-.tc.sm{border-top:2px solid var(--amber)}
-.tc.so{border-top:2px solid var(--red)}
-.tc.st{border-top:2px solid var(--purple)}
+.tc.sa{border-top:2px solid var(--green)}.tc.sm{border-top:2px solid var(--amber)}
+.tc.so{border-top:2px solid var(--red)}.tc.st{border-top:2px solid var(--purple)}
 .cm{width:100%;height:130px;background:#0d1620;position:relative}
-.cm.cms{height:100px}
-.cm.cml{height:160px}
+.cm.cms{height:100px}.cm.cml{height:160px}
+.nco{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;font-family:var(--font-mono)}
 .cb{padding:8px 10px}
 .cc{font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--blue);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .csp{font-size:10px;color:var(--text);margin-bottom:4px}
 .cf{font-family:var(--font-mono);font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
-.cft{display:flex;align-items:center;justify-content:space-between}
-.ca{font-family:var(--font-mono);font-size:8px;color:var(--muted)}
+.cft{display:flex;align-items:center;justify-content:space-between}.ca{font-family:var(--font-mono);font-size:8px;color:var(--muted)}
+.tree-list{display:flex;flex-direction:column}
+.li{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border);font-size:11px;align-items:center}
+.li:hover{background:var(--card)}
+.lc{font-family:var(--font-mono);font-size:10px;color:var(--blue);font-weight:700}
+.lf{font-family:var(--font-mono);font-size:9px;color:var(--muted)}
+.lco{font-family:var(--font-mono);font-size:9px;color:var(--muted)}
 .badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
 .badge.allocated{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b)}
 .badge.mismatch{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b)}
 .badge.outside{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b)}
 .badge.outside-tagged{background:rgba(167,139,250,0.1);color:var(--purple);border:1px solid rgba(167,139,250,0.3)}
 .badge.missing{background:var(--faint);color:var(--muted);border:1px solid var(--border)}
-.tree-list{display:flex;flex-direction:column;gap:4px}
-.li{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:8px 12px;display:flex;align-items:center;gap:12px;font-size:11px;font-family:var(--font-mono);transition:background .1s}
-.li:hover{background:var(--panel)}
-.lc{color:var(--blue);font-weight:700;width:120px;flex-shrink:0}
-.lsp{color:var(--text);flex:1;font-family:var(--font-sans);font-size:11px}
-.lf{color:var(--muted);font-size:10px;width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lco{color:var(--muted);font-size:10px;width:160px;flex-shrink:0}
+.map-legend{position:absolute;bottom:6px;left:6px;z-index:1000;background:rgba(8,12,16,0.85);border:1px solid var(--border);border-radius:4px;padding:5px 7px;font-size:9px;font-family:var(--font-mono);pointer-events:none}
+.ml-row{display:flex;align-items:center;gap:5px;margin-bottom:3px}.ml-row:last-child{margin-bottom:0}
+.ml-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,0.4)}
 .pagination{padding:8px 16px;background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);font-family:var(--font-mono);flex-shrink:0}
-.pagination .sp{flex:1}
+.sp{flex:1}
 .pb{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:3px;padding:3px 10px;cursor:pointer;font-size:10px;font-family:var(--font-mono)}
-.pb:hover{border-color:var(--green);color:var(--green)}
-.pb:disabled{opacity:.3;cursor:not-allowed}
-.empty{color:var(--muted);font-family:var(--font-mono);font-size:11px;text-align:center;padding:60px 20px;line-height:2.5}
-.nco{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;color:var(--muted);background:var(--bg)}
+.pb:hover{border-color:var(--green);color:var(--green)}.pb:disabled{opacity:.3;cursor:not-allowed}
+.empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:11px;line-height:2}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
 </style>
 </head>
 <body>
+
 <header>
-  <div class="logo"><div class="logo-icon">🌳</div><div><div class="logo-text">CCS Tree Catalog</div><div class="logo-sub">Read-Only Viewer · Allocation Data</div></div></div>
+  <div class="logo">
+    <div class="logo-icon">🌳</div>
+    <div>
+      <div class="logo-text">CCS Tree Catalog</div>
+      <div class="logo-sub" id="viewSubLabel">Field &middot; Compliance &middot; Overview</div>
+    </div>
+  </div>
   <div class="hd"></div>
   <div class="kpi-strip">
+    <div class="kpi-chip blue"><span class="kv" id="kpiFields">—</span><span class="kl">Fields</span></div>
     <div class="kpi-chip blue"><span class="kv" id="kpiTotal">—</span><span class="kl">Trees</span></div>
     <div class="kpi-chip green"><span class="kv" id="kpiAllocated">—</span><span class="kl">Allocated</span></div>
     <div class="kpi-chip amber"><span class="kv" id="kpiMismatch">—</span><span class="kl">Mismatch</span></div>
     <div class="kpi-chip red"><span class="kv" id="kpiOutside">—</span><span class="kl">Outside</span></div>
   </div>
   <div class="hs"></div>
-  <a class="btn-back" href="index.html">← Polygon Corrector</a>
+  <a class="btn-back" href="ccs_active_tree_catalog_v7.html">← Main Catalog</a>
 </header>
 
-<div class="upload-wrap" id="uploadWrap">
+<div class="toolbar">
+  <input type="text" class="ts" id="searchBox" placeholder="Search…" oninput="debouncedFilter()"/>
+  <div id="fieldFilters" style="display:flex;gap:8px">
+    <select class="ts" id="fltFieldZone" onchange="debouncedFilter()"><option value="">All zones</option></select>
+    <select class="ts" id="fltFieldPct" onchange="debouncedFilter()">
+      <option value="">All compliance</option>
+      <option value="high">High (90%+)</option>
+      <option value="mid">Mid (70-89%)</option>
+      <option value="low">Low (under 70%)</option>
+    </select>
+  </div>
+  <div id="treeFilters" style="display:none;gap:8px">
+    <select class="ts" id="fltStatus" onchange="debouncedFilter()">
+      <option value="">All statuses</option>
+      <option value="Allocated">Allocated</option>
+      <option value="Allocated - Field mismatch">Field mismatch</option>
+      <option value="Outside polygon">Outside polygon</option>
+      <option value="Outside polygon but field tagged">Outside + tagged</option>
+    </select>
+    <select class="ts" id="fltSpecies" onchange="debouncedFilter()"><option value="">All species</option></select>
+    <select class="ts" id="fltField"   onchange="debouncedFilter()"><option value="">All fields</option></select>
+  </div>
+  <span id="fsp">Filtering…</span>
+  <div class="tb-sp"></div>
+  <span class="tb-ct" id="tbCt"></span>
+  <div class="vtg" id="sizeToggle" style="display:none">
+    <button class="vb" onclick="setSize('s')">S</button>
+    <button class="vb active" onclick="setSize('m')">M</button>
+    <button class="vb" onclick="setSize('l')">L</button>
+  </div>
+  <div class="vtg" id="layoutToggle" style="display:none">
+    <button class="vb active" id="vt-g" onclick="setLayout('g')">Grid</button>
+    <button class="vb"        id="vt-l" onclick="setLayout('l')">List</button>
+  </div>
+  <div class="vtg">
+    <button class="vb active" id="vt-field" onclick="switchView('field')">Fields</button>
+    <button class="vb"        id="vt-tree"  onclick="switchView('tree')">Trees</button>
+  </div>
+  <button class="btn btn-sec" onclick="clearFilters()">Clear</button>
+</div>
+
+<div id="uploadWrap" class="upload-wrap" style="display:none">
   <div class="upload-zone" id="uploadZone">
-    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="loadFile(this.files[0])"/>
+    <input type="file" accept=".xlsx,.xls,.csv" onchange="loadFile(this.files[0])"/>
     <div class="uz-icon">🌱</div>
     <div class="uz-title">Drop your Active Trees file here</div>
     <div class="uz-sub">Upload the <strong>Active Trees</strong> Excel export from Fieldforce<br>or the <strong>allocation results CSV</strong> from the CCS Tree Catalog tool</div>
   </div>
-  <div class="upload-hint" id="uploadStatus"></div>
+  <div id="uploadStatus"></div>
 </div>
 
-<div id="cw" class="cw">
-  <div class="toolbar">
-    <input type="text" class="ts" id="searchBox" placeholder="Search code, species, field…" oninput="debouncedFilter()"/>
-    <select class="ts" id="fltStatus" onchange="applyFilters()">
-      <option value="">All statuses</option>
-      <option value="Allocated">Allocated</option>
-      <option value="Allocated - Field mismatch">Field mismatch</option>
-      <option value="Allocated - Owner mismatch">Owner mismatch</option>
-      <option value="Outside polygon">Outside polygon</option>
-      <option value="Outside polygon but field tagged">Outside + tagged</option>
-    </select>
-    <select class="ts" id="fltSpecies" onchange="applyFilters()"><option value="">All species</option></select>
-    <select class="ts" id="fltField" onchange="applyFilters()"><option value="">All fields</option></select>
-    <button class="btn btn-sec" onclick="clearFilters()" style="font-size:9px">Clear</button>
-    <div class="tb-sp"></div>
-    <span class="tb-ct" id="tbCt"></span>
-    <span id="fsp" style="display:none"><span class="spinner"></span></span>
-    <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:9px;color:var(--muted)">SIZE
-      <div class="vtg">
-        <button class="vb" onclick="setSize('s')">S</button>
-        <button class="vb active" id="sz-m" onclick="setSize('m')">M</button>
-        <button class="vb" onclick="setSize('l')">L</button>
-      </div>
-    </div>
-    <div class="vtg">
-      <button class="vb active" id="vt-g" onclick="setView('g')">⊞ Grid</button>
-      <button class="vb" id="vt-l" onclick="setView('l')">≡ List</button>
-    </div>
+<div class="cw" id="cw" style="display:none">
+  <div class="cs" id="fieldView">
+    <div class="field-grid" id="fieldGrid"></div>
+    <div class="empty" id="fieldEmpty" style="display:none">No fields match the current filters</div>
   </div>
-  <div class="cs" id="cs">
-    <div id="tgrid" class="tree-grid"></div>
-    <div id="tlist" class="tree-list" style="display:none"></div>
-    <div id="empty" class="empty" style="display:none">No trees match the current filters</div>
+  <div class="cs" id="treeView" style="display:none">
+    <div class="tree-grid" id="tgrid"></div>
+    <div class="tree-list" id="tlist" style="display:none"></div>
+    <div class="empty" id="treeEmpty" style="display:none">No trees match the current filters</div>
   </div>
   <div class="pagination">
     <span id="pi">—</span><div class="sp"></div>
-    <button class="pb" onclick="changePage(-1)" id="bprev">← Prev</button>
-    <button class="pb" onclick="changePage(1)" id="bnext">Next →</button>
+    <button class="pb" onclick="changePage(-1)" id="bprev">Prev</button>
+    <button class="pb" onclick="changePage(1)"  id="bnext">Next</button>
   </div>
 </div>
 
 <script>
-let allRows=[],filtered=[],searchIdx=[],currentPage=1,filterTimer=null;
-let curView='g',curSize='m';
+let allRows=[], allFields=[], fieldCards=[];
+let filteredFields=[], filteredTrees=[], searchIdx=[];
+let currentPage=1, filterTimer=null;
+let curMainView='field', curLayout='g', curSize='m';
 const PAGE=60;
-let maps={};
+let treeMaps={}, fieldMaps={}, observer=null;
 
-function setStatus(msg,ok){const el=document.getElementById('uploadStatus');el.textContent=msg;el.style.color=ok?'var(--green)':'var(--red)';}
-function fc(keys,names){return keys.find(k=>names.some(n=>k.toLowerCase().replace(/[\s_()\-]/g,'').includes(n.toLowerCase().replace(/[\s_()\-]/g,''))));}
-function aLL(a,b){if(a<0&&b>0)return{lat:a,lng:b};if(b<0&&a>0)return{lat:b,lng:a};if(Math.abs(a)<90)return{lat:a,lng:b};return{lat:b,lng:a};}
-
-async function loadFile(file){
-  if(!file)return;
-  setStatus('Reading…',true);
+// ── IndexedDB ──────────────────────────────────────────────────────────────
+function tcOpenDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('ccs_tree_catalog',1);
+    req.onupgradeneeded=e=>{if(!e.target.result.objectStoreNames.contains('cache'))e.target.result.createObjectStore('cache',{keyPath:'key'});};
+    req.onsuccess=e=>res(e.target.result);req.onerror=e=>rej(e.target.error);
+  });
+}
+async function tcLoadFromDB(){
   try{
-    let rows=file.name.endsWith('.csv')?parseCSV(await file.text()):await readXL(file);
+    const db=await tcOpenDB();
+    return new Promise(res=>{
+      const req=db.transaction('cache','readonly').objectStore('cache').get('tree_catalog_passthrough');
+      req.onsuccess=e=>{const r=e.target.result;res(r&&r.value&&Date.now()-r.value.ts<86400000?r.value:null);};
+      req.onerror=()=>res(null);
+    });
+  }catch(e){return null;}
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function setStatus(msg,ok){const el=document.getElementById('uploadStatus');el.textContent=msg;el.style.color=ok?'var(--green)':'var(--red)';}
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function aLL(a,b){if(a<0&&b>0)return{lat:a,lng:b};if(b<0&&a>0)return{lat:b,lng:a};if(Math.abs(a)<90)return{lat:a,lng:b};return{lat:b,lng:a};}
+function fcol(keys,names){return keys.find(k=>names.some(n=>k.toLowerCase().replace(/[\s_()\-]/g,'').includes(n.toLowerCase().replace(/[\s_()\-]/g,''))));}
+
+// ── File loading ───────────────────────────────────────────────────────────
+async function loadFile(file){
+  if(!file)return;setStatus('Reading…',true);
+  try{
+    const rows=file.name.endsWith('.csv')?parseCSV(await file.text()):await readXL(file);
     if(!rows.length){setStatus('No data',false);return;}
-    build(rows);
+    buildFromRows(rows);
   }catch(e){setStatus('Error: '+e.message,false);}
 }
-
-function parseCSV(t){
-  const lines=t.split('\n').filter(l=>l.trim());
-  if(!lines.length)return[];
-  const hd=splitRow(lines[0]);
-  return lines.slice(1).map(l=>{const v=splitRow(l);const o={};hd.forEach((h,i)=>o[h]=v[i]??'');return o;});
-}
+function parseCSV(t){const lines=t.split('\n').filter(l=>l.trim());if(!lines.length)return[];const hd=splitRow(lines[0]);return lines.slice(1).map(l=>{const v=splitRow(l);const o={};hd.forEach((h,i)=>o[h]=v[i]??'');return o;});}
 function splitRow(r){const res=[];let c='',q=false;for(let i=0;i<r.length;i++){if(r[i]==='"'){q=!q;}else if(r[i]===','&&!q){res.push(c.trim());c='';}else c+=r[i];}res.push(c.trim());return res;}
 function readXL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});let b=null,bl=0;wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:''});if(rows.length>bl){bl=rows.length;b=rows;}});res(b||[]);}catch(e){rej(e);}};r.readAsArrayBuffer(f);});}
 
-function build(rows){
+function buildFromRows(rows){
   const keys=Object.keys(rows[0]);
-  const cC=fc(keys,['treecode','code']),spC=fc(keys,['species']),
-        laC=fc(keys,['treelat','latitude','lat']),lnC=fc(keys,['treelong','longitude','lng','lon']),
-        fiC=fc(keys,['treefield','field']),owC=fc(keys,['treeowner','fieldowner','owner']),
-        mfC=fc(keys,['matchedfieldid','matchedfield']),stC=fc(keys,['status']),
-        acC=fc(keys,['accuracy']),dtC=fc(keys,['createdon','created']);
+  const cC=fcol(keys,['treecode','code']),spC=fcol(keys,['species']),
+        laC=fcol(keys,['treelat','latitude','lat']),lnC=fcol(keys,['treelong','longitude','lng','lon']),
+        fiC=fcol(keys,['treefield','field']),owC=fcol(keys,['treeowner','fieldowner','owner']),
+        mfC=fcol(keys,['matchedfieldid','matchedfield']),stC=fcol(keys,['status']),
+        acC=fcol(keys,['accuracy']),dtC=fcol(keys,['createdon','created']);
   allRows=rows.map((r,i)=>{
     const a=parseFloat(r[laC]),b=parseFloat(r[lnC]);
     const co=(!isNaN(a)&&!isNaN(b))?aLL(a,b):null;
@@ -208,207 +269,309 @@ function build(rows){
       status:stC?String(r[stC]||''):'',accuracy:acC?parseFloat(r[acC])||null:null,
       createdOn:dtC?String(r[dtC]||''):''};
   });
-  buildIdx();populateFilters();updateKPIs();
-  document.getElementById('uploadWrap').style.display='none';
-  document.getElementById('cw').classList.add('show');
-  applyFilters();
+  initialise();
 }
 
-function buildIdx(){searchIdx=allRows.map(r=>[r.treeCode,r.species,r.treeField,r.matchedFieldId,r.treeOwner,r.status].join(' ').toLowerCase());}
+function initialise(){
+  buildSearchIdx();buildFieldCards();populateFilters();updateKPIs();
+  document.getElementById('uploadWrap').style.display='none';
+  document.getElementById('cw').style.display='flex';
+  filteredFields=fieldCards.slice();filteredTrees=allRows.slice();
+  currentPage=1;renderCurrentView();
+}
+
+// ── Field cards ────────────────────────────────────────────────────────────
+function buildFieldCards(){
+  const byField={};
+  allRows.forEach(r=>{
+    const key=r.matchedFieldId||r.treeField||'__none__';
+    if(key==='__none__')return;
+    if(!byField[key]){
+      const f=allFields.find(f=>f.fieldId===key)||{fieldId:key,owner:r.treeOwner||'',zone:'',nrc:'',ring:null};
+      byField[key]={field:f,trees:[],allocated:0,mismatch:0,outside:0};
+    }
+    byField[key].trees.push(r);
+    if(r.status==='Allocated')byField[key].allocated++;
+    else if(r.status&&r.status.includes('mismatch'))byField[key].mismatch++;
+    else if(r.status&&r.status.includes('Outside'))byField[key].outside++;
+  });
+  fieldCards=Object.values(byField).sort((a,b)=>b.trees.length-a.trees.length);
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+function buildSearchIdx(){searchIdx=allRows.map(r=>[r.treeCode,r.species,r.treeField,r.matchedFieldId,r.treeOwner,r.status].join(' ').toLowerCase());}
 
 function populateFilters(){
   function fill(id,vals){const s=document.getElementById(id);const f=s.options[0];s.innerHTML='';s.appendChild(f);[...new Set(vals.filter(Boolean).sort())].forEach(v=>{const o=document.createElement('option');o.value=o.textContent=v;s.appendChild(o);});}
   fill('fltSpecies',allRows.map(r=>r.species));
   fill('fltField',allRows.map(r=>r.matchedFieldId||r.treeField));
+  fill('fltFieldZone',allFields.map(f=>f.zone));
 }
 
-function debouncedFilter(){clearTimeout(filterTimer);document.getElementById('fsp').style.display='inline';filterTimer=setTimeout(()=>applyFilters(),220);}
+function debouncedFilter(){clearTimeout(filterTimer);document.getElementById('fsp').style.display='inline';filterTimer=setTimeout(()=>applyFilters(),250);}
 
 function applyFilters(){
   clearTimeout(filterTimer);
   const q=(document.getElementById('searchBox').value||'').toLowerCase().trim();
-  const st=document.getElementById('fltStatus').value;
-  const sp=document.getElementById('fltSpecies').value;
-  const fi=document.getElementById('fltField').value;
-  const hf=q||st||sp||fi;
-  filtered=hf?[]:allRows.slice();
-  if(hf){for(let i=0;i<allRows.length;i++){const r=allRows[i];if(st&&r.status!==st)continue;if(sp&&r.species!==sp)continue;if(fi&&r.matchedFieldId!==fi&&r.treeField!==fi)continue;if(q&&!searchIdx[i].includes(q))continue;filtered.push(r);}}
-  currentPage=1;
-  document.getElementById('fsp').style.display='none';
-  document.getElementById('tbCt').textContent=`${filtered.length.toLocaleString()} trees`;
-  renderPage();
+  if(curMainView==='field'){
+    const zone=document.getElementById('fltFieldZone').value;
+    const pct=document.getElementById('fltFieldPct').value;
+    filteredFields=fieldCards.filter(fc=>{
+      if(zone&&fc.field.zone!==zone)return false;
+      if(pct){const p=fc.trees.length?Math.round(fc.allocated/fc.trees.length*100):0;
+        if(pct==='high'&&p<90)return false;if(pct==='mid'&&(p<70||p>=90))return false;if(pct==='low'&&p>=70)return false;}
+      if(q&&!fc.field.fieldId.toLowerCase().includes(q)&&!fc.field.owner.toLowerCase().includes(q))return false;
+      return true;
+    });
+    document.getElementById('tbCt').textContent=filteredFields.length.toLocaleString()+' fields';
+  }else{
+    const status=document.getElementById('fltStatus').value;
+    const species=document.getElementById('fltSpecies').value;
+    const field=document.getElementById('fltField').value;
+    filteredTrees=[];
+    for(let i=0;i<allRows.length;i++){
+      const r=allRows[i];
+      if(status&&r.status!==status)continue;if(species&&r.species!==species)continue;
+      if(field&&r.matchedFieldId!==field&&r.treeField!==field)continue;
+      if(q&&!searchIdx[i].includes(q))continue;filteredTrees.push(r);
+    }
+    document.getElementById('tbCt').textContent=filteredTrees.length.toLocaleString()+' trees';
+  }
+  currentPage=1;document.getElementById('fsp').style.display='none';renderCurrentView();
 }
 
-function clearFilters(){['fltStatus','fltSpecies','fltField'].forEach(id=>document.getElementById(id).value='');document.getElementById('searchBox').value='';applyFilters();}
-
-function updateKPIs(){
-  document.getElementById('kpiTotal').textContent=allRows.length.toLocaleString();
-  document.getElementById('kpiAllocated').textContent=allRows.filter(r=>r.status==='Allocated').length.toLocaleString();
-  document.getElementById('kpiMismatch').textContent=allRows.filter(r=>r.status&&r.status.includes('mismatch')).length.toLocaleString();
-  document.getElementById('kpiOutside').textContent=allRows.filter(r=>r.status&&r.status.includes('Outside')).length.toLocaleString();
+function clearFilters(){
+  document.getElementById('searchBox').value='';
+  ['fltStatus','fltSpecies','fltField','fltFieldZone','fltFieldPct'].forEach(id=>document.getElementById(id).value='');
+  applyFilters();
 }
 
-function setView(v){
-  curView=v;
-  document.getElementById('vt-g').classList.toggle('active',v==='g');
-  document.getElementById('vt-l').classList.toggle('active',v==='l');
-  document.getElementById('tgrid').style.display=v==='g'?'grid':'none';
-  document.getElementById('tlist').style.display=v==='l'?'flex':'none';
-  renderPage();
+// ── View switching ─────────────────────────────────────────────────────────
+function switchView(v){
+  curMainView=v;
+  document.getElementById('vt-field').classList.toggle('active',v==='field');
+  document.getElementById('vt-tree').classList.toggle('active',v==='tree');
+  document.getElementById('fieldFilters').style.display=v==='field'?'flex':'none';
+  document.getElementById('treeFilters').style.display=v==='tree'?'flex':'none';
+  document.getElementById('sizeToggle').style.display=v==='tree'?'flex':'none';
+  document.getElementById('layoutToggle').style.display=v==='tree'?'flex':'none';
+  document.getElementById('fieldView').style.display=v==='field'?'block':'none';
+  document.getElementById('treeView').style.display=v==='tree'?'block':'none';
+  document.getElementById('viewSubLabel').textContent=v==='field'?'Field \u00b7 Compliance \u00b7 Overview':'Tree \u00b7 Spatial \u00b7 Allocation';
+  destroyMaps();applyFilters();
 }
-
-function setSize(s){
-  curSize=s;
-  document.querySelectorAll('.vtg .vb').forEach(b=>{if(['S','M','L'].includes(b.textContent.trim()))b.classList.remove('active');});
-  event.target.classList.add('active');
-  const g=document.getElementById('tgrid');
-  g.className='tree-grid'+(s==='s'?' gs':s==='l'?' gl':'');
-  renderPage();
-}
-
+function setLayout(l){curLayout=l;document.getElementById('vt-g').classList.toggle('active',l==='g');document.getElementById('vt-l').classList.toggle('active',l==='l');renderCurrentView();}
+function setSize(s){curSize=s;renderCurrentView();}
 function changePage(d){
-  const tp=Math.ceil(filtered.length/PAGE);
+  const src=curMainView==='field'?filteredFields:filteredTrees;
+  const tp=Math.ceil(src.length/PAGE);
   currentPage=Math.max(1,Math.min(tp,currentPage+d));
-  document.getElementById('cs').scrollTop=0;
-  Object.values(maps).forEach(m=>m.remove());maps={};
-  renderPage();
+  destroyMaps();
+  document.getElementById(curMainView==='field'?'fieldView':'treeView').scrollTop=0;
+  renderCurrentView();
 }
+function destroyMaps(){
+  Object.values(fieldMaps).forEach(m=>{try{m.remove();}catch(e){}});fieldMaps={};
+  Object.values(treeMaps).forEach(m=>{try{m.remove();}catch(e){}});treeMaps={};
+  if(observer){observer.disconnect();observer=null;}
+}
+function renderCurrentView(){if(curMainView==='field')renderFieldPage();else renderTreePage();}
 
-function renderPage(){
-  const start=(currentPage-1)*PAGE,page=filtered.slice(start,start+PAGE),total=filtered.length;
-  const tp=Math.ceil(total/PAGE);
+// ── Field view ─────────────────────────────────────────────────────────────
+function renderFieldPage(){
+  const start=(currentPage-1)*PAGE,page=filteredFields.slice(start,start+PAGE),total=filteredFields.length,tp=Math.ceil(total/PAGE);
   document.getElementById('pi').textContent=total===0?'No results':`${(start+1).toLocaleString()}–${Math.min(start+PAGE,total).toLocaleString()} of ${total.toLocaleString()}`;
-  document.getElementById('bprev').disabled=currentPage<=1;
-  document.getElementById('bnext').disabled=currentPage>=tp;
-  const em=document.getElementById('empty');
-  if(!page.length){em.style.display='';return;}
-  em.style.display='none';
-  if(curView==='g')renderGrid(page);else renderList(page);
+  document.getElementById('bprev').disabled=currentPage<=1;document.getElementById('bnext').disabled=currentPage>=tp;
+  document.getElementById('fieldEmpty').style.display=page.length?'none':'';
+
+  // Destroy old maps
+  Object.values(fieldMaps).forEach(m=>{try{m.remove();}catch(e){}});fieldMaps={};
+  if(observer){observer.disconnect();observer=null;}
+
+  document.getElementById('fieldGrid').innerHTML=page.map((fc,i)=>{
+    const tot=fc.trees.length,pct=tot?Math.round(fc.allocated/tot*100):0;
+    const cls=pct>=90?'high':pct>=70?'mid':'low';
+    const hasGeo=fc.field.ring&&fc.field.ring.length>0;
+    return`<div class="fc p${cls[0]}" onclick="drillIntoField('${esc(fc.field.fieldId)}')">
+      ${hasGeo?`<div class="fm" id="fm-${i}" data-idx="${i}"><div class="fm-ph"><span style="font-size:20px">🗺</span>Loading map…</div></div>`
+               :`<div class="fno-geo">No polygon geometry</div>`}
+      <div class="fb">
+        <div class="fid">${esc(fc.field.fieldId)}</div>
+        <div class="fowner">${esc(fc.field.owner)||'<span style="color:var(--muted)">Unknown owner</span>'}</div>
+        ${fc.field.zone?`<div class="fzone">Zone: ${esc(fc.field.zone)}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px">
+          <div><div class="fpct ${cls}">${pct}%</div><div class="fpct-lbl">Compliance</div></div>
+          <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
+            <span class="fstat g">${fc.allocated.toLocaleString()} allocated</span>
+            ${fc.mismatch>0?`<span class="fstat a">${fc.mismatch.toLocaleString()} mismatch</span>`:''}
+            ${fc.outside>0?`<span class="fstat r">${fc.outside.toLocaleString()} outside</span>`:''}
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:5px">${tot.toLocaleString()} trees total</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // IntersectionObserver for lazy map loading
+  observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting)return;
+      const el=entry.target,idx=parseInt(el.dataset.idx),fc=page[idx];
+      if(!fc||!fc.field.ring)return;
+      observer.unobserve(el);initFieldMap(el,fc,idx);
+    });
+  },{rootMargin:'120px'});
+
+  page.forEach((fc,i)=>{
+    if(!fc.field.ring)return;
+    const el=document.getElementById(`fm-${i}`);if(el)observer.observe(el);
+  });
 }
 
-function renderGrid(page){
-  Object.values(maps).forEach(m=>m.remove());maps={};
+function initFieldMap(container,fc,idx){
+  container.innerHTML='';
+  try{
+    const m=L.map(container,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(m);
+
+    // Polygon
+    const latLngs=fc.field.ring.map(c=>[c[1],c[0]]);
+    const poly=L.polygon(latLngs,{color:'#38bdf8',weight:2,fillColor:'#38bdf8',fillOpacity:0.08,dashArray:'6,4'}).addTo(m);
+
+    // Trees — cap at 200, sampled proportionally
+    const trees=fc.trees,step=trees.length>200?Math.ceil(trees.length/200):1;
+    trees.forEach((r,i)=>{
+      if(i%step!==0||r.lat===null||r.lng===null)return;
+      const col=r.status==='Allocated'?'#22c55e':r.status&&r.status.includes('mismatch')?'#f59e0b':'#ef4444';
+      L.circleMarker([r.lat,r.lng],{radius:3.5,color:'rgba(255,255,255,0.6)',weight:0.8,fillColor:col,fillOpacity:0.9}).addTo(m);
+    });
+
+    m.fitBounds(poly.getBounds(),{padding:[6,6]});
+    fieldMaps[`fm-${idx}`]=m;
+
+    // Legend overlay
+    const legend=document.createElement('div');
+    legend.className='map-legend';
+    legend.innerHTML=`<div class="ml-row"><div class="ml-dot" style="background:#22c55e"></div><span style="color:var(--muted)">Allocated</span></div>
+      <div class="ml-row"><div class="ml-dot" style="background:#f59e0b"></div><span style="color:var(--muted)">Mismatch</span></div>
+      <div class="ml-row"><div class="ml-dot" style="background:#ef4444"></div><span style="color:var(--muted)">Outside</span></div>`;
+    container.appendChild(legend);
+  }catch(e){container.innerHTML='<div class="fm-ph" style="color:var(--red)">Map error</div>';}
+}
+
+function drillIntoField(fieldId){
+  switchView('tree');
+  document.getElementById('fltField').value=fieldId;
+  applyFilters();
+}
+
+// ── Tree view ──────────────────────────────────────────────────────────────
+function renderTreePage(){
+  const start=(currentPage-1)*PAGE,page=filteredTrees.slice(start,start+PAGE),total=filteredTrees.length,tp=Math.ceil(total/PAGE);
+  document.getElementById('pi').textContent=total===0?'No results':`${(start+1).toLocaleString()}–${Math.min(start+PAGE,total).toLocaleString()} of ${total.toLocaleString()}`;
+  document.getElementById('bprev').disabled=currentPage<=1;document.getElementById('bnext').disabled=currentPage>=tp;
+  document.getElementById('treeEmpty').style.display=page.length?'none':'';
+  Object.values(treeMaps).forEach(m=>{try{m.remove();}catch(e){}});treeMaps={};
+  if(curLayout==='g')renderTreeGrid(page);else renderTreeList(page);
+}
+
+function renderTreeGrid(page){
+  document.getElementById('tgrid').style.display='grid';
+  document.getElementById('tlist').style.display='none';
+  const g=document.getElementById('tgrid');
+  g.className='tree-grid'+(curSize==='s'?' gs':curSize==='l'?' gl':'');
   const mh=curSize==='s'?'cms':curSize==='l'?'cml':'';
-  document.getElementById('tgrid').innerHTML=page.map((r,i)=>{
-    const sc=sCls(r.status),bd=sBadge(r.status),hc=r.lat!==null&&r.lng!==null;
+  g.innerHTML=page.map((r,i)=>{
+    const sc=sCls(r.status),hc=r.lat!==null&&r.lng!==null;
     return`<div class="tc ${sc}" onclick="detail('${esc(r.treeCode)}')">
-      <div class="cm ${mh}" id="m${i}">${hc?'':'<div class="nco">No coordinates</div>'}</div>
+      <div class="cm ${mh}" id="tm${i}">${hc?'':'<div class="nco">No coordinates</div>'}</div>
       <div class="cb">
         <div class="cc">${esc(r.treeCode)}</div>
         <div class="csp">${esc(r.species)||'<span style="color:var(--muted)">Unknown</span>'}</div>
         <div class="cf">${esc(r.matchedFieldId||r.treeField)||'—'}</div>
-        <div class="cft">${bd}<span class="ca">${r.accuracy!==null?r.accuracy.toFixed(1)+'m':''}</span></div>
+        <div class="cft">${sBadge(r.status)}<span class="ca">${r.accuracy!==null?r.accuracy.toFixed(1)+'m':''}</span></div>
       </div></div>`;
   }).join('');
+
   requestAnimationFrame(()=>{
     page.forEach((r,i)=>{
       if(r.lat===null||r.lng===null)return;
-      const el=document.getElementById(`m${i}`);if(!el)return;
+      const el=document.getElementById(`tm${i}`);if(!el)return;
+      const fieldObj=allFields.find(f=>f.fieldId===r.matchedFieldId);
       try{
         const m=L.map(el,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false});
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(m);
-        const col=r.status==='Allocated'?'#22c55e':r.status&&r.status.includes('mismatch')?'#f59e0b':'#ef4444';
-        L.marker([r.lat,r.lng],{icon:L.divIcon({className:'',html:`<div style="background:${col};width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.6)"></div>`,iconSize:[10,10],iconAnchor:[5,5]})}).addTo(m);
-        m.setView([r.lat,r.lng],15);maps[`m${i}`]=m;
+        if(fieldObj&&fieldObj.ring){
+          const ll=fieldObj.ring.map(c=>[c[1],c[0]]);
+          const poly=L.polygon(ll,{color:'#38bdf8',weight:1.5,fillColor:'#38bdf8',fillOpacity:0.06,dashArray:'5,4'}).addTo(m);
+          const col=r.status==='Allocated'?'#22c55e':r.status&&r.status.includes('mismatch')?'#f59e0b':'#ef4444';
+          L.circleMarker([r.lat,r.lng],{radius:6,color:'#fff',weight:1.5,fillColor:col,fillOpacity:1}).addTo(m);
+          m.fitBounds(poly.getBounds(),{padding:[4,4]});
+        }else{
+          const col=r.status==='Allocated'?'#22c55e':r.status&&r.status.includes('mismatch')?'#f59e0b':'#ef4444';
+          L.circleMarker([r.lat,r.lng],{radius:6,color:'#fff',weight:1.5,fillColor:col,fillOpacity:1}).addTo(m);
+          m.setView([r.lat,r.lng],15);
+        }
+        treeMaps[`tm${i}`]=m;
       }catch(e){}
     });
   });
 }
 
-function renderList(page){
+function renderTreeList(page){
+  document.getElementById('tgrid').style.display='none';
+  document.getElementById('tlist').style.display='flex';
   document.getElementById('tlist').innerHTML=page.map(r=>`
     <div class="li">
       <span class="lc">${esc(r.treeCode)}</span>
-      <span class="lsp">${esc(r.species)||'—'}</span>
+      <span>${esc(r.species)||'—'}</span>
       <span class="lf">${esc(r.matchedFieldId||r.treeField)||'—'}</span>
-      <span class="lco">${r.lat!==null?`${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}`:'<span style="color:var(--red)">No coords</span>'}</span>
+      <span class="lco">${r.lat!==null?r.lat.toFixed(5)+', '+r.lng.toFixed(5):'<span style="color:var(--red)">No coords</span>'}</span>
       <span>${sBadge(r.status)}</span>
     </div>`).join('');
 }
 
+// ── KPIs & badge helpers ───────────────────────────────────────────────────
+function updateKPIs(){
+  document.getElementById('kpiFields').textContent=fieldCards.length.toLocaleString();
+  document.getElementById('kpiTotal').textContent=allRows.length.toLocaleString();
+  document.getElementById('kpiAllocated').textContent=allRows.filter(r=>r.status==='Allocated').length.toLocaleString();
+  document.getElementById('kpiMismatch').textContent=allRows.filter(r=>r.status&&r.status.includes('mismatch')).length.toLocaleString();
+  document.getElementById('kpiOutside').textContent=allRows.filter(r=>r.status&&r.status.includes('Outside')).length.toLocaleString();
+}
 function sCls(s){if(!s)return'';if(s==='Allocated')return'sa';if(s.includes('mismatch'))return'sm';if(s==='Outside polygon but field tagged')return'st';if(s.includes('Outside'))return'so';return'';}
-function sBadge(s){if(!s)return'<span class="badge missing">—</span>';const c=s==='Allocated'?'allocated':s.includes('mismatch')?'mismatch':s==='Outside polygon but field tagged'?'outside-tagged':s.includes('Outside')?'outside':'missing';const l=s==='Allocated'?'Allocated':s==='Allocated - Field mismatch'?'Field Mismatch':s==='Allocated - Owner mismatch'?'Owner Mismatch':s==='Outside polygon but field tagged'?'Outside+Tagged':s.includes('Outside')?'Outside':s;return`<span class="badge ${c}">${esc(l)}</span>`;}
-function esc(s){if(s===undefined||s===null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function detail(code){const r=allRows.find(x=>x.treeCode===code);if(!r)return;alert(`Tree: ${r.treeCode}\nSpecies: ${r.species}\nStatus: ${r.status}\nField: ${r.matchedFieldId||r.treeField||'—'}\nOwner: ${r.treeOwner||'—'}\nCoords: ${r.lat!==null?r.lat.toFixed(6)+', '+r.lng.toFixed(6):'Missing'}\nAccuracy: ${r.accuracy!==null?r.accuracy.toFixed(1)+'m':'—'}`);}
-
-const zone=document.getElementById('uploadZone');
-zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
-zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
-zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');loadFile(e.dataTransfer.files[0]);});
-
-// ── Auto-load from Active Tree Catalog via IndexedDB ────────────────────────
-// Uses the same IndexedDB as the main catalog (ccs_tree_catalog / cache store)
-// Key: 'tree_catalog_passthrough' — written by openTreeCatalog() in v7
-// Falls back to localStorage for backwards compatibility, then shows upload
-
-const TC_DB_NAME = 'ccs_tree_catalog';
-const TC_DB_VER  = 1;
-
-function tcOpenDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(TC_DB_NAME, TC_DB_VER);
-    req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('cache')) {
-        db.createObjectStore('cache', { keyPath: 'key' });
-      }
-    };
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
-  });
+function sBadge(s){
+  if(!s)return'<span class="badge missing">—</span>';
+  const c=s==='Allocated'?'allocated':s.includes('mismatch')?'mismatch':s==='Outside polygon but field tagged'?'outside-tagged':s.includes('Outside')?'outside':'missing';
+  const l=s==='Allocated'?'Allocated':s==='Allocated - Field mismatch'?'Field Mismatch':s==='Outside polygon but field tagged'?'Outside+Tagged':s.includes('Outside')?'Outside':s;
+  return`<span class="badge ${c}">${esc(l)}</span>`;
+}
+function detail(code){
+  const r=allRows.find(x=>x.treeCode===code);if(!r)return;
+  alert(`Tree: ${r.treeCode}\nSpecies: ${r.species}\nStatus: ${r.status}\nField: ${r.matchedFieldId||r.treeField||'—'}\nOwner: ${r.treeOwner||'—'}\nCoords: ${r.lat!==null?r.lat.toFixed(6)+', '+r.lng.toFixed(6):'Missing'}\nAccuracy: ${r.accuracy!==null?r.accuracy.toFixed(1)+'m':'—'}`);
 }
 
-async function tcLoadFromDB() {
-  try {
-    const db = await tcOpenDB();
-    return new Promise((resolve) => {
-      const tx  = db.transaction('cache', 'readonly');
-      const req = tx.objectStore('cache').get('tree_catalog_passthrough');
-      req.onsuccess = e => {
-        const rec = e.target.result;
-        // Accept data up to 24 hours old
-        if (rec && rec.value && Date.now() - rec.value.ts < 86400000) {
-          resolve(rec.value.rows);
-        } else {
-          resolve(null);
-        }
-      };
-      req.onerror = () => resolve(null);
-    });
-  } catch(e) { return null; }
-}
+// ── Drag & drop ────────────────────────────────────────────────────────────
+const uploadZone=document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover',e=>{e.preventDefault();uploadZone.classList.add('drag');});
+uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop',e=>{e.preventDefault();uploadZone.classList.remove('drag');loadFile(e.dataTransfer.files[0]);});
 
-(async function tryLoadFromCatalog() {
-  // 1. Try IndexedDB first (handles 456k+ trees, no size limit)
-  const rows = await tcLoadFromDB();
-  if (rows && Array.isArray(rows) && rows.length) {
-    allRows = rows;
-    buildIdx(); populateFilters(); updateKPIs();
-    document.getElementById('uploadWrap').style.display = 'none';
-    document.getElementById('cw').classList.add('show');
-    applyFilters();
-    setStatus(`✓ ${allRows.length.toLocaleString()} trees loaded from Active Tree Catalog`, true);
+// ── Auto-load from IndexedDB ───────────────────────────────────────────────
+(async function tryLoadFromCatalog(){
+  const cached=await tcLoadFromDB();
+  if(cached&&Array.isArray(cached.rows)&&cached.rows.length){
+    allRows=cached.rows;allFields=cached.fields||[];
+    initialise();
+    setStatus('Loaded '+allRows.length.toLocaleString()+' trees, '+allFields.length.toLocaleString()+' fields',true);
     return;
   }
-
-  // 2. Fall back to localStorage (older sessions / small datasets)
-  try {
-    const raw = localStorage.getItem('ccs_tree_allocation');
-    if (raw) {
-      const lsRows = JSON.parse(raw);
-      if (Array.isArray(lsRows) && lsRows.length) {
-        allRows = lsRows;
-        buildIdx(); populateFilters(); updateKPIs();
-        document.getElementById('uploadWrap').style.display = 'none';
-        document.getElementById('cw').classList.add('show');
-        applyFilters();
-        setStatus(`✓ ${allRows.length.toLocaleString()} trees loaded from Active Tree Catalog`, true);
-        return;
-      }
-    }
-  } catch(e) {}
-
-  // 3. Nothing available — show upload prompt (normal first-use flow)
+  // localStorage fallback
+  try{
+    const raw=localStorage.getItem('ccs_tree_allocation');
+    if(raw){const lr=JSON.parse(raw);if(Array.isArray(lr)&&lr.length){allRows=lr;allFields=[];initialise();setStatus('Loaded '+allRows.length.toLocaleString()+' trees (no polygon data — re-open from main catalog)',true);return;}}
+  }catch(e){}
+  document.getElementById('uploadWrap').style.display='flex';
 })();
 </script>
 </body>

@@ -2109,24 +2109,32 @@ async function openTreeCatalog() {
   }
   if (!data.length) { alert("Connect to Fieldforce and run allocation first."); return; }
 
-  // Store only the fields tree-catalog.html actually uses — keeps payload lean
+  // Slim trees — only fields tree-catalog.html needs
   const slim = data.map(r => ({
-    treeCode:      r.treeCode,
-    species:       r.species,
-    lat:           r.lat,
-    lng:           r.lng,
-    treeField:     r.treeField,
-    treeOwner:     r.fieldOwner || r.treeOwner || '',
+    treeCode:       r.treeCode,
+    species:        r.species,
+    lat:            r.lat,
+    lng:            r.lng,
+    treeField:      r.treeField,
+    treeOwner:      r.fieldOwner || r.treeOwner || '',
     matchedFieldId: r.matchedFieldId,
-    status:        r.status,
-    accuracy:      r.accuracy,
-    createdOn:     r.createdOn
+    status:         r.status,
+    accuracy:       r.accuracy,
+    createdOn:      r.createdOn
   }));
 
-  // Write to IndexedDB (no size limit — handles 456k+ trees)
-  // tree-catalog.html reads from the same DB under key 'tree_catalog_passthrough'
+  // Slim fields — include pre-parsed ring for polygon drawing in tree catalog
+  const slimFields = fieldsData.map(f => ({
+    fieldId: f.fieldId,
+    owner:   f.owner,
+    nrc:     f.nrc   || '',
+    zone:    f.zone  || '',
+    ring:    f.ring  || null   // pre-parsed coordinate array — no re-parsing needed
+  })).filter(f => f.ring); // only fields with valid geometry
+
+  // Write both to IndexedDB
   try {
-    await cacheSet('tree_catalog_passthrough', { rows: slim, ts: Date.now() });
+    await cacheSet('tree_catalog_passthrough', { rows: slim, fields: slimFields, ts: Date.now() });
   } catch(e) {
     console.warn('IndexedDB write failed, falling back to localStorage:', e);
     try { localStorage.setItem('ccs_tree_allocation', JSON.stringify(slim)); } catch(le) {}
