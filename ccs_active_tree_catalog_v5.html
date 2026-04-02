@@ -620,7 +620,6 @@ table.catalog tr.selected td { background: var(--green-bg); }
           <option value="">All statuses</option>
           <option value="Allocated">Allocated</option>
           <option value="Allocated - Field mismatch">Field mismatch</option>
-          <option value="Allocated - Owner mismatch">Owner mismatch</option>
           <option value="Outside polygon">Outside polygon</option>
           <option value="Outside polygon but field tagged">Outside + field tagged</option>
         </select>
@@ -1336,22 +1335,13 @@ function determineStatus(tree, matchedField, insideFlag) {
     return tree.treeField ? 'Outside polygon but field tagged' : 'Outside polygon';
   }
   if (insideFlag) {
+    // Status is determined solely by field ID match
+    // Owner is shown as an informational column but does not affect status
+    // because field owner is stored as a contact record name which rarely
+    // matches the plain text on the tree record
     const fieldMatch = matchedField &&
       tree.treeField.toLowerCase().trim() === matchedField.fieldId.toLowerCase().trim();
-
-    // Owner comparison: use partial match since field stores contact name
-    // and tree stores plain text which may differ in format
-    const treeOwner  = tree.fieldOwner.toLowerCase().trim();
-    const fieldOwner = matchedField ? matchedField.owner.toLowerCase().trim() : '';
-    const ownerMatch = matchedField && treeOwner && fieldOwner &&
-      (treeOwner === fieldOwner ||
-       treeOwner.includes(fieldOwner) ||
-       fieldOwner.includes(treeOwner));
-
-    if (fieldMatch && ownerMatch)  return 'Allocated';
-    if (!fieldMatch && ownerMatch) return 'Allocated - Field mismatch';
-    if (fieldMatch && !ownerMatch) return 'Allocated - Owner mismatch';
-    return 'Allocated - Field mismatch';
+    return fieldMatch ? 'Allocated' : 'Allocated - Field mismatch';
   }
   return 'Outside polygon';
 }
