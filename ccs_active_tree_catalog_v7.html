@@ -1060,14 +1060,15 @@ async function dvFetchAll(token, url, label, includeAnnotations = false) {
 }
 
 async function fetchAllFields(token) {
-  // ccs_contactid_field confirmed working against live API (v5/v6)
-  // ccs_fieldowner_field schema name unconfirmed -- removed to avoid HTTP 400
-  // ccs_nrclookup / ccs_zone_field -- schema names need live API verification
-  // TODO: add NRC + Zone once correct schema names confirmed via API metadata
+  // Confirmed OData column names from Power Apps Relationships view 2026-04-02:
+  // Field Owner = ccs_field_FieldOwner_field_contact -> _ccs_fieldowner_field_value
+  // NRC Lookup  = ccs_field_NRCLookup_contact       -> _ccs_nrclookup_value
+  // Both are contact lookups -- use FormattedValue for display name / NRC number
   const select = [
     'ccs_cssfieldid_field',
     'ccs_fieldgeojson_field',
-    'ccs_contactid_field',
+    '_ccs_fieldowner_field_value',
+    '_ccs_nrclookup_value',
     'ccs_fieldsizem2_field',
     'createdon'
   ].join(',');
@@ -1082,14 +1083,17 @@ async function fetchAllFields(token) {
     guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
     fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
     geoJSON: String(r.ccs_fieldgeojson_field || ''),
-    // Owner display name - ccs_contactid_field confirmed working
+    // Field Owner display name -- contact lookup, resolved via FormattedValue
     owner:   String(
-      r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
-      || r.ccs_contactid_field || ''
+      r['_ccs_fieldowner_field_value@OData.Community.Display.V1.FormattedValue']
+      || ''
     ),
-    // NRC and Zone: schema names need verification against live API
-    // Set to empty for now -- will add once column names confirmed
-    nrc:     '',
+    // NRC -- contact lookup to the farmer's NRC contact record, display name = NRC number
+    nrc:     String(
+      r['_ccs_nrclookup_value@OData.Community.Display.V1.FormattedValue']
+      || ''
+    ).trim(),
+    // Zone: schema name still unconfirmed -- set empty until verified
     zone:    '',
     size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
     ring:    null
