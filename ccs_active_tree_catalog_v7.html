@@ -694,20 +694,28 @@ table.catalog tr.selected td { background: var(--green-bg); }
       </div>
     </div>
 
-    <!-- Excluded Fields -->
-    <div class="sb-section" id="excludedSection">
-      <span class="sb-label" style="color:var(--red)">Excluded Polygons <span id="excludedCount" style="color:var(--red)"></span></span>
-      <div style="font-size:9px;color:var(--muted);margin-bottom:6px;line-height:1.5">
-        Excluded from spatial matching — trees fall back to their admin field tag.
+    <!-- Excluded Fields — collapsible -->
+    <div class="sb-section" id="excludedSection" style="padding-bottom:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer"
+           onclick="toggleExcluded()">
+        <span class="sb-label" style="color:var(--red);margin-bottom:0">
+          Excluded Polygons <span id="excludedCount" style="color:var(--red)"></span>
+        </span>
+        <span id="excludedToggle" style="font-size:10px;color:var(--red)">▼</span>
       </div>
-      <div id="excludedList" style="margin-bottom:6px"></div>
-      <div class="btn-row">
-        <input type="text" id="excludeInput" placeholder="FLD-XXXXX…"
-          style="flex:1;font-size:9px;padding:4px 6px"
-          onkeydown="if(event.key==='Enter')addExclusion()"/>
-        <button class="btn btn-red" onclick="addExclusion()" style="font-size:9px;padding:5px 8px">+ Exclude</button>
+      <div id="excludedBody" style="display:none;margin-top:6px">
+        <div style="font-size:9px;color:var(--muted);margin-bottom:6px;line-height:1.5">
+          Excluded from spatial matching — trees fall back to their admin field tag.
+        </div>
+        <div id="excludedList" style="margin-bottom:6px"></div>
+        <div class="btn-row">
+          <input type="text" id="excludeInput" placeholder="FLD-XXXXX…"
+            style="flex:1;font-size:9px;padding:4px 6px"
+            onkeydown="if(event.key==='Enter')addExclusion()"/>
+          <button class="btn btn-red" onclick="addExclusion()" style="font-size:9px;padding:5px 8px">+ Exclude</button>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:5px">Re-run allocation to apply changes.</div>
       </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:5px">Re-run allocation to apply changes.</div>
     </div>
 
     <!-- Field list (for map view) -->
@@ -2202,6 +2210,14 @@ function clearAll() {
 // ═══════════════════════════════════════════════════════════════════════════
 // EXCLUDED POLYGON MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
+
+function toggleExcluded() {
+  const body   = document.getElementById('excludedBody');
+  const toggle = document.getElementById('excludedToggle');
+  const open   = body.style.display === 'none';
+  body.style.display  = open ? 'block' : 'none';
+  toggle.textContent  = open ? '▲' : '▼';
+}
 
 function renderExcludedList() {
   const list = document.getElementById('excludedList');
