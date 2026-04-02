@@ -336,25 +336,79 @@ zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag
 zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
 zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');loadFile(e.dataTransfer.files[0]);});
 
-// ── Auto-load from Active Tree Catalog if data is in localStorage ──────────
-(function tryLoadFromCatalog() {
+// ── Auto-load from Active Tree Catalog via IndexedDB ────────────────────────
+// Uses the same IndexedDB as the main catalog (ccs_tree_catalog / cache store)
+// Key: 'tree_catalog_passthrough' — written by openTreeCatalog() in v7
+// Falls back to localStorage for backwards compatibility, then shows upload
+
+const TC_DB_NAME = 'ccs_tree_catalog';
+const TC_DB_VER  = 1;
+
+function tcOpenDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(TC_DB_NAME, TC_DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('cache')) {
+        db.createObjectStore('cache', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function tcLoadFromDB() {
   try {
-    const raw = localStorage.getItem('ccs_tree_allocation');
-    if (!raw) return;
-    const rows = JSON.parse(raw);
-    if (!Array.isArray(rows) || !rows.length) return;
-    // Data is already in allocation format — load directly, skip file upload
+    const db = await tcOpenDB();
+    return new Promise((resolve) => {
+      const tx  = db.transaction('cache', 'readonly');
+      const req = tx.objectStore('cache').get('tree_catalog_passthrough');
+      req.onsuccess = e => {
+        const rec = e.target.result;
+        // Accept data up to 24 hours old
+        if (rec && rec.value && Date.now() - rec.value.ts < 86400000) {
+          resolve(rec.value.rows);
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    });
+  } catch(e) { return null; }
+}
+
+(async function tryLoadFromCatalog() {
+  // 1. Try IndexedDB first (handles 456k+ trees, no size limit)
+  const rows = await tcLoadFromDB();
+  if (rows && Array.isArray(rows) && rows.length) {
     allRows = rows;
-    buildIdx();
-    populateFilters();
-    updateKPIs();
+    buildIdx(); populateFilters(); updateKPIs();
     document.getElementById('uploadWrap').style.display = 'none';
     document.getElementById('cw').classList.add('show');
     applyFilters();
     setStatus(`✓ ${allRows.length.toLocaleString()} trees loaded from Active Tree Catalog`, true);
-  } catch(e) {
-    // localStorage unavailable or corrupt — show upload screen as normal
+    return;
   }
+
+  // 2. Fall back to localStorage (older sessions / small datasets)
+  try {
+    const raw = localStorage.getItem('ccs_tree_allocation');
+    if (raw) {
+      const lsRows = JSON.parse(raw);
+      if (Array.isArray(lsRows) && lsRows.length) {
+        allRows = lsRows;
+        buildIdx(); populateFilters(); updateKPIs();
+        document.getElementById('uploadWrap').style.display = 'none';
+        document.getElementById('cw').classList.add('show');
+        applyFilters();
+        setStatus(`✓ ${allRows.length.toLocaleString()} trees loaded from Active Tree Catalog`, true);
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // 3. Nothing available — show upload prompt (normal first-use flow)
 })();
 </script>
 </body>

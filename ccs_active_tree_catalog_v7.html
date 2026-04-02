@@ -731,23 +731,23 @@ table.catalog tr.selected td { background: var(--green-bg); }
           Filtering…
         </span>
         <div style="flex:1"></div>
-        <button class="btn btn-secondary" onclick="sortBy('status')" style="font-size:9px">Sort: Status</button>
-        <button class="btn btn-secondary" onclick="sortBy('field')"  style="font-size:9px">Sort: Field</button>
+        <button class="btn btn-secondary" id="sortBtnStatus" onclick="sortBy('status')" style="font-size:9px">Sort: Status ▼</button>
+        <button class="btn btn-secondary" id="sortBtnField"  onclick="sortBy('matchedFieldId')" style="font-size:9px">Sort: Field</button>
       </div>
       <div class="catalog-table-wrap">
         <table class="catalog" id="catalogTable">
           <thead>
             <tr>
-              <th onclick="sortBy('treeCode')">#  Tree Code</th>
-              <th onclick="sortBy('species')">Species</th>
-              <th onclick="sortBy('treeField')">Tree Field</th>
-              <th onclick="sortBy('matchedField')">Matched Field</th>
-              <th onclick="sortBy('fieldMatch')">Field ✓</th>
-              <th onclick="sortBy('ownerMatch')">Owner ✓</th>
-              <th onclick="sortBy('status')">Status</th>
+              <th onclick="sortBy('treeCode')"       id="th-treeCode">#  Tree Code</th>
+              <th onclick="sortBy('species')"        id="th-species">Species</th>
+              <th onclick="sortBy('treeField')"      id="th-treeField">Tree Field</th>
+              <th onclick="sortBy('matchedFieldId')" id="th-matchedFieldId">Matched Field</th>
+              <th onclick="sortBy('fieldMatch')"     id="th-fieldMatch">Field ✓</th>
+              <th onclick="sortBy('ownerMatch')"     id="th-ownerMatch">Owner ✓</th>
+              <th onclick="sortBy('status')"         id="th-status">Status</th>
               <th>Coordinates</th>
-              <th onclick="sortBy('accuracy')">Accuracy</th>
-              <th onclick="sortBy('createdOn')">Created</th>
+              <th onclick="sortBy('accuracy')"       id="th-accuracy">Accuracy</th>
+              <th onclick="sortBy('createdOn')"      id="th-createdOn">Created</th>
             </tr>
           </thead>
           <tbody id="catalogBody">
@@ -1729,6 +1729,23 @@ function esc(s) {
 function sortBy(col) {
   if (sortCol === col) sortDir = -sortDir;
   else { sortCol = col; sortDir = 1; }
+
+  // Update column header visual indicators
+  const sortableCols = ['treeCode','species','treeField','matchedFieldId','fieldMatch','ownerMatch','status','accuracy','createdOn'];
+  sortableCols.forEach(c => {
+    const th = document.getElementById('th-' + c);
+    if (!th) return;
+    const base = th.textContent.replace(/ [▲▼]$/, '');
+    th.textContent = c === col ? base + (sortDir === 1 ? ' ▲' : ' ▼') : base;
+    th.classList.toggle('sorted', c === col);
+  });
+
+  // Update toolbar sort buttons
+  const btnStatus = document.getElementById('sortBtnStatus');
+  const btnField  = document.getElementById('sortBtnField');
+  if (btnStatus) btnStatus.textContent = 'Sort: Status' + (col === 'status' ? (sortDir === 1 ? ' ▲' : ' ▼') : '');
+  if (btnField)  btnField.textContent  = 'Sort: Field'  + (col === 'matchedFieldId' ? (sortDir === 1 ? ' ▲' : ' ▼') : '');
+
   applyFilters();
 }
 
@@ -2064,14 +2081,37 @@ function clearFilters() {
 }
 
 
-function openTreeCatalog() {
+async function openTreeCatalog() {
   // Use allocation if available, fall back to raw treesData mapped to basic shape
   let data = allocation;
   if (!data.length && treesData.length) {
     data = treesData.map(t => ({ ...t, status: '', matchedFieldId: t.treeField, insidePolygon: false }));
   }
   if (!data.length) { alert("Connect to Fieldforce and run allocation first."); return; }
-  try { localStorage.setItem("ccs_tree_allocation", JSON.stringify(data)); } catch(e) {}
+
+  // Store only the fields tree-catalog.html actually uses — keeps payload lean
+  const slim = data.map(r => ({
+    treeCode:      r.treeCode,
+    species:       r.species,
+    lat:           r.lat,
+    lng:           r.lng,
+    treeField:     r.treeField,
+    treeOwner:     r.fieldOwner || r.treeOwner || '',
+    matchedFieldId: r.matchedFieldId,
+    status:        r.status,
+    accuracy:      r.accuracy,
+    createdOn:     r.createdOn
+  }));
+
+  // Write to IndexedDB (no size limit — handles 456k+ trees)
+  // tree-catalog.html reads from the same DB under key 'tree_catalog_passthrough'
+  try {
+    await cacheSet('tree_catalog_passthrough', { rows: slim, ts: Date.now() });
+  } catch(e) {
+    console.warn('IndexedDB write failed, falling back to localStorage:', e);
+    try { localStorage.setItem('ccs_tree_allocation', JSON.stringify(slim)); } catch(le) {}
+  }
+
   window.open("tree-catalog.html", "_blank");
 }
 
