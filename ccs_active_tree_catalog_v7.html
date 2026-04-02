@@ -828,7 +828,7 @@ table.catalog tr.selected td { background: var(--green-bg); }
               <th>Owner ✓</th>
               <th>Status</th>
               <th>Coordinates</th>
-              <th>Tree Owner</th>
+              <th>Submitted By</th>
             </tr>
           </thead>
           <tbody id="excBody">
@@ -1060,21 +1060,41 @@ async function dvFetchAll(token, url, label, includeAnnotations = false) {
 }
 
 async function fetchAllFields(token) {
-  // Confirmed column names — include ccs_fieldowner_field (plain text) alongside contact lookup
-  const select = 'ccs_cssfieldid_field,ccs_fieldgeojson_field,ccs_contactid_field,ccs_fieldsizem2_field,createdon';
+  // ccs_fieldowner_field = contact lookup -> use FormattedValue for display name
+  // ccs_nrclookup        = NRC directly on field record -> use for owner matching
+  // ccs_zone_field       = zone lookup -> use FormattedValue for zone name
+  const select = [
+    'ccs_cssfieldid_field',
+    'ccs_fieldgeojson_field',
+    'ccs_fieldowner_field',
+    'ccs_nrclookup',
+    'ccs_zone_field',
+    'ccs_fieldsizem2_field',
+    'createdon'
+  ].join(',');
+
   const rows = await dvFetchAll(token,
     `${DV_API}/ccs_fields?$select=${select}&$filter=statecode eq 0`,
     'Fields',
-    true
+    true  // include FormattedValue annotations for all lookups
   );
 
   fieldsData = rows.map((r, i) => ({
     guid:    String(r.ccs_fieldid || `F${i}`).toLowerCase(),
     fieldId: String(r.ccs_cssfieldid_field || `Field-${i}`).trim(),
     geoJSON: String(r.ccs_fieldgeojson_field || ''),
-    owner:   String(r['ccs_contactid_field@OData.Community.Display.V1.FormattedValue']
-      || r.ccs_contactid_field || ''),
-    zone:    '',
+    // Owner display name - contact lookup, resolved via FormattedValue
+    owner:   String(
+      r['ccs_fieldowner_field@OData.Community.Display.V1.FormattedValue']
+      || r.ccs_fieldowner_field || ''
+    ),
+    // NRC - canonical owner identifier, used for secondary matching
+    nrc:     String(r['ccs_nrclookup'] || '').trim(),
+    // Zone - lookup, resolved via FormattedValue
+    zone:    String(
+      r['ccs_zone_field@OData.Community.Display.V1.FormattedValue']
+      || r.ccs_zone_field || ''
+    ),
     size:    parseFloat(r.ccs_fieldsizem2_field) || 0,
     ring:    null
   })).map(f => { f.ring = parseGeoJSON(f.geoJSON); return f; });
@@ -1123,9 +1143,12 @@ async function fetchAllTrees(token) {
       lat:           coords ? coords.lat : null,
       lng:           coords ? coords.lng : null,
       treeField:     treeFieldVal.trim(),
+      // Field owner name (plain text on tree record) - display only
       fieldOwner:    String(r[ownerCol] || ''),
-      fieldOwnerNRC: String(r[nrcCol]   || ''),
-      treeOwner:     String(r[ownerCol] || ''),
+      // Field owner NRC (plain text on tree record) - used for secondary owner matching
+      fieldOwnerNRC: String(r[nrcCol]   || '').trim(),
+      // System user who submitted the record (ownerid) - informational only
+      submittedBy:   String(r['_ownerid_value@OData.Community.Display.V1.FormattedValue'] || r['owneridyominame'] || ''),
       accuracy:      parseFloat(r[accCol]) || null,
       createdOn:     r.createdon ? r.createdon.split('T')[0] : '',
     };
@@ -1376,10 +1399,8 @@ function determineStatus(tree, matchedField, insideFlag) {
     return tree.treeField ? 'Outside polygon but field tagged' : 'Outside polygon';
   }
   if (insideFlag) {
-    // Status is determined solely by field ID match
-    // Owner is shown as an informational column but does not affect status
-    // because field owner is stored as a contact record name which rarely
-    // matches the plain text on the tree record
+    // Status is determined solely by field ID match (spatial priority)
+    // Owner match (NRC-based) is informational only and does not affect status
     const fieldMatch = matchedField &&
       tree.treeField.toLowerCase().trim() === matchedField.fieldId.toLowerCase().trim();
     return fieldMatch ? 'Allocated' : 'Allocated - Field mismatch';
@@ -1499,8 +1520,12 @@ async function runAllocation() {
         fieldMatch:  matchedField
           ? tree.treeField.toLowerCase().trim() === matchedField.fieldId.toLowerCase().trim()
           : null,
+        // Owner match: compare NRC numbers (canonical identifier) rather than names
+        // Falls back to name comparison if either NRC is missing
         ownerMatch:  matchedField
-          ? tree.fieldOwner.toLowerCase().trim() === matchedField.owner.toLowerCase().trim()
+          ? (tree.fieldOwnerNRC && matchedField.nrc)
+            ? tree.fieldOwnerNRC.trim() === matchedField.nrc.trim()
+            : tree.fieldOwner.toLowerCase().trim() === matchedField.owner.toLowerCase().trim()
           : null,
         status,
       });
@@ -1984,7 +2009,7 @@ function renderExceptionsTable(statusFilter) {
       <td class="${r.ownerMatch === true ? 'flag-yes' : r.ownerMatch === false ? 'flag-no' : 'flag-na'}">${r.ownerMatch === true ? '✓' : r.ownerMatch === false ? '✗' : '—'}</td>
       <td>${statusBadge(r.status)}</td>
       <td style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.lat !== null ? `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}` : '<span style="color:var(--red)">Missing</span>'}</td>
-      <td style="font-size:10px;color:var(--muted)">${esc(r.treeOwner) || '—'}</td>
+      <td style="font-size:10px;color:var(--muted)">${esc(r.submittedBy) || '—'}</td>
     </tr>`).join('');
 }
 
@@ -1997,7 +2022,7 @@ function exportCSV() {
                 'matchedFieldId','matchedFieldOwner','matchedFieldZone',
                 'insidePolygon','fieldMatch','ownerMatch','matchCount','status',
                 'accuracy','createdOn'];
-  const header = ['Tree Code','Species','Latitude','Longitude','Tree Field','Tree Owner','Field Owner',
+  const header = ['Tree Code','Species','Latitude','Longitude','Tree Field','Submitted By','Field Owner',
                   'Matched Field ID','Matched Field Owner','Zone',
                   'Inside Polygon','Field Match','Owner Match','Match Count','Status',
                   'Accuracy','Created On'];
