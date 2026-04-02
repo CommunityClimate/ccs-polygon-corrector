@@ -1728,11 +1728,15 @@ function buildFieldList(sourceRows) {
 
   // Build a lookup of fields that appear in the current rows
   const byField = {};
+  let outsideCount = 0; // trees outside all polygons with no field match at all
   rows.forEach(r => {
     const key = r.matchedFieldId || r.treeField || '__none__';
-    if (key === '__none__') return;
+    if (key === '__none__') {
+      // Tree is outside all polygons and has no field tag — count separately
+      outsideCount++;
+      return;
+    }
     if (!byField[key]) {
-      // Find the field object
       const fieldObj = fieldsData.find(f => f.fieldId === key)
         || { fieldId: key, owner: r.matchedFieldOwner || r.fieldOwner || 'Unknown', zone: '' };
       byField[key] = { field: fieldObj, inside: 0, outside: 0, mismatch: 0 };
@@ -1745,14 +1749,28 @@ function buildFieldList(sourceRows) {
   const entries = Object.values(byField).sort((a, b) =>
     (a.field.fieldId || '').localeCompare(b.field.fieldId || ''));
 
-  document.getElementById('fieldListCount').textContent = `(${entries.length})`;
+  // Total count includes the "outside all" group if present
+  const totalGroups = entries.length + (outsideCount > 0 ? 1 : 0);
+  document.getElementById('fieldListCount').textContent = `(${totalGroups})`;
 
-  if (!entries.length) {
+  if (!entries.length && outsideCount === 0) {
     container.innerHTML = '<div class="empty-state" style="padding:16px 12px;font-size:10px">No fields match current filters</div>';
     return;
   }
 
-  container.innerHTML = entries.map(e => `
+  // Build outside-polygon group entry if needed
+  const outsideEntry = outsideCount > 0 ? `
+    <div class="field-item" style="border-left:3px solid var(--red);opacity:0.85">
+      <div>
+        <div class="fi-id" style="color:var(--red)">Outside all polygons</div>
+        <div class="fi-owner" style="color:var(--muted)">No field match — GPS outside all boundaries</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+        <span class="fi-count zero">${outsideCount} out</span>
+      </div>
+    </div>` : '';
+
+  container.innerHTML = outsideEntry + entries.map(e => `
     <div class="field-item ${selectedFieldId === e.field.fieldId ? 'active' : ''}"
          onclick="selectField('${esc(e.field.fieldId)}')">
       <div>
