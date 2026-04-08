@@ -1397,16 +1397,16 @@ async function connectFieldforce() {
 async function fetchAllPlots(token) {
   // Column names confirmed from Active_Plots Excel export 2026-04-07
   const select = [
-    'ccs_plotautoid',         // PlotAutoID — e.g. PLT_Kasanka_1
-    'ccs_polygongeojson',     // PolygonGeoJSON
-    'ccs_refcenterlat',       // RefCenterLat
-    'ccs_refcenterlong',      // RefCenterLong
-    'ccs_measuredcenterlat',  // MeasuredCenterLat
-    'ccs_measuredcenterlong'  // MeasuredCenterLong
+    'ccs_plotautoid_plot',         // PlotAutoID — e.g. PLT_Kasanka_1
+    'ccs_polygongeojson_plot',     // PolygonGeoJSON
+    'ccs_cornerselat_plot',       // RefCenterLat
+    'ccs_cornerselong_plot',      // RefCenterLong
+    'ccs_measuredcenterlat_plot',  // MeasuredCenterLat
+    'ccs_measuredcenterlong_plot'  // MeasuredCenterLong
   ].join(',');
 
   const rows = [];
-  let url = `${DV_API}/ccs_plots?$select=${select}&$filter=statecode eq 0&$orderby=ccs_plotautoid asc`;
+  let url = `${DV_API}/ccs_plots?$select=${select}&$filter=statecode eq 0&$orderby=ccs_plotautoid_plot asc`;
 
   let page = 0;
   while (url) {
@@ -1428,12 +1428,12 @@ async function fetchAllPlots(token) {
 
   plotsData = rows.map(r => ({
     guid:        r.ccs_plotid || '',
-    plotId:      r.ccs_plotautoid || '',
-    geoJSON:     r.ccs_polygongeojson || '',
-    refLat:      r.ccs_refcenterlat  || null,
-    refLng:      r.ccs_refcenterlong || null,
-    measLat:     r.ccs_measuredcenterlat  || null,
-    measLng:     r.ccs_measuredcenterlong || null,
+    plotId:      r.ccs_plotautoid_plot || r.ccs_plotautoid || '',
+    geoJSON:     r.ccs_polygongeojson_plot || '',
+    refLat:      r.ccs_cornerselat_plot  || null,
+    refLng:      r.ccs_cornerselong_plot || null,
+    measLat:     r.ccs_measuredcenterlat_plot  || null,
+    measLng:     r.ccs_measuredcenterlong_plot || null,
   }));
 
   // Populate dropdown
@@ -1625,7 +1625,7 @@ async function savePolygonToFieldforce() {
         'OData-MaxVersion': '4.0',
         'OData-Version':  '4.0'
       },
-      body: JSON.stringify({ ccs_polygongeojson: newGeoJSON })
+      body: JSON.stringify({ ccs_polygongeojson_plot: newGeoJSON })
     });
 
     if (res.status === 401) {
@@ -1639,7 +1639,7 @@ async function savePolygonToFieldforce() {
           'OData-MaxVersion': '4.0',
           'OData-Version':  '4.0'
         },
-        body: JSON.stringify({ ccs_polygongeojson: newGeoJSON })
+        body: JSON.stringify({ ccs_polygongeojson_plot: newGeoJSON })
       });
       if (!retry.ok) throw new Error(`HTTP ${retry.status}`);
     } else if (!res.ok) {
