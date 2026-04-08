@@ -216,6 +216,12 @@
   <div id="ffStatusHeader" style="font-size:10px;color:var(--muted);"></div>
   <div class="plot-label">Active: <span id="plotNameDisplay">—</span></div>
   <div class="spacer"></div>
+  <button id="btnCatalog" onclick="toggleCatalog()"
+    style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);
+    border-radius:4px;padding:5px 12px;font-family:'Segoe UI',sans-serif;font-size:11px;
+    font-weight:700;cursor:pointer;letter-spacing:.5px;display:none;margin-right:8px">
+    ⊞ Plot Catalog
+  </button>
   <div class="batch-counter">
     <div>
       <div class="bc-count" id="batchCount">0</div>
@@ -225,6 +231,35 @@
   </div>
 </header>
 
+<!-- Plot Catalog Overlay -->
+<div id="plotCatalog" style="display:none;position:fixed;inset:0;z-index:5000;
+  background:var(--bg);display:none;flex-direction:column;overflow:hidden">
+  <div style="background:var(--panel);border-bottom:1px solid var(--border);
+    padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <span style="font-family:'Courier New',monospace;font-size:13px;font-weight:700;
+      color:var(--accent);letter-spacing:2px">⊞ PLOT CATALOG</span>
+    <input type="text" id="catSearch" placeholder="Search plots…"
+      style="background:var(--bg);border:1px solid var(--border);border-radius:4px;
+      color:var(--text);font-size:11px;padding:5px 8px;outline:none;width:200px"
+      oninput="renderCatalog()"/>
+    <select id="catFilter" onchange="renderCatalog()"
+      style="background:var(--bg);border:1px solid var(--border);border-radius:4px;
+      color:var(--text);font-size:11px;padding:5px 8px;outline:none">
+      <option value="">All plots</option>
+      <option value="has_geo">With polygon</option>
+      <option value="no_geo">No polygon</option>
+    </select>
+    <span id="catCount" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
+    <div style="flex:1"></div>
+    <button onclick="toggleCatalog()"
+      style="background:var(--border);color:var(--text);border:none;border-radius:4px;
+      padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">✕ Close</button>
+  </div>
+  <div id="catalogGrid" style="flex:1;overflow-y:auto;padding:14px 16px;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+  </div>
+</div>
+
 <div class="main">
   <!-- LEFT -->
   <div class="left">
@@ -232,9 +267,15 @@
     <!-- Fieldforce Live Connection -->
     <div class="ff-section" id="ffSection">
       <label>☁ Connect to Fieldforce</label>
-      <button class="btn-ff" id="btnFF" onclick="connectFieldforce()">
-        ☁ Connect to Fieldforce
-      </button>
+      <div style="display:flex;gap:5px">
+        <button class="btn-ff" id="btnFF" onclick="connectFieldforce()" style="flex:1">
+          ☁ Connect to Fieldforce
+        </button>
+        <button id="btnRefreshPlot" onclick="refreshCurrentPlot()" title="Refresh current plot"
+          style="background:var(--border);color:var(--text);border:none;border-radius:4px;
+          padding:7px 10px;font-size:14px;cursor:pointer;flex-shrink:0;display:none"
+          title="Re-load current plot from Fieldforce">↺</button>
+      </div>
       <div class="ff-status" id="ffStatus">Connect to load plots directly from Fieldforce</div>
       <div id="plotPickerWrap" style="display:none;margin-top:6px">
         <input type="text" id="plotSearch" placeholder="Search plot name…"
@@ -832,7 +873,7 @@ function showSideLabels(ring) {
 function switchRefSource(src) {
   const refLat  = document.getElementById('refLat');
   const refLng  = document.getElementById('refLng');
-  // Find the plot in plotsData that matches current plot name
+  const measSection = document.querySelector('.meas-section');
   const plotName = document.getElementById('plotNameInput').value.trim();
   const plot = plotsData.find(p => p.plotId === plotName);
 
@@ -841,22 +882,23 @@ function switchRefSource(src) {
       refLat.value = plot.refLat;
       refLng.value = plot.refLng;
     }
-    // Update label color to blue
-    document.querySelector('.ref-section label').style.color = 'var(--blue)';
+    // Show MeasuredCenter section separately
+    if (measSection) measSection.style.display = '';
   } else if (src === 'meas') {
     if (plot && plot.measLat !== null) {
       refLat.value = plot.measLat;
       refLng.value = plot.measLng;
     } else {
-      // Fall back to measuredCenter fields
       const mLat = document.getElementById('measLat').value;
       const mLng = document.getElementById('measLng').value;
       if (mLat) { refLat.value = mLat; refLng.value = mLng; }
     }
-    document.querySelector('.ref-section label').style.color = 'var(--warn)';
+    // Hide MeasuredCenter section to avoid duplication
+    if (measSection) measSection.style.display = 'none';
   } else {
     refLat.value = '';
     refLng.value = '';
+    if (measSection) measSection.style.display = '';
   }
   updateRefStatus();
 }
@@ -1395,6 +1437,142 @@ function clearCurrent(){
 document.getElementById('plotNameInput').addEventListener('keydown',e=>{if(e.key==='Enter')runAnalysis();});
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PLOT CATALOG
+// ═══════════════════════════════════════════════════════════════════════════
+let catalogMaps = {};
+let catalogObserver = null;
+
+function toggleCatalog() {
+  const overlay = document.getElementById('plotCatalog');
+  const isOpen = overlay.style.display === 'flex';
+  if (isOpen) {
+    overlay.style.display = 'none';
+    // Destroy catalog maps to free memory
+    Object.values(catalogMaps).forEach(m => { try { m.remove(); } catch(e){} });
+    catalogMaps = {};
+    if (catalogObserver) { catalogObserver.disconnect(); catalogObserver = null; }
+  } else {
+    overlay.style.display = 'flex';
+    renderCatalog();
+  }
+}
+
+function renderCatalog() {
+  const q      = (document.getElementById('catSearch').value || '').toLowerCase();
+  const filter = document.getElementById('catFilter').value;
+
+  const plots = plotsData.filter(p => {
+    if (q && !p.plotId.toLowerCase().includes(q)) return false;
+    if (filter === 'has_geo' && !p.geoJSON) return false;
+    if (filter === 'no_geo'  &&  p.geoJSON) return false;
+    return true;
+  });
+
+  document.getElementById('catCount').textContent = plots.length.toLocaleString() + ' plots';
+
+  // Destroy old maps
+  Object.values(catalogMaps).forEach(m => { try { m.remove(); } catch(e){} });
+  catalogMaps = {};
+  if (catalogObserver) { catalogObserver.disconnect(); catalogObserver = null; }
+
+  const grid = document.getElementById('catalogGrid');
+  grid.innerHTML = plots.map((p, i) => {
+    const hasGeo = !!p.geoJSON;
+    return `<div class="catalog-card" style="background:#1a1d27;border:1px solid #2a2d3a;
+      border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s"
+      onmouseenter="this.style.borderColor='#4ade80'"
+      onmouseleave="this.style.borderColor='#2a2d3a'"
+      onclick="openPlotFromCatalog(${plotsData.indexOf(p)})">
+      ${hasGeo
+        ? `<div style="width:100%;height:140px;background:#0a0c12" id="cmap-${i}" data-idx="${i}">
+             <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+               color:#4a6480;font-size:10px;font-family:monospace">Loading map…</div>
+           </div>`
+        : `<div style="width:100%;height:60px;display:flex;align-items:center;justify-content:center;
+             background:#1a1d27;color:#4a6480;font-size:10px;font-family:monospace">
+             No polygon geometry
+           </div>`
+      }
+      <div style="padding:9px 11px">
+        <div style="font-family:'Courier New',monospace;font-size:11px;font-weight:700;
+          color:#60a5fa;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${p.plotId}
+        </div>
+        ${p.refLat ? `<div style="font-size:9px;color:#4a6480;font-family:'Courier New',monospace">
+          Ref: ${parseFloat(p.refLat).toFixed(5)}, ${parseFloat(p.refLng).toFixed(5)}</div>` : ''}
+        <div style="font-size:9px;color:${hasGeo?'#4ade80':'#f87171'};margin-top:3px;font-weight:700">
+          ${hasGeo ? '✓ Has polygon' : '✗ No polygon'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Lazy-load mini-maps
+  catalogObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el  = entry.target;
+      const idx = parseInt(el.dataset.idx);
+      const p   = plots[idx];
+      if (!p || !p.geoJSON) return;
+      catalogObserver.unobserve(el);
+      initCatalogMap(el, p, idx);
+    });
+  }, { rootMargin: '100px' });
+
+  plots.forEach((p, i) => {
+    if (!p.geoJSON) return;
+    const el = document.getElementById(`cmap-${i}`);
+    if (el) catalogObserver.observe(el);
+  });
+}
+
+function initCatalogMap(container, plot, idx) {
+  container.innerHTML = '';
+  try {
+    const ring = parsePolygon(plot.geoJSON);
+    if (!ring) { container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Invalid GeoJSON</div>'; return; }
+
+    const m = L.map(container, {
+      zoomControl:false, attributionControl:false,
+      dragging:false, scrollWheelZoom:false,
+      doubleClickZoom:false, touchZoom:false
+    });
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      subdomains:['mt0','mt1','mt2','mt3'], maxZoom:21
+    }).addTo(m);
+
+    const latLngs = ring.map(c => [c[1], c[0]]);
+    const poly = L.polygon(latLngs, {
+      color:'#4ade80', weight:2, fillColor:'#4ade80', fillOpacity:0.1, dashArray:'5,4'
+    }).addTo(m);
+
+    // RefCenter marker if available
+    if (plot.refLat) {
+      const icon = L.divIcon({ className:'',
+        html:`<div style="background:#60a5fa;width:8px;height:8px;border-radius:50%;border:2px solid #fff"></div>`,
+        iconSize:[8,8], iconAnchor:[4,4]
+      });
+      L.marker([plot.refLat, plot.refLng], { icon }).addTo(m);
+    }
+
+    m.fitBounds(poly.getBounds(), { padding:[4,4] });
+    catalogMaps[`cmap-${idx}`] = m;
+  } catch(e) {
+    container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Map error</div>';
+  }
+}
+
+function openPlotFromCatalog(idx) {
+  // Close catalog and load the plot
+  toggleCatalog();
+  document.getElementById('plotSelect').value = idx;
+  loadPlotFromFieldforce();
+  // Scroll sidebar to top
+  document.querySelector('.left').scrollTop = 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // FIELDFORCE CONNECTION (MSAL + Dataverse)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1528,6 +1706,57 @@ async function fetchAllPlots(token) {
   });
   document.getElementById('plotPickerWrap').style.display = 'block';
   setFFStatus(`✓ ${plotsData.length.toLocaleString()} plots loaded — select one below`, true);
+  document.getElementById('btnCatalog').style.display = 'inline-block';
+}
+
+async function refreshCurrentPlot() {
+  const plotName = document.getElementById('plotNameInput').value.trim();
+  if (!plotName) return;
+  const idx = plotsData.findIndex(p => p.plotId === plotName);
+  if (idx < 0) { alert('No plot loaded to refresh.'); return; }
+
+  const btn = document.getElementById('btnRefreshPlot');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+
+  try {
+    const token = await getToken();
+    const select = [
+      'ccs_plotautoid', 'ccs_polygongeojson_plot', 'ccs_plotpolygon_plot',
+      'ccs_cornerselat_plot', 'ccs_cornerselong_plot',
+      'ccs_measuredcenterlat_plot', 'ccs_measuredcenterlong_plot',
+      'ccs_refcenterlat_plot', 'ccs_refcenterlong_plot'
+    ].join(',');
+
+    const res = await fetch(
+      `${DV_API}/ccs_plots?$select=${select}&$filter=ccs_plotautoid eq '${plotName}'`,
+      { headers: { 'Authorization': `Bearer ${token}`, 'OData-MaxVersion': '4.0', 'OData-Version': '4.0' } }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const r = data.value[0];
+    if (!r) throw new Error('Plot not found');
+
+    // Update plotsData entry
+    plotsData[idx] = {
+      ...plotsData[idx],
+      geoJSON:  r.ccs_polygongeojson_plot || r.ccs_plotpolygon_plot || '',
+      refLat:   r.ccs_refcenterlat_plot   || r.ccs_cornerselat_plot  || null,
+      refLng:   r.ccs_refcenterlong_plot  || r.ccs_cornerselong_plot || null,
+      measLat:  r.ccs_measuredcenterlat_plot  || null,
+      measLng:  r.ccs_measuredcenterlong_plot || null,
+    };
+
+    // Reload the plot
+    document.getElementById('plotSelect').value = idx;
+    loadPlotFromFieldforce();
+    setFFStatus(`✓ ${plotName} refreshed from Fieldforce`, true);
+  } catch(e) {
+    setFFStatus('Refresh failed: ' + e.message, false);
+  } finally {
+    btn.textContent = '↺';
+    btn.disabled = false;
+  }
 }
 
 function filterPlotDropdown() {
@@ -1614,6 +1843,8 @@ function loadPlotFromFieldforce() {
   }
   // Show the Fetch Trees from Fieldforce button
   document.getElementById('ffTreeSection').style.display = 'block';
+  // Show refresh button
+  document.getElementById('btnRefreshPlot').style.display = 'block';
   document.getElementById('ffTreeStatus').textContent = `Click to load inventory trees for ${plot.plotId}`;
 }
 
