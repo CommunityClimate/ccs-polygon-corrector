@@ -236,9 +236,18 @@
         ☁ Connect to Fieldforce
       </button>
       <div class="ff-status" id="ffStatus">Connect to load plots directly from Fieldforce</div>
-      <select class="plot-select" id="plotSelect" style="display:none" onchange="loadPlotFromFieldforce()">
-        <option value="">— Select a plot —</option>
-      </select>
+      <div id="plotPickerWrap" style="display:none;margin-top:6px">
+        <input type="text" id="plotSearch" placeholder="Search plot name…"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px 4px 0 0;
+          color:var(--text);font-size:11px;padding:5px 8px;outline:none;border-bottom:none"
+          oninput="filterPlotDropdown()" onfocus="document.getElementById('plotSelect').size=8"
+          onblur="setTimeout(()=>document.getElementById('plotSelect').size=1,200)"/>
+        <select class="plot-select" id="plotSelect" size="1"
+          style="border-radius:0 0 4px 4px;border-top:1px solid var(--blue);"
+          onchange="loadPlotFromFieldforce()">
+          <option value="">— Select a plot —</option>
+        </select>
+      </div>
     </div>
 
     <div class="section">
@@ -1397,13 +1406,21 @@ async function connectFieldforce() {
 
 async function fetchAllPlots(token) {
   // Column names confirmed from Active_Plots Excel export 2026-04-07
+  // Column names confirmed from live API 2026-04-08
+  // ccs_polygongeojson_plot = GeoJSON polygon (some plots may use ccs_plotpolygon_plot)
+  // ccs_cornerselat/long = SE corner coords used as RefCenter proxy
+  // ccs_measuredcenterlat/long = MeasuredCenter confirmed
   const select = [
-    'ccs_plotautoid',              // PlotAutoID — no _plot suffix on primary name field
-    'ccs_polygongeojson_plot',     // PolygonGeoJSON
-    'ccs_cornerselat_plot',       // RefCenterLat
-    'ccs_cornerselong_plot',      // RefCenterLong
-    'ccs_measuredcenterlat_plot',  // MeasuredCenterLat
-    'ccs_measuredcenterlong_plot'  // MeasuredCenterLong
+    'ccs_plotautoid',
+    'ccs_polygongeojson_plot',
+    'ccs_plotpolygon_plot',        // fallback polygon field
+    'ccs_cornerselat_plot',        // SE corner lat — used as RefCenter proxy
+    'ccs_cornerselong_plot',       // SE corner long
+    'ccs_cornernelat_plot',        // NE corner lat
+    'ccs_measuredcenterlat_plot',
+    'ccs_measuredcenterlong_plot',
+    'ccs_refcenterlat_plot',       // try direct RefCenter if exists
+    'ccs_refcenterlong_plot'
   ].join(',');
 
   const rows = [];
@@ -1428,13 +1445,15 @@ async function fetchAllPlots(token) {
   }
 
   plotsData = rows.map(r => ({
-    guid:        r.ccs_plotid || '',
-    plotId:      r.ccs_plotautoid || r.ccs_name || r.ccs_plotid || 'Plot-' + r.ccs_plotid?.slice(0,8) || '',
-    geoJSON:     r.ccs_polygongeojson_plot || '',
-    refLat:      r.ccs_cornerselat_plot  || null,
-    refLng:      r.ccs_cornerselong_plot || null,
-    measLat:     r.ccs_measuredcenterlat_plot  || null,
-    measLng:     r.ccs_measuredcenterlong_plot || null,
+    guid:    r.ccs_plotid || '',
+    plotId:  r.ccs_plotautoid || r.ccs_name || 'Plot-' + (r.ccs_plotid||'').slice(0,8),
+    // Try GeoJSON column first, then WKT polygon fallback
+    geoJSON: r.ccs_polygongeojson_plot || r.ccs_plotpolygon_plot || '',
+    // RefCenter: prefer direct refcenter columns, fall back to SE corner
+    refLat:  r.ccs_refcenterlat_plot  || r.ccs_cornerselat_plot  || null,
+    refLng:  r.ccs_refcenterlong_plot || r.ccs_cornerselong_plot || null,
+    measLat: r.ccs_measuredcenterlat_plot  || null,
+    measLng: r.ccs_measuredcenterlong_plot || null,
   }));
 
   // Populate dropdown
@@ -1446,8 +1465,23 @@ async function fetchAllPlots(token) {
     o.textContent = p.plotId;
     sel.appendChild(o);
   });
-  sel.style.display = 'block';
+  document.getElementById('plotPickerWrap').style.display = 'block';
   setFFStatus(`✓ ${plotsData.length.toLocaleString()} plots loaded — select one below`, true);
+}
+
+function filterPlotDropdown() {
+  const q = document.getElementById('plotSearch').value.toLowerCase();
+  const sel = document.getElementById('plotSelect');
+  sel.innerHTML = '<option value="">— Select a plot —</option>';
+  plotsData.forEach((p, i) => {
+    if (!q || p.plotId.toLowerCase().includes(q)) {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = p.plotId;
+      sel.appendChild(o);
+    }
+  });
+  // Auto-expand when searching
+  sel.size = q ? Math.min(8, sel.options.length) : 1;
 }
 
 function loadPlotFromFieldforce() {
@@ -1459,18 +1493,28 @@ function loadPlotFromFieldforce() {
 
   // Fill in all fields
   document.getElementById('plotNameInput').value = plot.plotId;
-  document.getElementById('polygonInput').value  = plot.geoJSON;
-  if (plot.refLat  !== null) document.getElementById('refLat').value  = plot.refLat;
-  if (plot.refLng  !== null) document.getElementById('refLng').value  = plot.refLng;
-  if (plot.measLat !== null) document.getElementById('measLat').value = plot.measLat;
-  if (plot.measLng !== null) document.getElementById('measLng').value = plot.measLng;
+  document.getElementById('polygonInput').value  = plot.geoJSON || '';
+
+  // Only overwrite coordinate fields if we have values
+  if (plot.refLat  !== null && plot.refLat  !== undefined) document.getElementById('refLat').value  = plot.refLat;
+  if (plot.refLng  !== null && plot.refLng  !== undefined) document.getElementById('refLng').value  = plot.refLng;
+  if (plot.measLat !== null && plot.measLat !== undefined) document.getElementById('measLat').value = plot.measLat;
+  if (plot.measLng !== null && plot.measLng !== undefined) document.getElementById('measLng').value = plot.measLng;
 
   currentPlotGuid = plot.guid;
+  // Reset search box and collapse dropdown
+  document.getElementById('plotSearch').value = '';
+  document.getElementById('plotSelect').size = 1;
 
   // Trigger status updates
   updateRefStatus();
   updateMeasStatus();
-  setFFStatus(`✓ ${plot.plotId} loaded — upload trees or paste coordinates, then Analyse`, true);
+
+  if (!plot.geoJSON) {
+    setFFStatus(`⚠ ${plot.plotId} loaded — no polygon geometry found. Upload trees and paste GeoJSON manually.`, false);
+  } else {
+    setFFStatus(`✓ ${plot.plotId} loaded — upload trees or paste coordinates, then Analyse`, true);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
