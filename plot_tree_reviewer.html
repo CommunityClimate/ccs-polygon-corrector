@@ -1441,19 +1441,77 @@ document.getElementById('plotNameInput').addEventListener('keydown',e=>{if(e.key
 // ═══════════════════════════════════════════════════════════════════════════
 let catalogMaps = {};
 let catalogObserver = null;
+let catalogTreesByPlot = {};  // plotGuid → [{lat,lng}] — loaded once when catalog opens
+let catalogTreesLoaded = false;
 
-function toggleCatalog() {
+async function toggleCatalog() {
   const overlay = document.getElementById('plotCatalog');
   const isOpen = overlay.style.display === 'flex';
   if (isOpen) {
     overlay.style.display = 'none';
-    // Destroy catalog maps to free memory
     Object.values(catalogMaps).forEach(m => { try { m.remove(); } catch(e){} });
     catalogMaps = {};
     if (catalogObserver) { catalogObserver.disconnect(); catalogObserver = null; }
   } else {
     overlay.style.display = 'flex';
+    // Fetch all inventory trees once for the catalog (lat/lng/plotGUID only)
+    if (!catalogTreesLoaded) {
+      await fetchCatalogTrees();
+    }
     renderCatalog();
+  }
+}
+
+async function fetchCatalogTrees() {
+  const countEl = document.getElementById('catCount');
+  if (countEl) countEl.textContent = 'Loading trees…';
+  try {
+    const token = await getToken();
+    const select = [
+      'ccs_treelat_inventorytree',
+      'ccs_treelong_inventorytree',
+      '_ccs_plotid_inventorytree_value'
+    ].join(',');
+
+    let url = `${DV_API}/ccs_inventorytrees?$select=${select}&$filter=statecode eq 0`;
+    const rows = [];
+    while (url) {
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
+          'Prefer': 'odata.maxpagesize=5000'
+        }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      rows.push(...(data.value || []));
+      url = data['@odata.nextLink'] || null;
+    }
+
+    // Group by plot GUID
+    catalogTreesByPlot = {};
+    rows.forEach(r => {
+      const plotGuid = r['_ccs_plotid_inventorytree_value'];
+      if (!plotGuid) return;
+      const a = parseFloat(r.ccs_treelat_inventorytree);
+      const b = parseFloat(r.ccs_treelong_inventorytree);
+      if (isNaN(a) || isNaN(b)) return;
+      // Auto-detect coordinate order
+      let lat, lng;
+      if      (a < 0 && b > 0)   { lat = a; lng = b; }
+      else if (b < 0 && a > 0)   { lat = b; lng = a; }
+      else if (Math.abs(a) < 90) { lat = a; lng = b; }
+      else                        { lat = b; lng = a; }
+      if (!catalogTreesByPlot[plotGuid]) catalogTreesByPlot[plotGuid] = [];
+      catalogTreesByPlot[plotGuid].push({ lat, lng });
+    });
+
+    catalogTreesLoaded = true;
+    console.log(`Catalog trees loaded: ${rows.length} trees across ${Object.keys(catalogTreesByPlot).length} plots`);
+  } catch(e) {
+    console.warn('Could not load catalog trees:', e.message);
+    // Non-fatal — catalog still shows polygons without trees
   }
 }
 
@@ -1479,12 +1537,12 @@ function renderCatalog() {
   grid.innerHTML = plots.map((p, i) => {
     const hasGeo = !!p.geoJSON;
     return `<div class="catalog-card" style="background:#1a1d27;border:1px solid #2a2d3a;
-      border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s"
+      border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s;display:flex;flex-direction:column"
       onmouseenter="this.style.borderColor='#4ade80'"
       onmouseleave="this.style.borderColor='#2a2d3a'"
       onclick="openPlotFromCatalog(${plotsData.indexOf(p)})">
       ${hasGeo
-        ? `<div style="width:100%;height:140px;background:#0a0c12" id="cmap-${i}" data-idx="${i}">
+        ? `<div style="width:100%;height:160px;min-height:160px;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
                color:#4a6480;font-size:10px;font-family:monospace">Loading map…</div>
            </div>`
@@ -1507,7 +1565,8 @@ function renderCatalog() {
     </div>`;
   }).join('');
 
-  // Lazy-load mini-maps
+  // Delay to let grid layout settle before observing
+  setTimeout(() => {
   catalogObserver = new IntersectionObserver(entries => {
     entries.forEach(entry => {
       if (!entry.isIntersecting) return;
@@ -1525,13 +1584,17 @@ function renderCatalog() {
     const el = document.getElementById(`cmap-${i}`);
     if (el) catalogObserver.observe(el);
   });
+  }, 100);
 }
 
 function initCatalogMap(container, plot, idx) {
   container.innerHTML = '';
   try {
     const ring = parsePolygon(plot.geoJSON);
-    if (!ring) { container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Invalid GeoJSON</div>'; return; }
+    if (!ring) {
+      container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Invalid GeoJSON</div>';
+      return;
+    }
 
     const m = L.map(container, {
       zoomControl:false, attributionControl:false,
@@ -1542,15 +1605,43 @@ function initCatalogMap(container, plot, idx) {
       subdomains:['mt0','mt1','mt2','mt3'], maxZoom:21
     }).addTo(m);
 
+    // Draw polygon
     const latLngs = ring.map(c => [c[1], c[0]]);
     const poly = L.polygon(latLngs, {
-      color:'#4ade80', weight:2, fillColor:'#4ade80', fillOpacity:0.1, dashArray:'5,4'
+      color:'#4ade80', weight:2, fillColor:'#4ade80', fillOpacity:0.08, dashArray:'5,4'
     }).addTo(m);
 
-    // RefCenter marker if available
+    // Plot trees from pre-fetched catalog data
+    const trees = catalogTreesByPlot[plot.guid] || [];
+    const step  = trees.length > 100 ? Math.ceil(trees.length / 100) : 1;
+    trees.forEach((t, i) => {
+      if (i % step !== 0) return;
+      const inside = pip(t.lat, t.lng, ring);
+      L.circleMarker([t.lat, t.lng], {
+        radius: 3,
+        color: 'rgba(255,255,255,0.5)',
+        weight: 0.5,
+        fillColor: inside ? '#4ade80' : '#f87171',
+        fillOpacity: 0.9
+      }).addTo(m);
+    });
+
+    // Tree count badge in card footer (update after render)
+    const footerEl = container.nextElementSibling;
+    if (footerEl && trees.length > 0) {
+      const inside  = trees.filter(t => pip(t.lat, t.lng, ring)).length;
+      const pct     = Math.round(inside / trees.length * 100);
+      const col     = pct >= 90 ? '#4ade80' : pct >= 70 ? '#fbbf24' : '#f87171';
+      const treeDiv = document.createElement('div');
+      treeDiv.style.cssText = `font-family:'Courier New',monospace;font-size:9px;color:${col};margin-top:3px;font-weight:700`;
+      treeDiv.textContent   = `${inside}/${trees.length} trees inside (${pct}%)`;
+      footerEl.appendChild(treeDiv);
+    }
+
+    // RefCenter marker
     if (plot.refLat) {
       const icon = L.divIcon({ className:'',
-        html:`<div style="background:#60a5fa;width:8px;height:8px;border-radius:50%;border:2px solid #fff"></div>`,
+        html:'<div style="background:#60a5fa;width:8px;height:8px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6)"></div>',
         iconSize:[8,8], iconAnchor:[4,4]
       });
       L.marker([plot.refLat, plot.refLng], { icon }).addTo(m);
@@ -1558,6 +1649,7 @@ function initCatalogMap(container, plot, idx) {
 
     m.fitBounds(poly.getBounds(), { padding:[4,4] });
     catalogMaps[`cmap-${idx}`] = m;
+    setTimeout(()=>{ try{ m.invalidateSize(); m.fitBounds(poly.getBounds(),{padding:[4,4]}); }catch(e){} }, 150);
   } catch(e) {
     container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Map error</div>';
   }
