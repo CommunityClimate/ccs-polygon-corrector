@@ -912,6 +912,7 @@ function runAnalysis(){
   renderMeasurements(ring, refResult);
   if(typeof showSideLabels==="function") setTimeout(()=>showSideLabels(ring), 600);
   document.getElementById('dlRow').style.display='flex';
+  document.getElementById('editRow').style.display='flex';
   document.getElementById('btnAddBatch').disabled=false;
 }
 
@@ -1673,13 +1674,7 @@ async function savePolygonToFieldforce() {
 }
 
 // ── Show edit row after analysis ─────────────────────────────────────────────
-const _origRunAnalysis = runAnalysis;
-// Patch runAnalysis to also show editRow
-const runAnalysis_orig = runAnalysis;
-function runAnalysis() {
-  runAnalysis_orig();
-  document.getElementById('editRow').style.display = 'flex';
-}
+// editRow is shown directly inside the original runAnalysis via the dlRow check below
 
 </script>
 </body>
