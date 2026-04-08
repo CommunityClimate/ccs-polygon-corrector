@@ -263,7 +263,22 @@ Paste the PolygonGeoJSON field directly.'></textarea>
     </div>
 
     <div class="ref-section">
-      <label>● RefCenter — RefCenterLat / RefCenterLong</label>
+      <label>● Reference Point — select source</label>
+      <!-- Selector: choose RefCenter or MeasuredCenter as the reference point -->
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer;color:var(--blue)">
+          <input type="radio" name="refSource" value="ref" checked onchange="switchRefSource('ref')" style="accent-color:var(--blue)"/>
+          RefCenter (GPS survey)
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer;color:var(--warn)">
+          <input type="radio" name="refSource" value="meas" onchange="switchRefSource('meas')" style="accent-color:var(--warn)"/>
+          MeasuredCenter (field officer)
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer;color:var(--muted)">
+          <input type="radio" name="refSource" value="none" onchange="switchRefSource('none')" style="accent-color:var(--muted)"/>
+          None
+        </label>
+      </div>
       <div class="ref-row">
         <div><span>RefCenterLat</span><input id="refLat" type="text" placeholder="-12.5010020000"/></div>
         <div><span>RefCenterLong</span><input id="refLng" type="text" placeholder="30.2697960000"/></div>
@@ -813,6 +828,39 @@ function showSideLabels(ring) {
 }
 
 // ── RefCenter ────────────────────────────────────────────────────────────────
+// Switch reference point source between RefCenter and MeasuredCenter
+function switchRefSource(src) {
+  const refLat  = document.getElementById('refLat');
+  const refLng  = document.getElementById('refLng');
+  // Find the plot in plotsData that matches current plot name
+  const plotName = document.getElementById('plotNameInput').value.trim();
+  const plot = plotsData.find(p => p.plotId === plotName);
+
+  if (src === 'ref') {
+    if (plot && plot.refLat !== null) {
+      refLat.value = plot.refLat;
+      refLng.value = plot.refLng;
+    }
+    // Update label color to blue
+    document.querySelector('.ref-section label').style.color = 'var(--blue)';
+  } else if (src === 'meas') {
+    if (plot && plot.measLat !== null) {
+      refLat.value = plot.measLat;
+      refLng.value = plot.measLng;
+    } else {
+      // Fall back to measuredCenter fields
+      const mLat = document.getElementById('measLat').value;
+      const mLng = document.getElementById('measLng').value;
+      if (mLat) { refLat.value = mLat; refLng.value = mLng; }
+    }
+    document.querySelector('.ref-section label').style.color = 'var(--warn)';
+  } else {
+    refLat.value = '';
+    refLng.value = '';
+  }
+  updateRefStatus();
+}
+
 ['refLat','refLng'].forEach(id=>document.getElementById(id).addEventListener('input',updateRefStatus));
 function updateRefStatus(){
   const lat=parseFloat(document.getElementById('refLat').value);
@@ -913,8 +961,11 @@ function runAnalysis(){
   document.getElementById('plotNameDisplay').textContent=plotName;
   const ring=parsePolygon(document.getElementById('polygonInput').value);
   if(!ring){alert('Could not parse polygon.');return;}
-  const trees=parsedFromExcel.length?parsedFromExcel:parseManualTrees(document.getElementById('treesInput').value);
-  if(!trees.length){alert('No tree coordinates found.');return;}
+  // Use Fieldforce/Excel trees if loaded, otherwise parse manual textarea
+  // Clear placeholder text from textarea so it doesn't confuse the parser
+  const manualText = document.getElementById('treesInput').value.trim();
+  const trees = parsedFromExcel.length ? parsedFromExcel : parseManualTrees(manualText);
+  if(!trees.length){alert('No tree coordinates found.\n\nEither:\n• Fetch trees from Fieldforce (green button above)\n• Upload an Excel file\n• Paste coordinates manually');return;}
   const refLatV=parseFloat(document.getElementById('refLat').value);
   const refLngV=parseFloat(document.getElementById('refLng').value);
   const hasRef=!isNaN(refLatV)&&!isNaN(refLngV);
