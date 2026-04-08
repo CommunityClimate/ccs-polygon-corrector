@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Plot Tree Reviewer v5</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<style>
+  :root {
+    --bg:#0f1117; --panel:#1a1d27; --border:#2a2d3a;
+    --accent:#4ade80; --accent2:#f97316; --text:#e2e8f0; --muted:#64748b;
+    --inside:#4ade80; --outside:#f87171; --blue:#60a5fa;
+    --blue-bg:rgba(96,165,250,0.08); --blue-border:rgba(96,165,250,0.25);
+    --warn:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* HEADER */
+  header{background:var(--panel);border-bottom:1px solid var(--border);padding:9px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  header h1{font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;white-space:nowrap;}
+  .badge{background:var(--accent);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;}
+  .plot-label{font-size:12px;color:var(--muted);}
+  #plotNameDisplay{color:var(--accent2);font-weight:700;}
+  .spacer{flex:1;}
+
+  /* BATCH COUNTER */
+  .batch-counter{display:flex;align-items:center;gap:8px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:6px;padding:5px 12px;}
+  .batch-counter .bc-count{font-size:14px;font-weight:800;color:var(--warn);}
+  .batch-counter .bc-label{font-size:10px;color:var(--muted);letter-spacing:0.5px;}
+  .btn-dl-all{background:var(--warn);color:#000;border:none;border-radius:4px;padding:6px 12px;font-weight:800;font-size:11px;letter-spacing:0.5px;cursor:pointer;transition:opacity 0.15s;}
+  .btn-dl-all:hover{opacity:0.85;}
+  .btn-dl-all:disabled{opacity:0.4;cursor:not-allowed;}
+
+  .main{display:flex;flex:1;overflow:hidden;}
+
+  /* LEFT PANEL */
+  .left{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--panel);overflow-y:auto;}
+  .section{padding:9px 12px;border-bottom:1px solid var(--border);}
+  .section label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px;}
+  input[type=text],textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Courier New',monospace;font-size:11px;padding:6px 8px;outline:none;transition:border-color 0.2s;}
+  input[type=text]:focus,textarea:focus{border-color:var(--accent);}
+  textarea{resize:none;height:68px;}
+
+  .ref-section{padding:9px 12px;border-bottom:1px solid var(--border);background:var(--blue-bg);border-left:3px solid var(--blue);}
+  .ref-section label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--blue);text-transform:uppercase;display:block;margin-bottom:6px;}
+  .ref-row{display:flex;gap:6px;}
+  .ref-row>div{flex:1;}
+  .ref-row>div span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px;}
+  .ref-status{font-size:10px;margin-top:5px;color:var(--muted);}
+  .ref-status.set{color:var(--blue);}
+
+  .upload-section{padding:9px 12px;border-bottom:1px solid var(--border);}
+  .upload-section label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;}
+  .upload-zone{border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;position:relative;}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(74,222,128,0.04);}
+  .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .upload-text{font-size:11px;color:var(--muted);}
+  .upload-status{margin-top:5px;font-size:11px;}
+  .upload-status.ok{color:var(--accent);}
+  .upload-status.err{color:var(--outside);}
+  .or-divider{display:flex;align-items:center;gap:8px;padding:5px 12px;}
+  .or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+  .or-divider span{font-size:10px;color:var(--muted);letter-spacing:1px;}
+  .hint{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5;}
+
+  .btn{padding:8px;border:none;border-radius:4px;cursor:pointer;font-weight:700;font-size:11px;letter-spacing:.5px;text-transform:uppercase;transition:opacity 0.15s,transform 0.1s;white-space:nowrap;}
+  .btn:hover{opacity:0.85;}
+  .btn:active{transform:scale(0.98);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-primary{background:var(--accent);color:#000;flex:1;}
+  .btn-save{background:rgba(251,191,36,0.15);color:var(--warn);border:1px solid rgba(251,191,36,0.3);}
+  .btn-dl-one{background:rgba(96,165,250,0.15);color:var(--blue);border:1px solid var(--blue-border);}
+  .btn-clear{background:var(--border);color:var(--text);width:36px;flex-shrink:0;}
+  .btn-row{display:flex;gap:5px;padding:9px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .btn-row2{display:flex;gap:5px;padding:7px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+
+  /* Results */
+  .results-panel{flex:1;overflow-y:auto;padding:10px 12px;}
+  .results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+  .summary-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+  .chip{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+  .chip-total{background:rgba(100,116,139,0.2);color:var(--muted);}
+  .chip-in{background:rgba(74,222,128,0.15);color:var(--inside);}
+  .chip-out{background:rgba(248,113,113,0.15);color:var(--outside);}
+  .chip-blue{background:rgba(96,165,250,0.15);color:var(--blue);}
+  .tree-list{display:flex;flex-direction:column;gap:3px;}
+  .tree-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;font-size:11px;border:1px solid transparent;cursor:pointer;transition:background 0.1s;}
+  .tree-item:hover{background:rgba(255,255,255,0.04);}
+  .tree-item.inside{border-color:rgba(74,222,128,0.2);}
+  .tree-item.outside{border-color:rgba(248,113,113,0.3);background:rgba(248,113,113,0.05);}
+  .tree-item.refcenter{border-color:var(--blue-border);background:var(--blue-bg);}
+  .tree-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;flex-shrink:0;}
+  .num-in{background:var(--inside);color:#000;}
+  .num-out{background:var(--outside);color:#000;}
+  .num-blue{background:var(--blue);color:#000;}
+  .tree-coords{font-family:'Courier New',monospace;color:var(--muted);flex:1;font-size:10px;}
+  .tree-uid{font-size:9px;color:var(--muted);opacity:.7;}
+  .tree-status{font-size:10px;font-weight:700;margin-left:auto;white-space:nowrap;}
+  .status-in{color:var(--inside);}
+  .status-out{color:var(--outside);}
+  .empty-state{color:var(--muted);font-size:12px;text-align:center;padding:24px 16px;line-height:2;}
+
+  .copy-bar{padding:7px 12px;background:rgba(74,222,128,0.05);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .copy-bar .result-text{font-size:12px;color:var(--text);flex:1;}
+  .copy-bar strong{color:var(--outside);}
+  .btn-copy-num{padding:4px 10px;background:var(--accent);color:#000;border:none;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;}
+
+  /* Batch list */
+  .batch-list{padding:8px 12px;border-bottom:1px solid var(--border);max-height:120px;overflow-y:auto;}
+  .batch-list-header{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--warn);text-transform:uppercase;margin-bottom:5px;}
+  .batch-item{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+  .batch-item-name{color:var(--text);}
+  .batch-item-stat{font-size:10px;color:var(--outside);font-weight:700;}
+  .batch-item-stat.ok{color:var(--inside);}
+  .batch-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px;}
+  .batch-remove:hover{color:var(--outside);}
+
+  /* Map area */
+  #mapWrapper{flex:1;display:flex;flex-direction:column;position:relative;}
+  .map-placeholder{flex:1;display:flex;align-items:center;justify-content:center;background:#0a0c12;color:var(--muted);font-size:13px;text-align:center;line-height:2;}
+  #map{width:100%;flex:1;display:none;}
+
+  /* Capture overlay */
+  .capture-overlay{position:absolute;inset:0;background:rgba(15,17,23,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px;}
+  .capture-overlay .co-text{font-size:14px;color:var(--accent);font-weight:700;}
+  .capture-overlay .co-sub{font-size:11px;color:var(--muted);}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+
+  /* Measured center section */
+  .meas-section{padding:9px 12px;border-bottom:1px solid var(--border);background:rgba(251,191,36,0.06);border-left:3px solid var(--warn);}
+  .meas-section label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--warn);text-transform:uppercase;display:block;margin-bottom:6px;}
+  .meas-status{font-size:10px;margin-top:5px;color:var(--muted);}
+  .meas-status.set{color:var(--warn);}
+
+  /* Measurements panel */
+  .measure-panel{padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(15,17,23,0.6);}
+  .measure-panel-title{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+  .measure-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .measure-card{background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:7px 9px;}
+  .measure-card.warn{border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.05);}
+  .measure-card.ok{border-color:rgba(74,222,128,0.3);background:rgba(74,222,128,0.04);}
+  .measure-card.full{grid-column:1/-1;}
+  .mc-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
+  .mc-value{font-size:14px;font-weight:800;color:var(--text);font-family:'Courier New',monospace;}
+  .mc-sub{font-size:9px;color:var(--muted);margin-top:2px;}
+  .mc-target{font-size:9px;color:var(--warn);}
+
+  /* Click-to-measure map tool */
+  .map-toolbar{position:absolute;top:8px;right:8px;z-index:1000;display:flex;gap:6px;}
+  .map-tool-btn{background:rgba(26,29,39,0.92);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.15s;white-space:nowrap;}
+  .map-tool-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .map-tool-btn.active{background:var(--accent);color:#000;border-color:var(--accent);}
+
+  /* Side-length labels */
+  .side-label {
+    background: rgba(15,17,23,0.88);
+    color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.5);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .side-label.ok  { color: #4ade80; border-color: rgba(74,222,128,0.5); }
+  .side-label.warn{ color: #f87171; border-color: rgba(248,113,113,0.5); }
+  .measure-tooltip{background:rgba(26,29,39,0.95);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  /* Fieldforce connect */
+  .ff-section{padding:9px 12px;border-bottom:1px solid var(--border);background:rgba(96,165,250,0.04);border-left:3px solid var(--blue);}
+  .ff-section label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--blue);text-transform:uppercase;display:block;margin-bottom:6px;}
+  .btn-ff{background:linear-gradient(135deg,#0078d4,#005a9e);color:#fff;border:none;border-radius:4px;padding:7px 12px;font-weight:700;font-size:11px;cursor:pointer;width:100%;letter-spacing:.5px;transition:opacity .15s;}
+  .btn-ff:hover{opacity:.85;}
+  .btn-ff:disabled{opacity:.5;cursor:not-allowed;}
+  .ff-status{font-size:10px;margin-top:5px;color:var(--muted);}
+  .ff-status.ok{color:var(--blue);}
+  .ff-status.err{color:var(--outside);}
+  .plot-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Segoe UI',sans-serif;font-size:11px;padding:6px 8px;outline:none;margin-top:6px;cursor:pointer;}
+  .plot-select:focus{border-color:var(--blue);}
+  /* Polygon edit */
+  .btn-edit-poly{background:rgba(251,191,36,0.12);color:var(--warn);border:1px solid rgba(251,191,36,0.3);border-radius:4px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:all .15s;}
+  .btn-edit-poly:hover{background:rgba(251,191,36,0.2);}
+  .btn-edit-poly.active{background:var(--warn);color:#000;}
+  .btn-save-poly{background:rgba(74,222,128,0.12);color:var(--accent);border:1px solid rgba(74,222,128,0.3);border-radius:4px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:all .15s;display:none;}
+  .btn-save-poly:hover{background:rgba(74,222,128,0.22);}
+  .edit-hint{font-size:9px;color:var(--warn);margin-top:4px;display:none;line-height:1.5;}
+
+
+  /* Column picker */
+  .col-picker{background:rgba(20,40,70,0.97);border:1px solid var(--blue-border);border-radius:6px;padding:10px 12px;margin-top:8px;}
+  .col-picker-title{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--blue);text-transform:uppercase;margin-bottom:6px;}
+  .col-picker-file{font-size:9px;color:var(--muted);margin-bottom:8px;font-style:italic;word-break:break-all;}
+  .col-picker-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+  .col-picker-row label{font-size:10px;color:var(--muted);width:72px;flex-shrink:0;}
+  .col-picker-row select{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:11px;padding:4px 5px;outline:none;}
+  .col-picker-row select:focus{border-color:var(--blue);}
+  .btn-apply-cols{width:100%;margin-top:6px;padding:7px;background:var(--blue);color:#000;border:none;border-radius:4px;font-weight:700;font-size:11px;cursor:pointer;letter-spacing:.5px;}
+  .btn-apply-cols:hover{opacity:0.85;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌳 Plot Tree Reviewer</h1>
+  <span class="badge">v5</span>
+  <div id="ffStatusHeader" style="font-size:10px;color:var(--muted);"></div>
+  <div class="plot-label">Active: <span id="plotNameDisplay">—</span></div>
+  <div class="spacer"></div>
+  <div class="batch-counter">
+    <div>
+      <div class="bc-count" id="batchCount">0</div>
+      <div class="bc-label">plots in batch</div>
+    </div>
+    <button class="btn-dl-all" id="btnDlAll" onclick="downloadBatch()" disabled>⬇ Download All PDF</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- LEFT -->
+  <div class="left">
+
+    <!-- Fieldforce Live Connection -->
+    <div class="ff-section" id="ffSection">
+      <label>☁ Connect to Fieldforce</label>
+      <button class="btn-ff" id="btnFF" onclick="connectFieldforce()">
+        ☁ Connect to Fieldforce
+      </button>
+      <div class="ff-status" id="ffStatus">Connect to load plots directly from Fieldforce</div>
+      <select class="plot-select" id="plotSelect" style="display:none" onchange="loadPlotFromFieldforce()">
+        <option value="">— Select a plot —</option>
+      </select>
+    </div>
+
+    <div class="section">
+      <label>Plot Name</label>
+      <input id="plotNameInput" type="text" placeholder="e.g. PLT_Kasanka_49" style="font-family:'Segoe UI',sans-serif;font-size:12px;"/>
+    </div>
+
+    <div class="section">
+      <label>PolygonGeoJSON — from Plot record</label>
+      <textarea id="polygonInput" placeholder='{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[lng,lat],...]]}}
+
+Paste the PolygonGeoJSON field directly.'></textarea>
+    </div>
+
+    <div class="ref-section">
+      <label>● RefCenter — RefCenterLat / RefCenterLong</label>
+      <div class="ref-row">
+        <div><span>RefCenterLat</span><input id="refLat" type="text" placeholder="-12.5010020000"/></div>
+        <div><span>RefCenterLong</span><input id="refLng" type="text" placeholder="30.2697960000"/></div>
+      </div>
+      <div class="ref-status" id="refStatus">Not set — will be skipped</div>
+    </div>
+
+    <div class="meas-section">
+      <label>📐 Measured Center — MeasuredCenterLat / Long</label>
+      <div class="ref-row">
+        <div><span>MeasuredCenterLat</span><input id="measLat" type="text" placeholder="-9.2307253100"/></div>
+        <div><span>MeasuredCenterLong</span><input id="measLng" type="text" placeholder="31.0517368900"/></div>
+      </div>
+      <div class="meas-status" id="measStatus">Not set — centre distance won't be shown</div>
+    </div>
+
+    <div class="upload-section">
+      <label>📊 Trees — Upload Excel export</label>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])"/>
+        <div style="font-size:18px;margin-bottom:3px;">📂</div>
+        <div class="upload-text">Drop .xlsx / .csv here or click to browse<br><span style="font-size:9px;opacity:.6;">Columns auto-detected — or map manually if needed</span></div>
+      </div>
+      <div class="upload-status" id="uploadStatus"></div>
+      <div class="col-picker" id="colPicker" style="display:none">
+        <div class="col-picker-title">📋 Map columns manually</div>
+        <div class="col-picker-file" id="colPickerFile"></div>
+        <div class="col-picker-row">
+          <label>Latitude col</label>
+          <select id="colPickerLat"></select>
+        </div>
+        <div class="col-picker-row">
+          <label>Longitude col</label>
+          <select id="colPickerLng"></select>
+        </div>
+        <div class="col-picker-row">
+          <label>Tree UID col</label>
+          <select id="colPickerUid"></select>
+        </div>
+        <button class="btn-apply-cols" onclick="applyPickerColumns()">✓ Apply Column Mapping</button>
+      </div>
+    </div>
+
+    <div class="or-divider"><span>OR PASTE</span></div>
+
+    <div class="section">
+      <label>Tree Coordinates — manual (one per line)</label>
+      <textarea id="treesInput" placeholder="-12.9065946200, 30.9553237600
+30.9553063600  -12.9065684700"></textarea>
+      <div class="hint">Lat/lng auto-detected. Comma or space separator fine.</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="runAnalysis()">▶ Analyse</button>
+      <button class="btn btn-clear" onclick="clearCurrent()" title="Clear current">✕</button>
+    </div>
+
+    <!-- Download buttons — shown after analysis -->
+    <div class="btn-row2" id="dlRow" style="display:none">
+      <button class="btn btn-save" onclick="addToBatch()" id="btnAddBatch">＋ Add to Batch</button>
+      <button class="btn btn-dl-one" onclick="downloadSingle()" id="btnDlSingle">⬇ Download PDF</button>
+    </div>
+    <!-- Polygon edit tools — shown after analysis -->
+    <div class="btn-row2" id="editRow" style="display:none;gap:5px;flex-wrap:wrap">
+      <button class="btn-edit-poly" id="btnEditPoly" onclick="toggleEditPolygon()">✏️ Edit Polygon</button>
+      <button class="btn-save-poly" id="btnSavePoly" onclick="savePolygonToFieldforce()">💾 Save to Fieldforce</button>
+      <div class="edit-hint" id="editHint">Drag vertices to reshape. Click Save when done.</div>
+    </div>
+
+    <!-- Measurements panel — shown after analysis -->
+    <div class="measure-panel" id="measurePanel" style="display:none">
+      <div class="measure-panel-title">📐 Measurements</div>
+      <div class="measure-grid" id="measureGrid"></div>
+    </div>
+
+    <!-- Batch list -->
+    <div class="batch-list" id="batchListWrap" style="display:none">
+      <div class="batch-list-header">📦 Batch queue</div>
+      <div id="batchListItems"></div>
+    </div>
+
+    <div class="results-panel" id="resultsPanel">
+      <div class="empty-state">Fill in polygon + RefCenter + trees<br>then click <strong>Analyse</strong></div>
+    </div>
+
+    <div class="copy-bar" id="copyBar" style="display:none">
+      <div class="result-text" id="copyText"></div>
+      <button class="btn-copy-num" onclick="copyOutsideCount()">Copy #</button>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div id="mapWrapper">
+    <div class="map-placeholder" id="mapPlaceholder">Run an analysis to see the satellite map</div>
+    <div class="map-toolbar" id="mapToolbar" style="display:none">
+      <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📐 Side lengths</button>
+      <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📏 A→B ruler</button>
+      <button class="map-tool-btn" id="btnClearMeasure" onclick="clearMeasure()" style="display:none">✕ Ruler</button>
+    </div>
+    <div id="map"></div>
+    <div class="capture-overlay" id="captureOverlay" style="display:none">
+      <div class="spinner"></div>
+      <div class="co-text">Capturing map…</div>
+      <div class="co-sub">Please wait, rendering satellite tiles</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+let map = null, mapLayers = [];
+let parsedFromExcel = [];
+let currentResult = null; // { plotName, results, refResult, insideCount, outsideCount }
+let batch = []; // array of { plotName, results, refResult, insideCount, outsideCount, mapDataUrl }
+
+// ── Drag-drop ────────────────────────────────────────────────────────────────
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('drag');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');handleFile(e.dataTransfer.files[0]);});
+
+// ── Excel parser ─────────────────────────────────────────────────────────────
+let rawExcelRows = [], allExcelKeys = [];
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      // Try all sheets, use the one with most rows
+      let bestWs = null, bestLen = 0;
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+        if (rows.length > bestLen) { bestLen = rows.length; bestWs = rows; }
+      });
+      if (!bestWs || !bestLen) { setUploadStatus('No data found in file.', false); return; }
+      rawExcelRows = bestWs;
+      allExcelKeys = Object.keys(rawExcelRows[0]);
+
+      // Try to auto-detect columns
+      const fc = names => allExcelKeys.find(k => names.some(n => k.toLowerCase().replace(/[\s_()]/g,'').includes(n.toLowerCase().replace(/[\s_()]/g,''))));
+      const latCol = fc(['treelat','treetlat','lat','latitude']);
+      const lngCol = fc(['treelong','treelong','lng','lon','longitude']);
+      const uidCol = fc(['treeinventoryuid','uid','treeid','id']);
+
+      if (latCol && lngCol) {
+        // Auto-detected — go straight to parsing
+        applyColumnMapping(latCol, lngCol, uidCol, file.name);
+      } else {
+        // Show manual column picker
+        showColumnPicker(file.name);
+      }
+    } catch(err) { setUploadStatus('Error reading file: ' + err.message, false); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showColumnPicker(filename) {
+  setUploadStatus('', false);
+  const picker = document.getElementById('colPicker');
+  const latSel = document.getElementById('colPickerLat');
+  const lngSel = document.getElementById('colPickerLng');
+  const uidSel = document.getElementById('colPickerUid');
+  // Populate dropdowns
+  const opts = allExcelKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+  const optsBlank = `<option value="">— skip —</option>` + opts;
+  latSel.innerHTML = opts;
+  lngSel.innerHTML = opts;
+  uidSel.innerHTML = optsBlank;
+  // Try to pre-select sensible defaults by index (lat=first numeric-looking, etc.)
+  const numericCols = allExcelKeys.filter(k => {
+    const sample = rawExcelRows.slice(0,3).map(r=>parseFloat(r[k])).filter(v=>!isNaN(v));
+    return sample.length > 0;
+  });
+  if (numericCols[0]) latSel.value = numericCols[0];
+  if (numericCols[1]) lngSel.value = numericCols[1];
+  // Try uid
+  const uidGuess = allExcelKeys.find(k => k.toLowerCase().includes('uid') || k.toLowerCase().includes('id'));
+  if (uidGuess) uidSel.value = uidGuess;
+
+  document.getElementById('colPickerFile').textContent = filename;
+  picker.style.display = 'block';
+  setUploadStatus(`⚠ Column names not recognised — please map them below.`, false);
+}
+
+function applyPickerColumns() {
+  const latCol = document.getElementById('colPickerLat').value;
+  const lngCol = document.getElementById('colPickerLng').value;
+  const uidCol = document.getElementById('colPickerUid').value || null;
+  if (!latCol || !lngCol) { alert('Please select both a Latitude and Longitude column.'); return; }
+  document.getElementById('colPicker').style.display = 'none';
+  applyColumnMapping(latCol, lngCol, uidCol, document.getElementById('colPickerFile').textContent);
+}
+
+function applyColumnMapping(latCol, lngCol, uidCol, filename) {
+  parsedFromExcel = rawExcelRows.map(r => {
+    const a = parseFloat(r[latCol]), b = parseFloat(r[lngCol]);
+    if (isNaN(a) || isNaN(b)) return null;
+    let lat, lng;
+    // Auto-detect swapped fields (Dynamics app stores TreeLat=lng, TreeLong=lat)
+    if      (a < 0 && b > 0)       { lat = a; lng = b; }
+    else if (b < 0 && a > 0)       { lat = b; lng = a; }
+    else if (Math.abs(a) < 90)     { lat = a; lng = b; }
+    else                            { lat = b; lng = a; }
+    return { uid: uidCol ? String(r[uidCol]) : '', lat, lng };
+  }).filter(Boolean);
+
+  if (parsedFromExcel.length && parsedFromExcel[0].uid) {
+    const m = parsedFromExcel[0].uid.match(/^(PLT_[A-Za-z]+_\d+)/);
+    if (m && !document.getElementById('plotNameInput').value)
+      document.getElementById('plotNameInput').value = m[1];
+  }
+  setUploadStatus(`✓ ${parsedFromExcel.length} trees loaded — lat: "${latCol}", lng: "${lngCol}"`, true);
+  document.getElementById('treesInput').value = '';
+}
+
+function setUploadStatus(msg, ok) {
+  const el = document.getElementById('uploadStatus');
+  el.textContent = msg;
+  el.className = 'upload-status ' + (ok ? 'ok' : 'err');
+}
+
+
+// ── Geodesy helpers ───────────────────────────────────────────────────────────
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // metres
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function polygonPerimeter(ring) {
+  let total = 0;
+  for (let i=0; i<ring.length-1; i++)
+    total += haversine(ring[i][1], ring[i][0], ring[i+1][1], ring[i+1][0]);
+  return total;
+}
+
+function polygonArea(ring) {
+  // Shoelace in degrees → convert using approx metres per degree at centroid
+  let sumLat=0, sumLng=0, n=ring.length-1;
+  for(let i=0;i<n;i++){sumLat+=ring[i][1];sumLng+=ring[i][0];}
+  const cLat=sumLat/n, cLng=sumLng/n;
+  const mPerLat=111320;
+  const mPerLng=111320*Math.cos(cLat*Math.PI/180);
+  let area=0;
+  for(let i=0,j=n-1;i<n;j=i++){
+    const xi=(ring[i][0]-cLng)*mPerLng, yi=(ring[i][1]-cLat)*mPerLat;
+    const xj=(ring[j][0]-cLng)*mPerLng, yj=(ring[j][1]-cLat)*mPerLat;
+    area+=xi*yj - xj*yi;
+  }
+  return Math.abs(area/2);
+}
+
+function fmtDist(m) {
+  if (m < 1000) return m.toFixed(1) + ' m';
+  return (m/1000).toFixed(3) + ' km';
+}
+
+// ── Measured center live status ───────────────────────────────────────────────
+['measLat','measLng'].forEach(id=>document.getElementById(id).addEventListener('input',updateMeasStatus));
+function updateMeasStatus(){
+  const lat=parseFloat(document.getElementById('measLat').value);
+  const lng=parseFloat(document.getElementById('measLng').value);
+  const el=document.getElementById('measStatus');
+  if(!isNaN(lat)&&!isNaN(lng)){
+    el.textContent=`✓ Set: (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
+    el.className='meas-status set';
+  } else {
+    el.textContent='Not set — centre distance will not be shown';
+    el.className='meas-status';
+  }
+}
+
+// ── Render measurement panel ──────────────────────────────────────────────────
+function renderMeasurements(ring, refResult) {
+  const panel = document.getElementById('measurePanel');
+  const grid  = document.getElementById('measureGrid');
+  if (!ring || ring.length < 3) { panel.style.display='none'; return; }
+
+  const perim   = polygonPerimeter(ring);
+  const area    = polygonArea(ring);
+  const side    = Math.sqrt(area); // equiv square side
+  const TARGET  = 20; // metres — expected 20x20
+  const areaDiff= Math.abs(area - TARGET*TARGET);
+  const areaOk  = areaDiff < (TARGET*TARGET*0.2); // within 20% of 400m²
+
+  // MeasuredCenter distance
+  const measLatV = parseFloat(document.getElementById('measLat').value);
+  const measLngV = parseFloat(document.getElementById('measLng').value);
+  const hasMeas  = !isNaN(measLatV) && !isNaN(measLngV);
+
+  // RefCenter ↔ MeasuredCenter distance
+  let centreDistHtml = '';
+  if (refResult && hasMeas) {
+    const cd = haversine(refResult.lat, refResult.lng, measLatV, measLngV);
+    const cdOk = cd < 5;
+    centreDistHtml = `
+      <div class="measure-card full ${cdOk?'ok':'warn'}">
+        <div class="mc-label">RefCenter → MeasuredCenter distance</div>
+        <div class="mc-value">${fmtDist(cd)}</div>
+        <div class="mc-sub">${cdOk?'✓ Centres align well':'⚠ Large offset between ref and measured centre'}</div>
+      </div>`;
+  }
+
+  // MeasuredCenter marker on map
+  if (hasMeas) {
+    const measIcon = L.divIcon({className:'',
+      html:`<div style="background:var(--warn,#fbbf24);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.7)">M</div>`,
+      iconSize:[22,22],iconAnchor:[11,11]});
+    const mm = L.marker([measLatV,measLngV],{icon:measIcon}).addTo(map)
+      .bindPopup(`<b>MeasuredCenter</b><br>${measLatV.toFixed(7)}, ${measLngV.toFixed(7)}`);
+    mapLayers.push(mm);
+    // Draw line between RefCenter and MeasuredCenter
+    if (refResult) {
+      const line = L.polyline([[refResult.lat,refResult.lng],[measLatV,measLngV]],
+        {color:'#fbbf24',weight:2,dashArray:'5,4',opacity:0.8}).addTo(map);
+      mapLayers.push(line);
+    }
+  }
+
+  grid.innerHTML = `
+    <div class="measure-card ${areaOk?'ok':'warn'}">
+      <div class="mc-label">Area</div>
+      <div class="mc-value">${area.toFixed(1)} m²</div>
+      <div class="mc-sub">Equiv. ${side.toFixed(1)} × ${side.toFixed(1)} m</div>
+      <div class="mc-target">Target: 400 m² (20×20)</div>
+    </div>
+    <div class="measure-card">
+      <div class="mc-label">Perimeter</div>
+      <div class="mc-value">${fmtDist(perim)}</div>
+      <div class="mc-sub">Target: ~80 m</div>
+    </div>
+    ${centreDistHtml}
+  `;
+  panel.style.display='block';
+  document.getElementById('mapToolbar').style.display='flex';
+}
+
+// ── Click-to-measure map tool ─────────────────────────────────────────────────
+// ── Measure tool — click to place, then drag endpoints live ──────────────────
+let measureMode = false;
+let mA = null, mB = null; // draggable markers
+let mLine = null, mLabel = null; // polyline + distance label
+let mLayers = []; // all measure layers for easy removal
+
+function makeDragHandle(latlng, letter) {
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:20px;height:20px;border-radius:50%;
+      background:#fbbf24;border:3px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,0.6);
+      display:flex;align-items:center;justify-content:center;
+      font-size:10px;font-weight:800;color:#000;
+      cursor:grab;user-select:none;
+    ">${letter}</div>`,
+    iconSize:[20,20], iconAnchor:[10,10]
+  });
+  return L.marker(latlng, { icon, draggable: true, zIndexOffset: 1000 });
+}
+
+function updateMeasureLine() {
+  if (!mA || !mB) return;
+  const p1 = mA.getLatLng(), p2 = mB.getLatLng();
+  const dist = haversine(p1.lat, p1.lng, p2.lat, p2.lng);
+  const mid  = L.latLng((p1.lat+p2.lat)/2, (p1.lng+p2.lng)/2);
+
+  if (mLine) { mLine.setLatLngs([p1, p2]); }
+  else {
+    mLine = L.polyline([p1,p2], {color:'#fbbf24', weight:2.5, dashArray:'7,5', opacity:0.9}).addTo(map);
+    mLayers.push(mLine);
+  }
+  if (mLabel) { map.removeLayer(mLabel); }
+  mLabel = L.marker(mid, {
+    icon: L.divIcon({
+      className: 'measure-tooltip',
+      html: fmtDist(dist),
+      iconAnchor: [35, -6]
+    }),
+    zIndexOffset: 2000
+  }).addTo(map);
+  mLayers.push(mLabel);
+}
+
+function clearMeasure() {
+  mLayers.forEach(l => map && map.removeLayer(l)); mLayers = [];
+  if (mA) { map.removeLayer(mA); mA = null; }
+  if (mB) { map.removeLayer(mB); mB = null; }
+  mLine = null; mLabel = null;
+  measureMode = false;
+  document.getElementById('btnMeasure').classList.remove('active');
+  document.getElementById('btnMeasure').textContent = '📏 Measure';
+  document.getElementById('btnClearMeasure').style.display = 'none';
+  document.getElementById('map').style.cursor = '';
+}
+
+function toggleMeasure() {
+  if (measureMode || mA) { clearMeasure(); return; }
+  measureMode = true;
+  const btn = document.getElementById('btnMeasure');
+  btn.classList.add('active');
+  btn.textContent = '📏 Click point A…';
+  document.getElementById('map').style.cursor = 'crosshair';
+}
+
+// Attach map click — first click = A, second click = B, then drag freely
+function attachMeasureClick() {
+  map.on('click', function(e) {
+    if (!measureMode) return;
+
+    if (!mA) {
+      // Place point A
+      mA = makeDragHandle(e.latlng, 'A').addTo(map);
+      mA.on('drag', updateMeasureLine);
+      mA.on('dragstart', () => { document.getElementById('map').style.cursor = 'grabbing'; });
+      mA.on('dragend',   () => { document.getElementById('map').style.cursor = ''; });
+      document.getElementById('btnMeasure').textContent = '📏 Click point B…';
+
+    } else if (!mB) {
+      // Place point B — line appears, both endpoints draggable
+      mB = makeDragHandle(e.latlng, 'B').addTo(map);
+      mB.on('drag', updateMeasureLine);
+      mB.on('dragstart', () => { document.getElementById('map').style.cursor = 'grabbing'; });
+      mB.on('dragend',   () => { document.getElementById('map').style.cursor = ''; });
+      updateMeasureLine();
+
+      measureMode = false;
+      document.getElementById('map').style.cursor = '';
+      document.getElementById('btnMeasure').textContent = '📏 Measure';
+      document.getElementById('btnMeasure').classList.remove('active');
+      document.getElementById('btnClearMeasure').style.display = '';
+    }
+  });
+}
+
+
+// ── Auto side-length labels ───────────────────────────────────────────────────
+let sideLabelLayers = [], sidesVisible = false;
+const SIDE_TARGET = 20; // metres — expected plot side
+
+function toggleSideLabels() {
+  if (sidesVisible) {
+    clearSideLabels();
+    return;
+  }
+  if (!currentResult || !currentResult.ring) {
+    alert('Run an analysis first to load the plot polygon.');
+    return;
+  }
+  showSideLabels(currentResult.ring);
+}
+
+function clearSideLabels() {
+  sideLabelLayers.forEach(l => map && map.removeLayer(l));
+  sideLabelLayers = [];
+  sidesVisible = false;
+  const btn = document.getElementById('btnSides');
+  if (btn) { btn.classList.remove('active'); btn.textContent = '📐 Side lengths'; }
+}
+
+function showSideLabels(ring) {
+  clearSideLabels();
+  // ring is closed (first = last), so iterate n-1 sides
+  const n = ring.length - 1;
+  let totalPerim = 0;
+  const sides = [];
+
+  for (let i = 0; i < n; i++) {
+    const c1 = ring[i], c2 = ring[i+1];
+    const lat1=c1[1], lng1=c1[0], lat2=c2[1], lng2=c2[0];
+    const dist = haversine(lat1, lng1, lat2, lng2);
+    totalPerim += dist;
+    sides.push({ lat1, lng1, lat2, lng2, dist, idx: i+1 });
+  }
+
+  sides.forEach(s => {
+    // Midpoint for label
+    const midLat = (s.lat1 + s.lat2) / 2;
+    const midLng = (s.lng1 + s.lng2) / 2;
+
+    // Colour: green if within 15% of target, red if more than 30% off
+    const pct = Math.abs(s.dist - SIDE_TARGET) / SIDE_TARGET;
+    const cls = pct < 0.15 ? 'ok' : (pct > 0.30 ? 'warn' : '');
+
+    // Side label marker
+    const labelHtml = `<div class="side-label ${cls}">Side ${s.idx}: ${s.dist.toFixed(1)} m</div>`;
+    const lbl = L.marker([midLat, midLng], {
+      icon: L.divIcon({ className: '', html: labelHtml, iconAnchor: [50, -6] }),
+      interactive: false,
+      zIndexOffset: 500
+    }).addTo(map);
+    sideLabelLayers.push(lbl);
+
+    // Endpoint vertex dots
+    const dot1 = L.circleMarker([s.lat1, s.lng1], {
+      radius: 4, color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.9, weight: 1.5
+    }).addTo(map);
+    const dot2 = L.circleMarker([s.lat2, s.lng2], {
+      radius: 4, color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.9, weight: 1.5
+    }).addTo(map);
+    sideLabelLayers.push(dot1, dot2);
+  });
+
+  // Summary tooltip in corner — total perimeter + avg side
+  const avgSide = totalPerim / n;
+  const perimOk = Math.abs(totalPerim - SIDE_TARGET * 4) / (SIDE_TARGET * 4) < 0.15;
+  const summaryHtml = `
+    <div style="
+      background:rgba(15,17,23,0.92);border:1px solid rgba(251,191,36,0.4);
+      border-radius:5px;padding:6px 10px;font-size:11px;line-height:1.7;
+      color:#e2e8f0;min-width:160px;
+    ">
+      <div style="font-weight:800;color:#fbbf24;letter-spacing:1px;margin-bottom:3px;">POLYGON SIDES</div>
+      <div>${n} sides &nbsp;|&nbsp; Target: 20 m each</div>
+      <div>Avg side: <b style="color:${Math.abs(avgSide-20)<3?'#4ade80':'#f87171'}">${avgSide.toFixed(1)} m</b></div>
+      <div>Perimeter: <b style="color:${perimOk?'#4ade80':'#f87171'}">${totalPerim.toFixed(1)} m</b> <span style="color:#64748b">(target 80 m)</span></div>
+      <div style="margin-top:4px;font-size:9px;color:#64748b;">🟢 &lt;15% off &nbsp; 🔴 &gt;30% off</div>
+    </div>`;
+  const summary = L.marker(
+    [Math.max(...ring.slice(0,n).map(c=>c[1])), Math.min(...ring.slice(0,n).map(c=>c[0]))],
+    {
+      icon: L.divIcon({ className: '', html: summaryHtml, iconAnchor: [-8, 0] }),
+      interactive: false,
+      zIndexOffset: 600
+    }
+  ).addTo(map);
+  sideLabelLayers.push(summary);
+
+  sidesVisible = true;
+  const btn = document.getElementById('btnSides');
+  if (btn) { btn.classList.add('active'); btn.textContent = '📐 Hide sides'; }
+}
+
+// ── RefCenter ────────────────────────────────────────────────────────────────
+['refLat','refLng'].forEach(id=>document.getElementById(id).addEventListener('input',updateRefStatus));
+function updateRefStatus(){
+  const lat=parseFloat(document.getElementById('refLat').value);
+  const lng=parseFloat(document.getElementById('refLng').value);
+  const el=document.getElementById('refStatus');
+  if(!isNaN(lat)&&!isNaN(lng)){el.textContent=`✓ (${lat.toFixed(6)}, ${lng.toFixed(6)})`;el.className='ref-status set';}
+  else{el.textContent='Not set — will be skipped';el.className='ref-status';}
+}
+
+// ── Parsers ──────────────────────────────────────────────────────────────────
+function parsePolygon(raw){
+  raw = raw.trim();
+  if (!raw) return null;
+
+  // Helper: validate a ring — array of [lng,lat] pairs, at least 3 unique points
+  function validRing(r) {
+    return Array.isArray(r) && r.length >= 3 &&
+      Array.isArray(r[0]) && r[0].length === 2 &&
+      typeof r[0][0] === 'number' && typeof r[0][1] === 'number';
+  }
+
+  // Strategy 1: try raw as valid JSON first
+  function tryParse(str) {
+    try {
+      const obj = JSON.parse(str);
+      // Full GeoJSON Feature or Geometry
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        const geo = obj.geometry || obj;
+        if (geo && geo.type === 'Polygon')      return geo.coordinates[0];
+        if (geo && geo.type === 'MultiPolygon') return geo.coordinates[0][0];
+      }
+      // Array: [[[lng,lat],...]] — GeoJSON coordinates wrapper
+      if (Array.isArray(obj)) {
+        if (Array.isArray(obj[0]) && Array.isArray(obj[0][0])) return obj[0];
+        if (Array.isArray(obj[0]) && typeof obj[0][0] === 'number') return obj;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  // Try raw directly
+  let result = tryParse(raw);
+  if (result && validRing(result)) return result;
+
+  // Strategy 2: strip trailing garbage characters (}}, ]]], extra braces from partial paste)
+  // Keep stripping from the end until we get valid JSON or run out
+  let cleaned = raw;
+  // Remove common Dynamics export trailing chars: }}}, ]}}}, etc.
+  cleaned = cleaned.replace(/[}\]]+$/, '');
+  // Find the last complete ] and trim to it
+  const lastBracket = cleaned.lastIndexOf(']');
+  if (lastBracket > 0) {
+    cleaned = cleaned.substring(0, lastBracket + 1);
+    result = tryParse(cleaned);
+    if (result && validRing(result)) return result;
+  }
+
+  // Strategy 3: extract coordinate pairs directly using regex
+  // Handles any malformed wrapping — just pull all [number,number] pairs
+  const pairRe = /\[\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\]/g;
+  const pairs = [];
+  let m;
+  while ((m = pairRe.exec(raw)) !== null) {
+    pairs.push([parseFloat(m[1]), parseFloat(m[2])]);
+  }
+  if (pairs.length >= 3) return pairs;
+
+  // Strategy 4: wrap in brackets and try
+  try {
+    const arr = JSON.parse('[' + raw + ']');
+    if (Array.isArray(arr[0]) && Array.isArray(arr[0][0])) return arr[0];
+    if (Array.isArray(arr[0]) && typeof arr[0][0] === 'number') return arr;
+  } catch(e) {}
+
+  return null;
+}
+function parseManualTrees(raw){
+  return raw.trim().split('\n').map(line=>{
+    const nums=line.trim().replace(/[,;|]+/g,' ').split(/\s+/).map(Number).filter(n=>!isNaN(n));
+    if(nums.length<2)return null;
+    const[a,b]=nums;let lat,lng;
+    if(a<0&&b>0){lat=a;lng=b;}else if(b<0&&a>0){lat=b;lng=a;}else if(Math.abs(a)<90){lat=a;lng=b;}else{lat=b;lng=a;}
+    return{uid:'',lat,lng};
+  }).filter(Boolean);
+}
+function pip(lat,lng,ring){
+  let inside=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+    if(((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi))inside=!inside;
+  }
+  return inside;
+}
+
+// ── Analysis ─────────────────────────────────────────────────────────────────
+function runAnalysis(){
+  const plotName=document.getElementById('plotNameInput').value.trim()||'Unknown Plot';
+  document.getElementById('plotNameDisplay').textContent=plotName;
+  const ring=parsePolygon(document.getElementById('polygonInput').value);
+  if(!ring){alert('Could not parse polygon.');return;}
+  const trees=parsedFromExcel.length?parsedFromExcel:parseManualTrees(document.getElementById('treesInput').value);
+  if(!trees.length){alert('No tree coordinates found.');return;}
+  const refLatV=parseFloat(document.getElementById('refLat').value);
+  const refLngV=parseFloat(document.getElementById('refLng').value);
+  const hasRef=!isNaN(refLatV)&&!isNaN(refLngV);
+  let insideCount=0,outsideCount=0;
+  const results=trees.map((t,i)=>{
+    const inside=pip(t.lat,t.lng,ring);
+    if(inside)insideCount++;else outsideCount++;
+    return{...t,inside,n:i+1,label:String(i+1)};
+  });
+  const refResult=hasRef?{lat:refLatV,lng:refLngV,inside:pip(refLatV,refLngV,ring)}:null;
+  currentResult={plotName,results,refResult,insideCount,outsideCount,ring};
+  renderResults(results,refResult,insideCount,outsideCount,plotName);
+  renderMap(ring,results,refResult,plotName);
+  renderMeasurements(ring, refResult);
+  if(typeof showSideLabels==="function") setTimeout(()=>showSideLabels(ring), 600);
+  document.getElementById('dlRow').style.display='flex';
+  document.getElementById('btnAddBatch').disabled=false;
+}
+
+// ── Results panel ────────────────────────────────────────────────────────────
+function renderResults(results,refResult,insideCount,outsideCount,plotName){
+  let html=`<div class="results-header"><span>${plotName}</span><span>${results.length} trees</span></div>
+  <div class="summary-chips">
+    <span class="chip chip-total">Total: ${results.length}</span>
+    <span class="chip chip-in">✓ ${insideCount} in</span>
+    <span class="chip chip-out">✗ ${outsideCount} out</span>
+    ${refResult?`<span class="chip chip-blue">● Ref: ${refResult.inside?'in':'OUT'}</span>`:''}
+  </div><div class="tree-list">`;
+  if(refResult){
+    html+=`<div class="tree-item refcenter" onclick="flyTo(${refResult.lat},${refResult.lng})">
+      <div class="tree-num num-blue">●</div>
+      <div class="tree-coords"><span style="color:var(--blue);font-size:9px;font-weight:700;letter-spacing:1px;">REF CENTER</span><br>${refResult.lat.toFixed(7)}, ${refResult.lng.toFixed(7)}</div>
+      <span class="tree-status ${refResult.inside?'status-in':'status-out'}">${refResult.inside?'IN':'OUT ⚠'}</span>
+    </div>`;
+  }
+  results.forEach(r=>{
+    html+=`<div class="tree-item ${r.inside?'inside':'outside'}" onclick="flyTo(${r.lat},${r.lng})">
+      <div class="tree-num ${r.inside?'num-in':'num-out'}">${r.label}</div>
+      <div class="tree-coords">${r.uid?`<span class="tree-uid">${r.uid}</span><br>`:''} ${r.lat.toFixed(7)}, ${r.lng.toFixed(7)}</div>
+      <span class="tree-status ${r.inside?'status-in':'status-out'}">${r.inside?'IN':'OUT ⚠'}</span>
+    </div>`;
+  });
+  html+='</div>';
+  document.getElementById('resultsPanel').innerHTML=html;
+  document.getElementById('copyText').innerHTML=`<strong>${outsideCount} outside</strong> / ${results.length} total`;
+  document.getElementById('copyBar').style.display='flex';
+}
+
+function flyTo(lat,lng){if(map)map.flyTo([lat,lng],21,{duration:0.5});}
+function copyOutsideCount(){
+  if(!currentResult)return;
+  navigator.clipboard.writeText(String(currentResult.outsideCount)).catch(()=>{});
+  const btn=event.target;btn.textContent='✓';setTimeout(()=>btn.textContent='Copy #',1200);
+}
+
+// ── Map ──────────────────────────────────────────────────────────────────────
+function renderMap(ring,results,refResult,plotName){
+  document.getElementById('mapPlaceholder').style.display='none';
+  document.getElementById('map').style.display='block';
+  if(!map){
+    map=L.map('map',{zoomControl:true,preferCanvas:true});
+    // Esri World Imagery — supports crossOrigin for canvas capture
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+      subdomains:['mt0','mt1','mt2','mt3'],maxZoom:21,attribution:'© Google Maps'
+    }).addTo(map);
+    attachMeasureClick();
+  }
+  mapLayers.forEach(l=>map.removeLayer(l));mapLayers=[];
+  const latLngs=ring.map(c=>[c[1],c[0]]);
+  const poly=L.polygon(latLngs,{color:'#4ade80',weight:2.5,fillColor:'#4ade80',fillOpacity:0.12,dashArray:'6,4'}).addTo(map);
+  mapLayers.push(poly);
+  if(refResult){
+    const ri=L.divIcon({className:'',html:`<div style="background:#60a5fa;color:#000;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;border:3px solid #fff;box-shadow:0 0 0 3px rgba(96,165,250,0.5),0 3px 8px rgba(0,0,0,0.7)">●</div>`,iconSize:[26,26],iconAnchor:[13,13]});
+    mapLayers.push(L.marker([refResult.lat,refResult.lng],{icon:ri}).addTo(map).bindPopup(`<b>RefCenter</b><br>${refResult.inside?'✓ Inside':'⚠ OUTSIDE'}`));
+  }
+  results.forEach(r=>{
+    const c=r.inside?'#4ade80':'#f87171';
+    const ic=L.divIcon({className:'',html:`<div style="background:${c};color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.7)">${r.label}</div>`,iconSize:[22,22],iconAnchor:[11,11]});
+    mapLayers.push(L.marker([r.lat,r.lng],{icon:ic}).addTo(map).bindPopup(`<b>${r.uid||'Tree '+r.label}</b><br>${r.inside?'✓ Inside':'⚠ OUTSIDE'}<br><code style="font-size:10px">${r.lat.toFixed(7)}, ${r.lng.toFixed(7)}</code>`));
+  });
+  const allPts=[...latLngs,...results.map(r=>[r.lat,r.lng])];
+  if(refResult)allPts.push([refResult.lat,refResult.lng]);
+  map.fitBounds(allPts,{padding:[35,35]});
+}
+
+// ── Map capture: SVG diagram ─────────────────────────────────────────────────
+function captureMap() {
+  return new Promise((resolve) => {
+    if (!currentResult) { resolve(null); return; }
+    try {
+      const { ring, results, refResult } = currentResult;
+      const W = 860, H = 460;
+
+      // Collect ALL points (polygon vertices + trees + refcenter)
+      let allLng = [], allLat = [];
+      if (ring) ring.forEach(c => { allLng.push(c[0]); allLat.push(c[1]); });
+      results.forEach(r => { allLng.push(r.lng); allLat.push(r.lat); });
+      if (refResult) { allLng.push(refResult.lng); allLat.push(refResult.lat); }
+
+      if (!allLng.length) { resolve(null); return; }
+
+      let minLng = Math.min(...allLng), maxLng = Math.max(...allLng);
+      let minLat = Math.min(...allLat), maxLat = Math.max(...allLat);
+
+      // Ensure non-zero range — add minimum padding
+      const rngLng = maxLng - minLng || 0.001;
+      const rngLat = maxLat - minLat || 0.001;
+      const pad = 0.20; // 20% padding on each side
+      minLng -= rngLng * pad; maxLng += rngLng * pad;
+      minLat -= rngLat * pad; maxLat += rngLat * pad;
+
+      const scaleX = W / (maxLng - minLng);
+      const scaleY = H / (maxLat - minLat);
+
+      const toX = lng => ((lng - minLng) * scaleX).toFixed(1);
+      const toY = lat => (H - (lat - minLat) * scaleY).toFixed(1);
+
+      // Polygon
+      let polyEl = '';
+      if (ring && ring.length > 2) {
+        const pts = ring.map(c => `${toX(c[0])},${toY(c[1])}`).join(' ');
+        polyEl = `<polygon points="${pts}" fill="rgba(74,222,128,0.15)" stroke="#4ade80" stroke-width="3" stroke-dasharray="10,6" stroke-linejoin="round"/>`;
+      }
+
+      // RefCenter
+      let refEl = '';
+      if (refResult) {
+        const rx = toX(refResult.lng), ry = toY(refResult.lat);
+        refEl = `
+          <circle cx="${rx}" cy="${ry}" r="14" fill="#60a5fa" stroke="white" stroke-width="3"/>
+          <text x="${rx}" y="${ry}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="13" font-weight="bold" fill="white">R</text>`;
+      }
+
+      // Tree markers
+      let treeEls = results.map(r => {
+        const tx = toX(r.lng), ty = toY(r.lat);
+        const fill = r.inside ? '#4ade80' : '#f87171';
+        const textFill = '#000';
+        const lbl = r.label.length > 2 ? r.label.substring(0,2) : r.label;
+        return `
+          <circle cx="${tx}" cy="${ty}" r="13" fill="${fill}" stroke="white" stroke-width="2.5"/>
+          <text x="${tx}" y="${ty}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="10" font-weight="bold" fill="${textFill}">${lbl}</text>`;
+      }).join('');
+
+      // Legend
+      const lx = 10, ly = H - 32;
+      const legendEl = `
+        <rect x="${lx}" y="${ly}" width="210" height="24" rx="4" fill="rgba(15,17,23,0.85)"/>
+        <circle cx="${lx+14}" cy="${ly+12}" r="8" fill="#4ade80"/><text x="${lx+26}" y="${ly+16}" font-family="sans-serif" font-size="11" fill="#ccc">Inside</text>
+        <circle cx="${lx+80}" cy="${ly+12}" r="8" fill="#f87171"/><text x="${lx+92}" y="${ly+16}" font-family="sans-serif" font-size="11" fill="#ccc">Outside</text>
+        <circle cx="${lx+150}" cy="${ly+12}" r="8" fill="#60a5fa"/><text x="${lx+162}" y="${ly+16}" font-family="sans-serif" font-size="11" fill="#ccc">Ref</text>`;
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+        <rect width="${W}" height="${H}" fill="#1e293b"/>
+        <defs>
+          <pattern id="g" width="30" height="30" patternUnits="userSpaceOnUse">
+            <path d="M30 0L0 0 0 30" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="${W}" height="${H}" fill="url(#g)"/>
+        ${polyEl}
+        ${treeEls}
+        ${refEl}
+        ${legendEl}
+      </svg>`;
+
+      const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.92));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    } catch(e) {
+      console.warn('captureMap error:', e);
+      resolve(null);
+    }
+  });
+}
+
+function drawMarkersToCanvas(ctx, mapEl) {} // kept for compat, no longer used
+
+
+
+// ── PDF page builder ──────────────────────────────────────────────────────────
+function buildPdfPage(doc, plotData, mapDataUrl, pageNum, totalPages){
+  const {plotName, results, refResult, insideCount, outsideCount} = plotData;
+  const margin=14, pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
+  const contentW=pw-margin*2;
+  const now=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Header bar
+  doc.setFillColor(26,29,39);
+  doc.rect(0,0,pw,14,'F');
+  doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(74,222,128);
+  doc.text('PLOT TREE REVIEW',margin,9.5);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(180,180,180);
+  doc.text(`${now}   |   Page ${pageNum} of ${totalPages}`,pw-margin,9.5,'right');
+
+  let y=20;
+
+  // Plot name
+  doc.setFontSize(15);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
+  doc.text(plotName,margin,y);
+  y+=7;
+
+  // Summary chips
+  const chips=[
+    {label:`Total: ${results.length}`,bg:[240,240,240],fg:[60,60,60]},
+    {label:`Inside: ${insideCount}`,bg:[220,253,231],fg:[22,101,52]},
+    {label:`Outside: ${outsideCount}`,bg:[254,226,226],fg:[153,27,27]},
+  ];
+  if(refResult) chips.push({label:`RefCenter: ${refResult.inside?'inside':'OUTSIDE'}`,bg:[219,234,254],fg:[29,78,216]});
+  let cx=margin;
+  chips.forEach(ch=>{
+    const tw=doc.getStringUnitWidth(ch.label)*9/doc.internal.scaleFactor+8;
+    doc.setFillColor(...ch.bg);doc.roundedRect(cx,y,tw,7,2,2,'F');
+    doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...ch.fg);
+    doc.text(ch.label,cx+4,y+4.8);
+    cx+=tw+4;
+  });
+  y+=12;
+
+  // Map image or placeholder
+  const mapH=95;
+  doc.setDrawColor(200,200,200);doc.setLineWidth(0.3);
+  doc.rect(margin,y,contentW,mapH);
+  const validImg = mapDataUrl && typeof mapDataUrl==='string' && mapDataUrl.startsWith('data:image') && mapDataUrl.length>500;
+  if(validImg){
+    try {
+      doc.addImage(mapDataUrl,'JPEG',margin,y,contentW,mapH,undefined,'FAST');
+    } catch(imgErr){
+      doc.setFillColor(245,245,245);doc.rect(margin+0.3,y+0.3,contentW-0.6,mapH-0.6,'F');
+      doc.setFontSize(9);doc.setTextColor(120,120,120);doc.setFont('helvetica','italic');
+      doc.text('Plot diagram unavailable',pw/2,y+mapH/2,'center');
+    }
+  } else {
+    doc.setFillColor(245,245,245);doc.rect(margin+0.3,y+0.3,contentW-0.6,mapH-0.6,'F');
+    doc.setFontSize(9);doc.setTextColor(120,120,120);doc.setFont('helvetica','italic');
+    doc.text('Plot diagram unavailable',pw/2,y+mapH/2,'center');
+  }
+  y+=mapH+6;
+
+  // Table header
+  const cols=[
+    {label:'#',w:10},{label:'Tree UID',w:55},{label:'Latitude',w:38},{label:'Longitude',w:38},{label:'Status',w:35},
+  ];
+  doc.setFillColor(30,30,45);
+  doc.rect(margin,y,contentW,6,'F');
+  doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(200,200,200);
+  let cx2=margin+2;
+  cols.forEach(c=>{doc.text(c.label,cx2,y+4.2);cx2+=c.w;});
+  y+=6;
+
+  // RefCenter row
+  const rowH=5.8;
+  if(refResult){
+    doc.setFillColor(239,246,255);doc.rect(margin,y,contentW,rowH,'F');
+    doc.setFontSize(7);doc.setFont('helvetica','bold');
+    let rx=margin+2;
+    doc.setTextColor(29,78,216);doc.text('●',rx,y+3.8);rx+=cols[0].w;
+    doc.text('Reference Center',rx,y+3.8);rx+=cols[1].w;
+    doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);
+    doc.text(refResult.lat.toFixed(7),rx,y+3.8);rx+=cols[2].w;
+    doc.text(refResult.lng.toFixed(7),rx,y+3.8);rx+=cols[3].w;
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...(refResult.inside?[22,101,52]:[153,27,27]));
+    doc.text(refResult.inside?'Inside':'OUTSIDE',rx,y+3.8);
+    y+=rowH;
+  }
+
+  // Tree rows
+  results.forEach((r,i)=>{
+    if(y>ph-20){doc.addPage();y=20;}
+    const rowBg=r.inside?(i%2===0?[255,255,255]:[248,250,248]):[255,245,245];
+    doc.setFillColor(...rowBg);doc.rect(margin,y,contentW,rowH,'F');
+    doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);
+    let rx=margin+2;
+    doc.text(r.label,rx,y+3.8);rx+=cols[0].w;
+    doc.text(r.uid||'—',rx,y+3.8);rx+=cols[1].w;
+    doc.text(r.lat.toFixed(7),rx,y+3.8);rx+=cols[2].w;
+    doc.text(r.lng.toFixed(7),rx,y+3.8);rx+=cols[3].w;
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...(r.inside?[22,101,52]:[153,27,27]));
+    doc.text(r.inside?'Inside':'OUTSIDE',rx,y+3.8);
+    doc.setDrawColor(230,230,230);doc.setLineWidth(0.1);
+    doc.line(margin,y+rowH,margin+contentW,y+rowH);
+    y+=rowH;
+  });
+
+  // Footer
+  doc.setFontSize(7.5);doc.setFont('helvetica','bold');
+  if(outsideCount===0){
+    doc.setTextColor(22,101,52);
+    doc.text('All trees are within the plot boundary.',margin,ph-8);
+  } else {
+    const outsideUIDs=results.filter(r=>!r.inside).map(r=>r.uid||`Tree ${r.label}`).join(', ');
+    doc.setTextColor(153,27,27);
+    const line=`Trees outside boundary: ${outsideUIDs}`;
+    doc.text(line.length>90?line.substring(0,90)+'…':line,margin,ph-8);
+  }
+}
+
+// ── Download single ──────────────────────────────────────────────────────────
+async function downloadSingle(){
+  if(!currentResult)return;
+  const btn = document.getElementById('btnDlSingle');
+  btn.disabled=true; btn.textContent='⏳ Building…';
+  showCaptureOverlay(true);
+  let mapDataUrl = null;
+  try { mapDataUrl = await captureMap(); } catch(e){ console.warn(e); }
+  showCaptureOverlay(false);
+  try {
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    buildPdfPage(doc,currentResult,mapDataUrl,1,1);
+    doc.save(`${currentResult.plotName}_tree_review.pdf`);
+    btn.textContent='✓ Downloaded!';
+  } catch(e) {
+    alert('PDF error: '+e.message+'. Try using Chrome or Edge.');
+    btn.textContent='⬇ Download PDF';
+  }
+  setTimeout(()=>{btn.textContent='⬇ Download PDF';btn.disabled=false;},2000);
+}
+
+// ── Add to batch ─────────────────────────────────────────────────────────────
+async function addToBatch(){
+  if(!currentResult)return;
+  const btn=document.getElementById('btnAddBatch');
+  btn.disabled=true;btn.textContent='Capturing…';
+  showCaptureOverlay(true);
+  let mapDataUrl=null;
+  try { mapDataUrl=await captureMap(); } catch(e){ console.warn(e); }
+  showCaptureOverlay(false);
+  const idx=batch.findIndex(b=>b.plotName===currentResult.plotName);
+  const entry={...currentResult,mapDataUrl};
+  if(idx>=0){batch[idx]=entry;}else{batch.push(entry);}
+  updateBatchUI();
+  btn.textContent='✓ Added!';
+  setTimeout(()=>{btn.textContent='＋ Add to Batch';btn.disabled=false;},1500);
+}
+
+function updateBatchUI(){
+  document.getElementById('batchCount').textContent=batch.length;
+  document.getElementById('btnDlAll').disabled=batch.length===0;
+  const wrap=document.getElementById('batchListWrap');
+  const items=document.getElementById('batchListItems');
+  if(batch.length===0){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  items.innerHTML=batch.map((b,i)=>`
+    <div class="batch-item">
+      <span class="batch-item-name">${b.plotName}</span>
+      <span class="batch-item-stat ${b.outsideCount===0?'ok':''}">${b.outsideCount===0?'✓ All inside':`${b.outsideCount} outside`}</span>
+      <button class="batch-remove" onclick="removeBatchItem(${i})" title="Remove">✕</button>
+    </div>`).join('');
+}
+
+function removeBatchItem(i){
+  batch.splice(i,1);
+  updateBatchUI();
+}
+
+// ── Download batch (all plots → one PDF) ────────────────────────────────────
+async function downloadBatch(){
+  if(!batch.length)return;
+  const btn=document.getElementById('btnDlAll');
+  btn.disabled=true;btn.textContent='Building PDF…';
+  try {
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    batch.forEach((entry,i)=>{
+      if(i>0)doc.addPage();
+      buildPdfPage(doc,entry,entry.mapDataUrl,i+1,batch.length);
+    });
+    const today=new Date().toISOString().slice(0,10);
+    const filename=`Plot_Tree_Review_${today}_${batch.length}plots.pdf`;
+    // Robust save: try doc.save first, fallback to blob URL
+    try {
+      doc.save(filename);
+    } catch(e) {
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+      setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},2000);
+    }
+    btn.textContent=`✓ ${batch.length} plots downloaded!`;
+  } catch(e){
+    alert('PDF generation error: '+e.message);
+    btn.textContent='⬇ Download All PDF';
+  }
+  setTimeout(()=>{btn.disabled=false;btn.textContent='⬇ Download All PDF';},3000);
+}
+
+function showCaptureOverlay(show){
+  document.getElementById('captureOverlay').style.display=show?'flex':'none';
+}
+
+// ── Clear current ────────────────────────────────────────────────────────────
+function clearCurrent(){
+  ['plotNameInput','polygonInput','treesInput','refLat','refLng','measLat','measLng'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('plotNameDisplay').textContent='—';
+  document.getElementById('copyBar').style.display='none';
+  document.getElementById('dlRow').style.display='none';
+  document.getElementById('resultsPanel').innerHTML='<div class="empty-state">Fill in polygon + RefCenter + trees<br>then click <strong>Analyse</strong></div>';
+  document.getElementById('uploadStatus').textContent='';
+  parsedFromExcel=[];currentResult=null;
+  updateRefStatus();
+  updateMeasStatus();
+  document.getElementById('measurePanel').style.display='none';
+  document.getElementById('mapToolbar').style.display='none';
+  if(typeof clearMeasure==="function") clearMeasure();
+  if(typeof clearSideLabels==="function") clearSideLabels();
+  if(map){mapLayers.forEach(l=>map.removeLayer(l));mapLayers=[];}
+  document.getElementById('map').style.display='none';
+  document.getElementById('mapPlaceholder').style.display='flex';
+  document.getElementById('fileInput').value='';
+}
+
+document.getElementById('plotNameInput').addEventListener('keydown',e=>{if(e.key==='Enter')runAnalysis();});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIELDFORCE CONNECTION (MSAL + Dataverse)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MSAL_CONFIG = {
+  auth: {
+    clientId:    '60aa71ce-b771-46d9-9e0f-51fd1fe4f4d6', // CCS Field Polygon app
+    authority:   'https://login.microsoftonline.com/f9198cfe-2489-4324-b66f-e27f00e3f667',
+    redirectUri: window.location.href.split('?')[0]
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+
+const DV_ENV   = 'https://fieldforce.crm14.dynamics.com';
+const DV_API   = `${DV_ENV}/api/data/v9.2`;
+const DV_SCOPE = [`${DV_ENV}/user_impersonation`];
+
+let msalInstance = null;
+let dvAccount    = null;
+let plotsData    = [];   // all loaded plot records
+let currentPlotGuid = null; // GUID of currently loaded plot (for write-back)
+
+function getMSAL() {
+  if (!msalInstance) msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+  return msalInstance;
+}
+
+async function getToken() {
+  const app = getMSAL();
+  const accounts = app.getAllAccounts();
+  if (accounts.length > 0) dvAccount = accounts[0];
+  const req = { scopes: DV_SCOPE, account: dvAccount || undefined };
+  try {
+    const res = await app.acquireTokenSilent(req);
+    dvAccount = res.account; return res.accessToken;
+  } catch(e) {
+    const res = await app.acquireTokenPopup(req);
+    dvAccount = res.account; return res.accessToken;
+  }
+}
+
+function setFFStatus(msg, ok) {
+  const el = document.getElementById('ffStatus');
+  el.textContent = msg;
+  el.className = 'ff-status ' + (ok ? 'ok' : 'err');
+}
+
+async function connectFieldforce() {
+  const btn = document.getElementById('btnFF');
+  btn.disabled = true;
+  btn.textContent = '⏳ Signing in…';
+  setFFStatus('Authenticating with Microsoft…', true);
+
+  try {
+    const token = await getToken();
+    const name  = dvAccount?.name || dvAccount?.username || 'Signed in';
+    btn.textContent = `✓ ${name}`;
+    btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+    document.getElementById('ffStatusHeader').textContent = `✓ Fieldforce: ${name}`;
+    document.getElementById('ffStatusHeader').style.color = 'var(--accent)';
+
+    setFFStatus('Fetching plots…', true);
+    await fetchAllPlots(token);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '☁ Connect to Fieldforce';
+    btn.style.background = '';
+    setFFStatus('Auth failed: ' + (e.message || e), false);
+  }
+}
+
+async function fetchAllPlots(token) {
+  // Column names confirmed from Active_Plots Excel export 2026-04-07
+  const select = [
+    'ccs_plotautoid',         // PlotAutoID — e.g. PLT_Kasanka_1
+    'ccs_polygongeojson',     // PolygonGeoJSON
+    'ccs_refcenterlat',       // RefCenterLat
+    'ccs_refcenterlong',      // RefCenterLong
+    'ccs_measuredcenterlat',  // MeasuredCenterLat
+    'ccs_measuredcenterlong'  // MeasuredCenterLong
+  ].join(',');
+
+  const rows = [];
+  let url = `${DV_API}/ccs_plots?$select=${select}&$filter=statecode eq 0&$orderby=ccs_plotautoid asc`;
+
+  let page = 0;
+  while (url) {
+    page++;
+    setFFStatus(`Loading plots… page ${page} (${rows.length} so far)`, true);
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
+        'Prefer': 'odata.maxpagesize=5000'
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0,200)}`);
+    const data = await res.json();
+    rows.push(...(data.value || []));
+    url = data['@odata.nextLink'] || null;
+  }
+
+  plotsData = rows.map(r => ({
+    guid:        r.ccs_plotid || '',
+    plotId:      r.ccs_plotautoid || '',
+    geoJSON:     r.ccs_polygongeojson || '',
+    refLat:      r.ccs_refcenterlat  || null,
+    refLng:      r.ccs_refcenterlong || null,
+    measLat:     r.ccs_measuredcenterlat  || null,
+    measLng:     r.ccs_measuredcenterlong || null,
+  }));
+
+  // Populate dropdown
+  const sel = document.getElementById('plotSelect');
+  sel.innerHTML = '<option value="">— Select a plot —</option>';
+  plotsData.forEach((p, i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = p.plotId;
+    sel.appendChild(o);
+  });
+  sel.style.display = 'block';
+  setFFStatus(`✓ ${plotsData.length.toLocaleString()} plots loaded — select one below`, true);
+}
+
+function loadPlotFromFieldforce() {
+  const idx = parseInt(document.getElementById('plotSelect').value);
+  if (isNaN(idx)) return;
+
+  const plot = plotsData[idx];
+  if (!plot) return;
+
+  // Fill in all fields
+  document.getElementById('plotNameInput').value = plot.plotId;
+  document.getElementById('polygonInput').value  = plot.geoJSON;
+  if (plot.refLat  !== null) document.getElementById('refLat').value  = plot.refLat;
+  if (plot.refLng  !== null) document.getElementById('refLng').value  = plot.refLng;
+  if (plot.measLat !== null) document.getElementById('measLat').value = plot.measLat;
+  if (plot.measLng !== null) document.getElementById('measLng').value = plot.measLng;
+
+  currentPlotGuid = plot.guid;
+
+  // Trigger status updates
+  updateRefStatus();
+  updateMeasStatus();
+  setFFStatus(`✓ ${plot.plotId} loaded — upload trees or paste coordinates, then Analyse`, true);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POLYGON EDITOR (drag vertices to reshape)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let editMode       = false;
+let editMarkers    = [];   // draggable vertex markers
+let editPolyLayer  = null; // editable polygon layer
+let editRing       = [];   // current ring being edited [[lng,lat],...]
+
+function toggleEditPolygon() {
+  if (!currentResult || !currentResult.ring) {
+    alert('Run an analysis first to load the polygon.');
+    return;
+  }
+  editMode = !editMode;
+  const btn  = document.getElementById('btnEditPoly');
+  const save = document.getElementById('btnSavePoly');
+  const hint = document.getElementById('editHint');
+
+  if (editMode) {
+    btn.classList.add('active');
+    btn.textContent = '✕ Cancel Edit';
+    save.style.display = 'inline-block';
+    hint.style.display = 'block';
+    startEditing(currentResult.ring);
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '✏️ Edit Polygon';
+    save.style.display = 'none';
+    hint.style.display = 'none';
+    stopEditing(false);
+  }
+}
+
+function startEditing(ring) {
+  // Remove original polygon layer
+  mapLayers.forEach(l => { if (l === editPolyLayer) map.removeLayer(l); });
+
+  editRing = ring.map(c => [...c]); // deep copy
+
+  // Draw editable polygon
+  editPolyLayer = L.polygon(editRing.map(c => [c[1], c[0]]), {
+    color: '#fbbf24', weight: 2.5,
+    fillColor: '#fbbf24', fillOpacity: 0.08,
+    dashArray: '6,4'
+  }).addTo(map);
+
+  // Draggable vertex markers — skip closing duplicate
+  const n = editRing.length;
+  const isClosedRing = (
+    editRing[0][0] === editRing[n-1][0] &&
+    editRing[0][1] === editRing[n-1][1]
+  );
+  const vertexCount = isClosedRing ? n - 1 : n;
+
+  editMarkers = [];
+  for (let i = 0; i < vertexCount; i++) {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:#fbbf24;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.6);cursor:grab"></div>`,
+      iconSize: [14, 14], iconAnchor: [7, 7]
+    });
+    const marker = L.marker([editRing[i][1], editRing[i][0]], {
+      icon, draggable: true, zIndexOffset: 2000
+    }).addTo(map);
+
+    marker._ringIdx = i;
+    marker.on('drag', function() {
+      const ll = this.getLatLng();
+      editRing[this._ringIdx] = [ll.lng, ll.lat];
+      // Close ring if needed
+      if (isClosedRing) editRing[n-1] = [ll.lng, ll.lat];
+      // Redraw polygon
+      editPolyLayer.setLatLngs(editRing.map(c => [c[1], c[0]]));
+    });
+
+    editMarkers.push(marker);
+  }
+}
+
+function stopEditing(apply) {
+  editMarkers.forEach(m => map.removeLayer(m));
+  editMarkers = [];
+  if (editPolyLayer) { map.removeLayer(editPolyLayer); editPolyLayer = null; }
+
+  if (apply && editRing.length) {
+    // Update currentResult with new ring
+    currentResult.ring = editRing;
+    // Update polygon textarea
+    const newGeoJSON = JSON.stringify({
+      type: 'Feature', properties: {},
+      geometry: { type: 'Polygon', coordinates: [editRing] }
+    });
+    document.getElementById('polygonInput').value = newGeoJSON;
+    // Re-run to refresh map with new polygon
+    runAnalysis();
+  }
+
+  editMode = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAVE POLYGON TO FIELDFORCE (write-back with confirmation)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function savePolygonToFieldforce() {
+  if (!currentPlotGuid) {
+    alert('No plot loaded from Fieldforce.\n\nConnect to Fieldforce and select a plot first.');
+    return;
+  }
+  if (!editRing.length && !currentResult?.ring) {
+    alert('No polygon to save.');
+    return;
+  }
+
+  const ring     = editRing.length ? editRing : currentResult.ring;
+  const plotName = document.getElementById('plotNameInput').value || currentPlotGuid;
+
+  // ── Confirmation dialog ──────────────────────────────────────────────────
+  const confirmed = confirm(
+    `⚠️ SAVE POLYGON TO FIELDFORCE\n\n` +
+    `You are about to overwrite the polygon boundary for:\n` +
+    `  Plot: ${plotName}\n` +
+    `  GUID: ${currentPlotGuid}\n\n` +
+    `This will permanently update the PolygonGeoJSON field\n` +
+    `in Fieldforce for this plot record.\n\n` +
+    `This action cannot be undone from this tool.\n\n` +
+    `Are you sure you want to continue?`
+  );
+
+  if (!confirmed) return;
+
+  const btn = document.getElementById('btnSavePoly');
+  btn.textContent = '⏳ Saving…';
+  btn.style.opacity = '0.6';
+  btn.style.pointerEvents = 'none';
+
+  try {
+    const token = await getToken();
+
+    const newGeoJSON = JSON.stringify({
+      type: 'Feature', properties: {},
+      geometry: { type: 'Polygon', coordinates: [ring] }
+    });
+
+    const res = await fetch(`${DV_API}/ccs_plots(${currentPlotGuid})`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization':  `Bearer ${token}`,
+        'Content-Type':   'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version':  '4.0'
+      },
+      body: JSON.stringify({ ccs_polygongeojson: newGeoJSON })
+    });
+
+    if (res.status === 401) {
+      // Token expired — retry once
+      const freshToken = await getToken();
+      const retry = await fetch(`${DV_API}/ccs_plots(${currentPlotGuid})`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization':  `Bearer ${freshToken}`,
+          'Content-Type':   'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version':  '4.0'
+        },
+        body: JSON.stringify({ ccs_polygongeojson: newGeoJSON })
+      });
+      if (!retry.ok) throw new Error(`HTTP ${retry.status}`);
+    } else if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0,200)}`);
+    }
+
+    // Success
+    btn.textContent = '✓ Saved to Fieldforce!';
+    btn.style.background = 'rgba(74,222,128,0.2)';
+    btn.style.color = 'var(--accent)';
+    btn.style.borderColor = 'rgba(74,222,128,0.5)';
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+    setFFStatus(`✓ Polygon for ${plotName} saved to Fieldforce`, true);
+
+    // Apply the edited ring to currentResult
+    if (editRing.length) stopEditing(true);
+
+    // Reset button after 4 seconds
+    setTimeout(() => {
+      btn.textContent = '💾 Save to Fieldforce';
+      btn.style.cssText = '';
+    }, 4000);
+
+  } catch(e) {
+    btn.textContent = '💾 Save to Fieldforce';
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+    alert('Save failed: ' + e.message + '\n\nMake sure you are connected to Fieldforce and have write permissions on the ccs_plot table.');
+  }
+}
+
+// ── Show edit row after analysis ─────────────────────────────────────────────
+const _origRunAnalysis = runAnalysis;
+// Patch runAnalysis to also show editRow
+const runAnalysis_orig = runAnalysis;
+function runAnalysis() {
+  runAnalysis_orig();
+  document.getElementById('editRow').style.display = 'flex';
+}
+
+</script>
+</body>
+</html>
