@@ -1397,7 +1397,7 @@ async function connectFieldforce() {
 async function fetchAllPlots(token) {
   // Column names confirmed from Active_Plots Excel export 2026-04-07
   const select = [
-    'ccs_plotautoid_plot',         // PlotAutoID — e.g. PLT_Kasanka_1
+    'ccs_plotautoid',              // PlotAutoID — no _plot suffix on primary name field
     'ccs_polygongeojson_plot',     // PolygonGeoJSON
     'ccs_cornerselat_plot',       // RefCenterLat
     'ccs_cornerselong_plot',      // RefCenterLong
@@ -1406,7 +1406,7 @@ async function fetchAllPlots(token) {
   ].join(',');
 
   const rows = [];
-  let url = `${DV_API}/ccs_plots?$select=${select}&$filter=statecode eq 0&$orderby=ccs_plotautoid_plot asc`;
+  let url = `${DV_API}/ccs_plots?$select=${select}&$filter=statecode eq 0&$orderby=ccs_plotautoid asc`;
 
   let page = 0;
   while (url) {
@@ -1428,7 +1428,7 @@ async function fetchAllPlots(token) {
 
   plotsData = rows.map(r => ({
     guid:        r.ccs_plotid || '',
-    plotId:      r.ccs_plotautoid_plot || r.ccs_plotautoid || '',
+    plotId:      r.ccs_plotautoid || r.ccs_name || r.ccs_plotid || 'Plot-' + r.ccs_plotid?.slice(0,8) || '',
     geoJSON:     r.ccs_polygongeojson_plot || '',
     refLat:      r.ccs_cornerselat_plot  || null,
     refLng:      r.ccs_cornerselong_plot || null,
