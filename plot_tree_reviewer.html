@@ -241,8 +241,8 @@
     <input type="text" id="catSearch" placeholder="Search plots…"
       style="background:var(--bg);border:1px solid var(--border);border-radius:4px;
       color:var(--text);font-size:11px;padding:5px 8px;outline:none;width:200px"
-      oninput="renderCatalog()"/>
-    <select id="catFilter" onchange="renderCatalog()"
+      oninput="catalogPage=1;renderCatalog()"/>
+    <select id="catFilter" onchange="catalogPage=1;renderCatalog()"
       style="background:var(--bg);border:1px solid var(--border);border-radius:4px;
       color:var(--text);font-size:11px;padding:5px 8px;outline:none">
       <option value="">All plots</option>
@@ -251,6 +251,15 @@
     </select>
     <span id="catCount" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
     <div style="flex:1"></div>
+    <div id="catPagination" style="display:none;align-items:center;gap:6px;margin-right:10px">
+      <button id="catPrev" onclick="changeCatalogPage(-1)"
+        style="background:var(--border);color:var(--text);border:none;border-radius:4px;
+        padding:4px 10px;font-size:11px;cursor:pointer">← Prev</button>
+      <span id="catPageInfo" style="font-size:10px;color:var(--muted);font-family:'Courier New',monospace"></span>
+      <button id="catNext" onclick="changeCatalogPage(1)"
+        style="background:var(--border);color:var(--text);border:none;border-radius:4px;
+        padding:4px 10px;font-size:11px;cursor:pointer">Next →</button>
+    </div>
     <button onclick="toggleCatalog()"
       style="background:var(--border);color:var(--text);border:none;border-radius:4px;
       padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">✕ Close</button>
@@ -1443,6 +1452,8 @@ let catalogMaps = {};
 let catalogObserver = null;
 let catalogTreesByPlot = {};  // plotGuid → [{lat,lng}] — loaded once when catalog opens
 let catalogTreesLoaded = false;
+let catalogPage = 1;
+const CAT_PAGE_SIZE = 48;
 
 async function toggleCatalog() {
   const overlay = document.getElementById('plotCatalog');
@@ -1515,24 +1526,64 @@ async function fetchCatalogTrees() {
   }
 }
 
+function changeCatalogPage(dir) {
+  const q      = (document.getElementById('catSearch').value || '').toLowerCase();
+  const filter = document.getElementById('catFilter').value || 'has_geo';
+  const plots  = plotsData.filter(p => {
+    if (q && !p.plotId.toLowerCase().includes(q)) return false;
+    if (filter === 'has_geo' && !p.geoJSON) return false;
+    if (filter === 'no_geo'  &&  p.geoJSON) return false;
+    return true;
+  });
+  const tp = Math.ceil(plots.length / CAT_PAGE_SIZE);
+  catalogPage = Math.max(1, Math.min(tp, catalogPage + dir));
+  Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
+  catalogMaps = {};
+  if (catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
+  document.getElementById('catalogGrid').scrollTop = 0;
+  renderCatalog();
+}
+
 function renderCatalog() {
   const q      = (document.getElementById('catSearch').value || '').toLowerCase();
   const filter = document.getElementById('catFilter').value || 'has_geo';
 
-  const plots = plotsData.filter(p => {
+  const allPlots = plotsData.filter(p => {
     if (q && !p.plotId.toLowerCase().includes(q)) return false;
     if (filter === 'has_geo' && !p.geoJSON) return false;
     if (filter === 'no_geo'  &&  p.geoJSON) return false;
     return true;
   });
 
-  document.getElementById('catCount').textContent = plots.length.toLocaleString() + ' plots';
+  // Reset to page 1 on filter/search change
+  const tp = Math.ceil(allPlots.length / CAT_PAGE_SIZE);
+  if (catalogPage > tp) catalogPage = 1;
+  const start = (catalogPage - 1) * CAT_PAGE_SIZE;
+  const plots = allPlots.slice(start, start + CAT_PAGE_SIZE);
+
+  document.getElementById('catCount').textContent =
+    `${(start+1)}–${Math.min(start+CAT_PAGE_SIZE, allPlots.length)} of ${allPlots.length.toLocaleString()} plots`;
+
+  // Pagination controls
+  const pagEl = document.getElementById('catPagination');
+  const prevEl = document.getElementById('catPrev');
+  const nextEl = document.getElementById('catNext');
+  const infoEl = document.getElementById('catPageInfo');
+  if (allPlots.length > CAT_PAGE_SIZE) {
+    pagEl.style.display = 'flex';
+    prevEl.disabled = catalogPage <= 1;
+    nextEl.disabled = catalogPage >= tp;
+    infoEl.textContent = `Page ${catalogPage} / ${tp}`;
+  } else {
+    pagEl.style.display = 'none';
+  }
 
   // Destroy old maps
   Object.values(catalogMaps).forEach(m => { try { m.remove(); } catch(e){} });
   catalogMaps = {};
   if (catalogObserver) { catalogObserver.disconnect(); catalogObserver = null; }
 
+  // Reset page on search/filter
   const grid = document.getElementById('catalogGrid');
   grid.innerHTML = plots.map((p, i) => {
     const hasGeo = !!p.geoJSON;
