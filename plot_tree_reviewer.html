@@ -250,6 +250,18 @@
       <option value="no_geo">No polygon ✗</option>
     </select>
     <span id="catCount" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
+    <!-- Size toggle -->
+    <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-left:4px">
+      <button onclick="setCatalogSize('s')" id="catSizeS"
+        style="background:var(--bg);color:var(--muted);border:none;border-right:1px solid var(--border);
+        padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Courier New',monospace">S</button>
+      <button onclick="setCatalogSize('m')" id="catSizeM"
+        style="background:#4ade80;color:#000;border:none;border-right:1px solid var(--border);
+        padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Courier New',monospace">M</button>
+      <button onclick="setCatalogSize('l')" id="catSizeL"
+        style="background:var(--bg);color:var(--muted);border:none;
+        padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Courier New',monospace">L</button>
+    </div>
     <div style="flex:1"></div>
     <div id="catPagination" style="display:none;align-items:center;gap:6px;margin-right:10px">
       <button id="catPrev" onclick="changeCatalogPage(-1)"
@@ -1453,6 +1465,7 @@ let catalogObserver = null;
 let catalogTreesByPlot = {};  // plotGuid → [{lat,lng}] — loaded once when catalog opens
 let catalogTreesLoaded = false;
 let catalogPage = 1;
+let catalogSize = 'm'; // 's' | 'm' | 'l'
 const CAT_PAGE_SIZE = 48;
 
 async function toggleCatalog() {
@@ -1526,6 +1539,32 @@ async function fetchCatalogTrees() {
   }
 }
 
+function setCatalogSize(sz) {
+  catalogSize = sz;
+  // Update button styles
+  ['s','m','l'].forEach(s => {
+    const btn = document.getElementById('catSize' + s.toUpperCase());
+    if (!btn) return;
+    btn.style.background = s === sz ? '#4ade80' : 'var(--bg)';
+    btn.style.color      = s === sz ? '#000'    : 'var(--muted)';
+  });
+  // Update grid columns and map heights
+  const grid = document.getElementById('catalogGrid');
+  const sizes = {
+    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '110px', perPage: 80 },
+    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '160px', perPage: 48 },
+    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '240px', perPage: 24 },
+  };
+  const cfg = sizes[sz];
+  grid.style.gridTemplateColumns = cfg.cols;
+  // Destroy maps and re-render with new sizes
+  Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
+  catalogMaps={};
+  if(catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
+  catalogPage = 1;
+  renderCatalog();
+}
+
 function changeCatalogPage(dir) {
   const q      = (document.getElementById('catSearch').value || '').toLowerCase();
   const filter = document.getElementById('catFilter').value || 'has_geo';
@@ -1556,20 +1595,23 @@ function renderCatalog() {
   });
 
   // Reset to page 1 on filter/search change
-  const tp = Math.ceil(allPlots.length / CAT_PAGE_SIZE);
+  const sizeMap = { s: { mapH: '110px', perPage: 80 }, m: { mapH: '160px', perPage: 48 }, l: { mapH: '240px', perPage: 24 } };
+  const szCfg   = sizeMap[catalogSize] || sizeMap['m'];
+  const perPage = szCfg.perPage;
+  const tp = Math.ceil(allPlots.length / perPage);
   if (catalogPage > tp) catalogPage = 1;
-  const start = (catalogPage - 1) * CAT_PAGE_SIZE;
-  const plots = allPlots.slice(start, start + CAT_PAGE_SIZE);
+  const start = (catalogPage - 1) * perPage;
+  const plots = allPlots.slice(start, start + perPage);
 
   document.getElementById('catCount').textContent =
-    `${(start+1)}–${Math.min(start+CAT_PAGE_SIZE, allPlots.length)} of ${allPlots.length.toLocaleString()} plots`;
+    `${(start+1)}–${Math.min(start+perPage, allPlots.length)} of ${allPlots.length.toLocaleString()} plots`;
 
   // Pagination controls
   const pagEl = document.getElementById('catPagination');
   const prevEl = document.getElementById('catPrev');
   const nextEl = document.getElementById('catNext');
   const infoEl = document.getElementById('catPageInfo');
-  if (allPlots.length > CAT_PAGE_SIZE) {
+  if (allPlots.length > perPage) {
     pagEl.style.display = 'flex';
     prevEl.disabled = catalogPage <= 1;
     nextEl.disabled = catalogPage >= tp;
@@ -1593,7 +1635,7 @@ function renderCatalog() {
       onmouseleave="this.style.borderColor='#2a2d3a'"
       onclick="openPlotFromCatalog(${plotsData.indexOf(p)})">
       ${hasGeo
-        ? `<div style="width:100%;height:160px;min-height:160px;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
+        ? `<div style="width:100%;height:${sizeMap[catalogSize]?.mapH||"160px"};min-height:${sizeMap[catalogSize]?.mapH||"160px"};background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
                color:#4a6480;font-size:10px;font-family:monospace">Loading map…</div>
            </div>`
