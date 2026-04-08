@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<title>Plot Tree Reviewer v5.1</title>
+<title>Plot Tree Reviewer v5</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -212,7 +212,7 @@
 
 <header>
   <h1>🌳 Plot Tree Reviewer</h1>
-  <span class="badge">v5.1</span>
+  <span class="badge">v5</span>
   <div id="ffStatusHeader" style="font-size:10px;color:var(--muted);"></div>
   <div class="plot-label">Active: <span id="plotNameDisplay">—</span></div>
   <div class="spacer"></div>
@@ -279,6 +279,16 @@ Paste the PolygonGeoJSON field directly.'></textarea>
       </div>
       <div class="meas-status" id="measStatus">Not set — centre distance won't be shown</div>
     </div>
+
+    <div class="upload-section" id="ffTreeSection" style="display:none;padding:9px 12px;border-bottom:1px solid var(--border);background:rgba(74,222,128,0.04);border-left:3px solid var(--accent);">
+      <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;display:block;margin-bottom:6px;">🌳 Trees — Fetch from Fieldforce</label>
+      <button class="btn-ff" id="btnFetchTrees" onclick="fetchTreesFromFieldforce()" style="background:linear-gradient(135deg,#166534,#22c55e)">
+        🌳 Fetch Trees for this Plot
+      </button>
+      <div class="ff-status" id="ffTreeStatus">Click to load inventory trees for the selected plot</div>
+    </div>
+
+    <div class="or-divider"><span>OR UPLOAD</span></div>
 
     <div class="upload-section">
       <label>📊 Trees — Upload Excel export</label>
@@ -1513,7 +1523,104 @@ function loadPlotFromFieldforce() {
   if (!plot.geoJSON) {
     setFFStatus(`⚠ ${plot.plotId} loaded — no polygon geometry found. Upload trees and paste GeoJSON manually.`, false);
   } else {
-    setFFStatus(`✓ ${plot.plotId} loaded — upload trees or paste coordinates, then Analyse`, true);
+    setFFStatus(`✓ ${plot.plotId} loaded — fetch trees or upload Excel, then Analyse`, true);
+  }
+  // Show the Fetch Trees from Fieldforce button
+  document.getElementById('ffTreeSection').style.display = 'block';
+  document.getElementById('ffTreeStatus').textContent = `Click to load inventory trees for ${plot.plotId}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FETCH INVENTORY TREES FROM FIELDFORCE
+// ═══════════════════════════════════════════════════════════════════════════
+// Table: ccs_inventorytree (collection: ccs_inventorytrees)
+// Confirmed column names from Power Apps maker portal 2026-04-08:
+//   TreeLat  = ccs_treelat_inventorytree
+//   TreeLong = ccs_treelong_inventorytree
+//   PlotID   = ccs_plotid_inventorytree (lookup to ccs_plot)
+//   UID      = ccs_treeinventoryuid (primary name field)
+//   Species  = ccs_species_inventorytree
+
+async function fetchTreesFromFieldforce() {
+  if (!currentPlotGuid) {
+    alert('Select a plot from Fieldforce first.');
+    return;
+  }
+  const btn = document.getElementById('btnFetchTrees');
+  const status = document.getElementById('ffTreeStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Fetching trees…';
+
+  try {
+    const token = await getToken();
+    const select = [
+      'ccs_treeinventoryuid',
+      'ccs_treelat_inventorytree',
+      'ccs_treelong_inventorytree',
+      'ccs_species_inventorytree',
+      'ccs_treenumber_inventorytree'
+    ].join(',');
+
+    // Filter by plot GUID using the lookup field
+    const filter = `_ccs_plotid_inventorytree_value eq ${currentPlotGuid} and statecode eq 0`;
+    const url = `${DV_API}/ccs_inventorytrees?$select=${select}&$filter=${encodeURIComponent(filter)}`;
+
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
+        'Prefer': 'odata.maxpagesize=5000'
+      }
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`HTTP ${res.status}: ${err.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const rows = data.value || [];
+
+    if (!rows.length) {
+      status.textContent = '⚠ No inventory trees found for this plot in Fieldforce.';
+      status.className = 'ff-status err';
+      btn.disabled = false;
+      btn.textContent = '🌳 Fetch Trees for this Plot';
+      return;
+    }
+
+    // Convert to parsedFromExcel format
+    parsedFromExcel = rows.map(r => {
+      const a = parseFloat(r.ccs_treelat_inventorytree);
+      const b = parseFloat(r.ccs_treelong_inventorytree);
+      if (isNaN(a) || isNaN(b)) return null;
+      // Auto-detect coordinate order
+      let lat, lng;
+      if      (a < 0 && b > 0)     { lat = a; lng = b; }
+      else if (b < 0 && a > 0)     { lat = b; lng = a; }
+      else if (Math.abs(a) < 90)   { lat = a; lng = b; }
+      else                          { lat = b; lng = a; }
+      return {
+        uid: r.ccs_treeinventoryuid || r.ccs_treenumber_inventorytree || '',
+        lat, lng
+      };
+    }).filter(Boolean);
+
+    setUploadStatus(`✓ ${parsedFromExcel.length} trees loaded from Fieldforce`, true);
+    status.textContent = `✓ ${parsedFromExcel.length} inventory trees loaded — click Analyse`;
+    status.className = 'ff-status ok';
+    btn.textContent = `✓ ${parsedFromExcel.length} trees loaded`;
+    btn.style.background = 'linear-gradient(135deg,#166534,#22c55e)';
+
+    // Clear manual input
+    document.getElementById('treesInput').value = '';
+
+  } catch(e) {
+    status.textContent = 'Failed: ' + e.message;
+    status.className = 'ff-status err';
+    btn.disabled = false;
+    btn.textContent = '🌳 Fetch Trees for this Plot';
   }
 }
 
