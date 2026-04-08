@@ -245,8 +245,8 @@
     <select id="catFilter" onchange="renderCatalog()"
       style="background:var(--bg);border:1px solid var(--border);border-radius:4px;
       color:var(--text);font-size:11px;padding:5px 8px;outline:none">
-      <option value="" selected>All plots</option>
-      <option value="has_geo">With polygon ✓</option>
+      <option value="">All plots</option>
+      <option value="has_geo" selected>With polygon ✓</option>
       <option value="no_geo">No polygon ✗</option>
     </select>
     <span id="catCount" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
@@ -1517,7 +1517,7 @@ async function fetchCatalogTrees() {
 
 function renderCatalog() {
   const q      = (document.getElementById('catSearch').value || '').toLowerCase();
-  const filter = document.getElementById('catFilter').value;
+  const filter = document.getElementById('catFilter').value || 'has_geo';
 
   const plots = plotsData.filter(p => {
     if (q && !p.plotId.toLowerCase().includes(q)) return false;
@@ -1565,26 +1565,28 @@ function renderCatalog() {
     </div>`;
   }).join('');
 
-  // Delay to let grid layout settle before observing
+  // Use the scrollable grid as the observer root — prevents all 300 maps
+  // from initialising simultaneously when the grid is taller than the viewport
+  const gridRoot = document.getElementById('catalogGrid');
   setTimeout(() => {
-  catalogObserver = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      const el  = entry.target;
-      const idx = parseInt(el.dataset.idx);
-      const p   = plots[idx];
-      if (!p || !p.geoJSON) return;
-      catalogObserver.unobserve(el);
-      initCatalogMap(el, p, idx);
-    });
-  }, { rootMargin: '100px' });
+    catalogObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el  = entry.target;
+        const idx = parseInt(el.dataset.idx);
+        const p   = plots[idx];
+        if (!p || !p.geoJSON) return;
+        catalogObserver.unobserve(el);
+        initCatalogMap(el, p, idx);
+      });
+    }, { root: gridRoot, rootMargin: '400px', threshold: 0 });
 
-  plots.forEach((p, i) => {
-    if (!p.geoJSON) return;
-    const el = document.getElementById(`cmap-${i}`);
-    if (el) catalogObserver.observe(el);
-  });
-  }, 100);
+    plots.forEach((p, i) => {
+      if (!p.geoJSON) return;
+      const el = document.getElementById(`cmap-${i}`);
+      if (el) catalogObserver.observe(el);
+    });
+  }, 200);
 }
 
 function initCatalogMap(container, plot, idx) {
