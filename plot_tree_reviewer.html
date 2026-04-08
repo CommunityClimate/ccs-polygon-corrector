@@ -1567,6 +1567,42 @@ function loadPlotFromFieldforce() {
   document.getElementById('plotSearch').value = '';
   document.getElementById('plotSelect').size = 1;
 
+  // ── Reset all state for new plot ──────────────────────────────────────────
+  // Clear trees from previous plot
+  parsedFromExcel = [];
+  currentResult = null;
+  currentPlotGuid = plot.guid;
+
+  // Reset tree fetch button
+  const fetchBtn = document.getElementById('btnFetchTrees');
+  if (fetchBtn) {
+    fetchBtn.disabled = false;
+    fetchBtn.textContent = '🌳 Fetch Trees for this Plot';
+    fetchBtn.style.background = 'linear-gradient(135deg,#166534,#22c55e)';
+  }
+  const treeStatus = document.getElementById('ffTreeStatus');
+  if (treeStatus) {
+    treeStatus.textContent = `Click to load inventory trees for ${plot.plotId}`;
+    treeStatus.className = 'ff-status';
+  }
+
+  // Reset upload status
+  setUploadStatus('', true);
+
+  // Clear results panel and map
+  document.getElementById('resultsPanel').innerHTML =
+    '<div class="empty-state">Fetch trees from Fieldforce or upload, then click Analyse</div>';
+  document.getElementById('copyBar').style.display = 'none';
+  document.getElementById('dlRow').style.display = 'none';
+  document.getElementById('editRow').style.display = 'none';
+  if (map) { mapLayers.forEach(l => map.removeLayer(l)); mapLayers = []; }
+  document.getElementById('map').style.display = 'none';
+  document.getElementById('mapPlaceholder').style.display = 'flex';
+  document.getElementById('mapToolbar').style.display = 'none';
+  if (typeof clearMeasure === 'function') clearMeasure();
+  if (typeof clearSideLabels === 'function') clearSideLabels();
+  document.getElementById('measurePanel').style.display = 'none';
+
   // Trigger status updates
   updateRefStatus();
   updateMeasStatus();
