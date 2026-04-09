@@ -1465,7 +1465,12 @@ let catalogObserver = null;
 let catalogTreesByPlot = {};  // plotGuid → [{lat,lng}] — loaded once when catalog opens
 let catalogTreesLoaded = false;
 let catalogPage = 1;
-let catalogSize = 'm'; // 's' | 'm' | 'l'
+let catalogSize = 'm';
+const CAT_SIZE_CONFIG = {
+  s: { perPage: 60, mapH: 200, cols: 'repeat(auto-fill,minmax(220px,1fr))' },
+  m: { perPage: 30, mapH: 280, cols: 'repeat(auto-fill,minmax(320px,1fr))' },
+  l: { perPage: 15, mapH: 380, cols: 'repeat(auto-fill,minmax(440px,1fr))' },
+};
 const CAT_PAGE_SIZE = 48;
 
 async function toggleCatalog() {
@@ -1565,6 +1570,23 @@ function setCatalogSize(sz) {
   renderCatalog();
 }
 
+function setCatalogSize(size) {
+  catalogSize = size;
+  catalogPage = 1;
+  // Update button styles
+  ['s','m','l'].forEach(s => {
+    const btn = document.getElementById('catSize' + s.toUpperCase());
+    if (!btn) return;
+    btn.style.background = s === size ? 'var(--accent)' : 'var(--bg)';
+    btn.style.color      = s === size ? '#000' : 'var(--muted)';
+  });
+  // Destroy old maps
+  Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
+  catalogMaps = {};
+  if (catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
+  renderCatalog();
+}
+
 function changeCatalogPage(dir) {
   const q      = (document.getElementById('catSearch').value || '').toLowerCase();
   const filter = document.getElementById('catFilter').value || 'has_geo';
@@ -1635,7 +1657,7 @@ function renderCatalog() {
       onmouseleave="this.style.borderColor='#2a2d3a'"
       onclick="openPlotFromCatalog(${plotsData.indexOf(p)})">
       ${hasGeo
-        ? `<div style="width:100%;height:${sizeMap[catalogSize]?.mapH||"160px"};min-height:${sizeMap[catalogSize]?.mapH||"160px"};background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
+        ? `<div style="width:100%;height:${sizeMap[catalogSize]?.mapH||"160px"};min-height:${(CAT_SIZE_CONFIG[catalogSize]||CAT_SIZE_CONFIG.m).mapH}px;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
                color:#4a6480;font-size:10px;font-family:monospace">Loading map…</div>
            </div>`
