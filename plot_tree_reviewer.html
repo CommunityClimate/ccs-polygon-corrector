@@ -336,7 +336,31 @@
       padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">✕ Close</button>
   </div>
   <div id="catalogGrid" style="flex:1;overflow-y:auto;padding:14px 16px;
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+  </div>
+
+  <!-- Lightbox overlay (inside catalog) -->
+  <div id="catLightbox" style="display:none;position:absolute;inset:0;z-index:6000;
+    background:rgba(10,12,18,0.92);align-items:center;justify-content:center;flex-direction:column">
+    <div style="background:#1a1d27;border:1px solid #2a2d3a;border-radius:12px;
+      width:min(860px,94vw);max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #2a2d3a;flex-shrink:0">
+        <span id="lbPlotName" style="font-family:'Courier New',monospace;font-size:14px;font-weight:700;color:#60a5fa;flex:1"></span>
+        <button onclick="openPlotFromCatalog(window._lbIdx)"
+          style="background:#4ade80;color:#000;border:none;border-radius:4px;padding:6px 14px;
+          font-weight:700;font-size:11px;cursor:pointer;letter-spacing:.5px">
+          Open Plot →
+        </button>
+        <button onclick="closeLightbox()"
+          style="background:#2a2d3a;color:#e2e8f0;border:none;border-radius:4px;padding:6px 12px;
+          font-weight:700;font-size:13px;cursor:pointer;margin-left:4px">✕</button>
+      </div>
+      <!-- Map -->
+      <div id="lbMap" style="width:100%;flex:1;min-height:480px"></div>
+      <!-- Footer -->
+      <div id="lbFooter" style="padding:10px 16px;border-top:1px solid #2a2d3a;display:flex;gap:20px;flex-wrap:wrap;flex-shrink:0;font-size:11px"></div>
+    </div>
   </div>
 </div>
 
@@ -2571,6 +2595,103 @@ async function savePolygonToFieldforce() {
     alert('Save failed: ' + e.message + '\n\nMake sure you are connected to Fieldforce and have write permissions on the ccs_plot table.');
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CATALOG LIGHTBOX — expand card into large map overlay
+// ═══════════════════════════════════════════════════════════════════════════
+
+let lbMap = null;
+
+function expandCatalogCard(globalIdx) {
+  const p = plotsData[globalIdx];
+  if (!p) return;
+  window._lbIdx = globalIdx;
+
+  const lb = document.getElementById('catLightbox');
+  lb.style.display = 'flex';
+  document.getElementById('lbPlotName').textContent = p.plotId;
+
+  const footer = document.getElementById('lbFooter');
+  const parts = [];
+  if (p.refLat)  parts.push(`<span style="color:#60a5fa">● Ref: ${parseFloat(p.refLat).toFixed(6)}, ${parseFloat(p.refLng).toFixed(6)}</span>`);
+  if (p.measLat) parts.push(`<span style="color:#a78bfa">◆ Meas: ${parseFloat(p.measLat).toFixed(6)}, ${parseFloat(p.measLng).toFixed(6)}</span>`);
+  footer.innerHTML = parts.join('<span style="color:#2a2d3a;padding:0 6px">│</span>');
+
+  if (lbMap) { try { lbMap.remove(); } catch(e){} lbMap = null; }
+  const container = document.getElementById('lbMap');
+  container.innerHTML = '';
+
+  if (!p.geoJSON) {
+    container.innerHTML = '<div style="color:#4a6480;font-size:13px;font-family:monospace;padding:40px;text-align:center">No polygon geometry</div>';
+    return;
+  }
+
+  try {
+    const ring = parsePolygon(p.geoJSON);
+    if (!ring) return;
+
+    lbMap = L.map(container, { zoomControl:true, attributionControl:false });
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      subdomains:['mt0','mt1','mt2','mt3'], maxZoom:21
+    }).addTo(lbMap);
+
+    const poly = L.polygon(ring.map(c => [c[1], c[0]]), {
+      color:'#4ade80', weight:2.5, fillColor:'#4ade80', fillOpacity:0.08, dashArray:'6,4'
+    }).addTo(lbMap);
+
+    // Trees
+    const trees = catalogTreesByPlot[p.guid] || [];
+    trees.forEach(t => {
+      const inside = pip(t.lat, t.lng, ring);
+      L.circleMarker([t.lat, t.lng], {
+        radius:4, color:'rgba(255,255,255,0.5)', weight:0.5,
+        fillColor: inside ? '#4ade80' : '#f87171', fillOpacity:0.9
+      }).addTo(lbMap);
+    });
+
+    // RefCenter (blue dot)
+    if (p.refLat) {
+      L.marker([p.refLat, p.refLng], { icon: L.divIcon({ className:'',
+        html:'<div style="background:#60a5fa;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.7)"></div>',
+        iconSize:[10,10], iconAnchor:[5,5] }) })
+        .bindPopup(`<b>RefCenter</b><br>${parseFloat(p.refLat).toFixed(6)}, ${parseFloat(p.refLng).toFixed(6)}`)
+        .addTo(lbMap);
+    }
+
+    // MeasuredCenter (purple dot)
+    if (p.measLat) {
+      L.marker([p.measLat, p.measLng], { icon: L.divIcon({ className:'',
+        html:'<div style="background:#a78bfa;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.7)"></div>',
+        iconSize:[10,10], iconAnchor:[5,5] }) })
+        .bindPopup(`<b>MeasuredCenter</b><br>${parseFloat(p.measLat).toFixed(6)}, ${parseFloat(p.measLng).toFixed(6)}`)
+        .addTo(lbMap);
+    }
+
+    // Tree compliance in footer
+    if (trees.length > 0) {
+      const inside = trees.filter(t => pip(t.lat, t.lng, ring)).length;
+      const pct    = Math.round(inside / trees.length * 100);
+      const col    = pct >= 90 ? '#4ade80' : pct >= 70 ? '#fbbf24' : '#f87171';
+      footer.innerHTML += `<span style="color:${col};font-weight:700">🌳 ${inside}/${trees.length} inside (${pct}%)</span>`;
+    }
+
+    const fitIt = () => { try { lbMap.invalidateSize(); lbMap.fitBounds(poly.getBounds(), { padding:[48,48] }); } catch(e){} };
+    fitIt(); setTimeout(fitIt, 150); setTimeout(fitIt, 500);
+  } catch(e) {
+    container.innerHTML = `<div style="color:#f87171;font-size:12px;padding:20px">Map error: ${e.message}</div>`;
+  }
+}
+
+function closeLightbox() {
+  document.getElementById('catLightbox').style.display = 'none';
+  if (lbMap) { try { lbMap.remove(); } catch(e){} lbMap = null; }
+}
+
+// Backdrop click closes lightbox
+document.addEventListener('click', function(e) {
+  const lb = document.getElementById('catLightbox');
+  if (lb && e.target === lb) closeLightbox();
+});
 
 // ── User Handbook ──────────────────────────────────────────────────────────
 function openHandbook() {
