@@ -206,6 +206,61 @@
   .col-picker-row select:focus{border-color:var(--blue);}
   .btn-apply-cols{width:100%;margin-top:6px;padding:7px;background:var(--blue);color:#000;border:none;border-radius:4px;font-weight:700;font-size:11px;cursor:pointer;letter-spacing:.5px;}
   .btn-apply-cols:hover{opacity:0.85;}
+
+  /* ── USER HANDBOOK ─────────────────────────────────────────────────────── */
+  .hb-overlay{position:fixed;inset:0;z-index:10000;background:rgba(8,12,18,0.72);
+    display:none;align-items:flex-start;justify-content:flex-end;backdrop-filter:blur(3px);}
+  .hb-overlay.open{display:flex;}
+  .hb-drawer{width:520px;height:100vh;background:#1a1d27;border-left:1px solid #2a2d3a;
+    display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.6);
+    animation:hbSlide .2s ease;}
+  @keyframes hbSlide{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .hb-head{padding:14px 18px;background:#0f1117;border-bottom:1px solid #2a2d3a;
+    display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .hb-title-text{font-family:'Courier New',monospace;font-size:11px;font-weight:700;
+    letter-spacing:2px;color:#4ade80;text-transform:uppercase;flex:1;}
+  .hb-close-btn{background:#2a2d3a;border:none;color:#e2e8f0;width:28px;height:28px;
+    border-radius:4px;cursor:pointer;font-size:14px;display:flex;align-items:center;
+    justify-content:center;transition:background .15s;}
+  .hb-close-btn:hover{background:#f87171;color:#fff;}
+  .hb-search-bar{padding:10px 16px;border-bottom:1px solid #2a2d3a;flex-shrink:0;}
+  .hb-search-bar input{width:100%;background:#0f1117;border:1px solid #2a2d3a;border-radius:4px;
+    color:#e2e8f0;font-family:'Courier New',monospace;font-size:11px;padding:6px 10px;outline:none;}
+  .hb-search-bar input:focus{border-color:#4ade80;}
+  .hb-nav-bar{padding:8px 16px;border-bottom:1px solid #2a2d3a;display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0;}
+  .hb-nb{font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:1px;
+    text-transform:uppercase;background:#0f1117;border:1px solid #2a2d3a;color:#64748b;
+    border-radius:3px;padding:3px 8px;cursor:pointer;transition:all .15s;}
+  .hb-nb:hover{border-color:#4ade80;color:#4ade80;}
+  .hb-body{flex:1;overflow-y:auto;padding:0 20px 24px;}
+  .hb-sec{margin-top:24px;}
+  .hb-sec-title{font-family:'Courier New',monospace;font-size:10px;font-weight:700;
+    letter-spacing:2px;color:#4ade80;text-transform:uppercase;border-bottom:1px solid rgba(74,222,128,.2);
+    padding-bottom:6px;margin-bottom:12px;}
+  .hb-h3{font-size:12px;font-weight:700;color:#e2e8f0;margin:14px 0 6px;}
+  .hb-p{font-size:11px;color:#94a3b8;line-height:1.75;margin-bottom:8px;}
+  .hb-p strong{color:#e2e8f0;}
+  .hb-p .gc{color:#4ade80;font-weight:700;}
+  .hb-p .rc{color:#f87171;font-weight:700;}
+  .hb-p .ac{color:#fbbf24;font-weight:700;}
+  .hb-p .bc{color:#60a5fa;font-weight:700;}
+  .hb-p .pc{color:#a78bfa;font-weight:700;}
+  .hb-step{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
+  .hb-step-n{width:20px;height:20px;border-radius:50%;background:#4ade80;color:#000;
+    font-weight:800;font-size:10px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;margin-top:1px;font-family:'Courier New',monospace;}
+  .hb-step-t{font-size:11px;color:#94a3b8;line-height:1.65;}
+  .hb-step-t strong{color:#e2e8f0;}
+  .hb-tip{background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);
+    border-radius:5px;padding:8px 12px;margin:8px 0;font-size:11px;color:#e2e8f0;line-height:1.65;}
+  .hb-warn{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);
+    border-radius:5px;padding:8px 12px;margin:8px 0;font-size:11px;color:#e2e8f0;line-height:1.65;}
+  .hb-tbl{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px;}
+  .hb-tbl th{font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:1px;
+    color:#64748b;text-transform:uppercase;padding:5px 8px;border-bottom:1px solid #2a2d3a;text-align:left;}
+  .hb-tbl td{padding:6px 8px;border-bottom:1px solid rgba(42,45,58,.6);vertical-align:middle;color:#94a3b8;}
+  .hb-tbl tr:hover td{background:rgba(255,255,255,.02);}
+  .hb-hl{background:rgba(245,158,11,.3);border-radius:2px;}
 </style>
 </head>
 <body>
@@ -229,6 +284,10 @@
     </div>
     <button class="btn-dl-all" id="btnDlAll" onclick="downloadBatch()" disabled>⬇ Download All PDF</button>
   </div>
+  <button onclick="openHandbook()"
+    style="background:rgba(96,165,250,0.12);color:#60a5fa;border:1px solid rgba(96,165,250,0.3);
+    border-radius:4px;padding:5px 13px;font-weight:700;font-size:11px;cursor:pointer;
+    letter-spacing:.5px;margin-left:8px;white-space:nowrap">? HELP</button>
 </header>
 
 <!-- Plot Catalog Overlay -->
@@ -277,33 +336,181 @@
       padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">✕ Close</button>
   </div>
   <div id="catalogGrid" style="flex:1;overflow-y:auto;padding:14px 16px;
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-  </div>
-
-  <!-- Lightbox overlay (inside catalog) -->
-  <div id="catLightbox" style="display:none;position:absolute;inset:0;z-index:6000;
-    background:rgba(10,12,18,0.92);align-items:center;justify-content:center;flex-direction:column">
-    <div style="background:#1a1d27;border:1px solid #2a2d3a;border-radius:12px;
-      width:min(860px,94vw);max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
-      <!-- Header -->
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #2a2d3a;flex-shrink:0">
-        <span id="lbPlotName" style="font-family:'Courier New',monospace;font-size:14px;font-weight:700;color:#60a5fa;flex:1"></span>
-        <button onclick="openPlotFromCatalog(window._lbIdx)"
-          style="background:#4ade80;color:#000;border:none;border-radius:4px;padding:6px 14px;
-          font-weight:700;font-size:11px;cursor:pointer;letter-spacing:.5px">
-          Open Plot →
-        </button>
-        <button onclick="closeLightbox()"
-          style="background:#2a2d3a;color:#e2e8f0;border:none;border-radius:4px;padding:6px 12px;
-          font-weight:700;font-size:13px;cursor:pointer;margin-left:4px">✕</button>
-      </div>
-      <!-- Map -->
-      <div id="lbMap" style="width:100%;flex:1;min-height:480px"></div>
-      <!-- Footer -->
-      <div id="lbFooter" style="padding:10px 16px;border-top:1px solid #2a2d3a;display:flex;gap:20px;flex-wrap:wrap;flex-shrink:0;font-size:11px"></div>
-    </div>
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
   </div>
 </div>
+
+<!-- ── USER HANDBOOK DRAWER ──────────────────────────────────────────── -->
+<div class="hb-overlay" id="hbOverlay" onclick="if(event.target===this)closeHandbook()">
+  <div class="hb-drawer">
+    <div class="hb-head">
+      <span class="hb-title-text">📖 Plot Tree Reviewer — User Handbook</span>
+      <button class="hb-close-btn" onclick="closeHandbook()">✕</button>
+    </div>
+    <div class="hb-search-bar">
+      <input type="text" id="hbSearch" placeholder="Search handbook…" oninput="searchHandbook(this.value)"/>
+    </div>
+    <div class="hb-nav-bar">
+      <button class="hb-nb" onclick="hbGo('hb-start')">Getting Started</button>
+      <button class="hb-nb" onclick="hbGo('hb-plot')">Selecting a Plot</button>
+      <button class="hb-nb" onclick="hbGo('hb-ref')">Reference Points</button>
+      <button class="hb-nb" onclick="hbGo('hb-map')">Map & Trees</button>
+      <button class="hb-nb" onclick="hbGo('hb-edit')">Editing Polygons</button>
+      <button class="hb-nb" onclick="hbGo('hb-save')">Saving</button>
+      <button class="hb-nb" onclick="hbGo('hb-catalog')">Plot Catalog</button>
+      <button class="hb-nb" onclick="hbGo('hb-pdf')">PDF Export</button>
+      <button class="hb-nb" onclick="hbGo('hb-legend')">Legend</button>
+      <button class="hb-nb" onclick="hbGo('hb-how')">How It Works</button>
+    </div>
+    <div class="hb-body" id="hbBody">
+
+      <!-- 1 GETTING STARTED -->
+      <div class="hb-sec" id="hb-start">
+        <div class="hb-sec-title">1 — Getting Started</div>
+        <div class="hb-h3">Connecting to Fieldforce</div>
+        <div class="hb-p">Click <strong>☁ Connect to Fieldforce</strong> in the left sidebar. You will be prompted to sign in with your Microsoft account. Once authenticated, the system loads all plots from Dataverse automatically — no file upload needed.</div>
+        <div class="hb-p">After connecting, a dropdown appears listing all available plots. Use the <strong>search box</strong> above the dropdown to type part of a plot name and filter the list instantly.</div>
+        <div class="hb-h3">What loads automatically</div>
+        <div class="hb-p">When you select a plot, the system fetches its <strong>polygon boundary</strong>, <strong>RefCenter</strong>, and <strong>MeasuredCenter</strong> coordinates directly from the plot record in Fieldforce. No copy-paste required.</div>
+        <div class="hb-tip">💡 If the connection times out, click the ↺ Refresh button next to the Connect button to reload the current plot without re-authenticating.</div>
+      </div>
+
+      <!-- 2 SELECTING A PLOT -->
+      <div class="hb-sec" id="hb-plot">
+        <div class="hb-sec-title">2 — Selecting a Plot</div>
+        <div class="hb-h3">Using the dropdown</div>
+        <div class="hb-p">After connecting, type in the search box to filter by plot name, then click a plot in the dropdown. The map, polygon, and all coordinates populate instantly.</div>
+        <div class="hb-h3">Uploading trees manually</div>
+        <div class="hb-p">If you have a tree export as an <strong>.xlsx or .csv</strong> file, drag it into the upload zone below the OR UPLOAD divider. Column names (lat, lng, tree UID) are detected automatically. If columns cannot be matched, a manual picker appears.</div>
+        <div class="hb-h3">Pasting coordinates</div>
+        <div class="hb-p">You can also paste tree coordinates directly into the <strong>Tree Coordinates</strong> text box — one coordinate pair per line in <code>lat,lng</code> format. Click <strong>▶ Run Analysis</strong> to process.</div>
+        <div class="hb-tip">💡 Use the <strong>⊞ Plot Catalog</strong> button in the header to browse all plots visually — then click any card to jump straight to that plot.</div>
+      </div>
+
+      <!-- 3 REFERENCE POINTS -->
+      <div class="hb-sec" id="hb-ref">
+        <div class="hb-sec-title">3 — Reference &amp; Measured Center</div>
+        <div class="hb-h3">RefCenter (GPS Survey)</div>
+        <div class="hb-p">The <span class="bc">RefCenter</span> is the GPS reference point recorded during the formal survey of the plot. It is plotted as a <strong>blue dot</strong> on the map. The system measures how far each tree is from this point.</div>
+        <div class="hb-h3">MeasuredCenter (Field Officer)</div>
+        <div class="hb-p">The <span class="pc">MeasuredCenter</span> is the GPS point recorded by the field officer at the centre of the plot at planting time. It is plotted as a <strong>purple dot</strong>. This often differs slightly from the RefCenter — the offset between the two is shown in the measurements panel.</div>
+        <div class="hb-h3">Switching the reference source</div>
+        <div class="hb-p">Use the radio buttons at the top of the Reference Point section to choose which point is used as the reference when counting inside/outside trees: <strong>RefCenter</strong>, <strong>MeasuredCenter</strong>, or <strong>None</strong>. This does not affect the polygon boundary — only which centre point is displayed and used for distance calculations.</div>
+        <div class="hb-warn">⚠ If RefCenter and MeasuredCenter are far apart, this usually indicates a data entry error or the polygon was drawn at the wrong location. Check both points on the map before correcting.</div>
+      </div>
+
+      <!-- 4 MAP & TREES -->
+      <div class="hb-sec" id="hb-map">
+        <div class="hb-sec-title">4 — Map &amp; Trees</div>
+        <div class="hb-h3">Reading the map</div>
+        <div class="hb-p">The map shows a satellite view of the plot area. The <strong>green dashed polygon</strong> is the registered plot boundary. Trees are shown as numbered circles — <span class="gc">green</span> if inside the polygon, <span class="rc">red</span> if outside.</div>
+        <div class="hb-h3">Tree list panel</div>
+        <div class="hb-p">The panel on the right shows all trees with their status, coordinates, and UID. Click any tree in the list to highlight it on the map and jump to its location.</div>
+        <div class="hb-h3">Side lengths</div>
+        <div class="hb-p">Click <strong>📐 Side Lengths</strong> to label every polygon edge with its length in metres. <span class="gc">Green</span> = within target range, <span class="rc">red</span> = significantly off. A summary shows average side length, total perimeter, and estimated area.</div>
+        <div class="hb-h3">A→B Ruler</div>
+        <div class="hb-p">Click <strong>📏 A→B Ruler</strong> then click two points on the map to measure any distance. Drag the handles to adjust. Useful for checking distances between trees or from a tree to the polygon edge.</div>
+        <div class="hb-tip">💡 Click any numbered tree marker on the map for a popup showing its tree number, UID, coordinates, and inside/outside status.</div>
+      </div>
+
+      <!-- 5 EDITING POLYGONS -->
+      <div class="hb-sec" id="hb-edit">
+        <div class="hb-sec-title">5 — Editing Polygons</div>
+        <div class="hb-h3">Starting an edit</div>
+        <div class="hb-p">Click <strong>✏ Edit Polygon</strong> to enter edit mode. <span class="ac">Yellow vertex markers</span> appear at each corner of the polygon. Drag any marker to reshape the boundary. The polygon updates live as you drag.</div>
+        <div class="hb-h3">Applying or discarding</div>
+        <div class="hb-p">When satisfied, click <strong>✓ Apply</strong> to commit the new shape — the analysis re-runs automatically with the corrected boundary. Click <strong>✗ Cancel</strong> to discard all changes and restore the original polygon.</div>
+        <div class="hb-warn">⚠ Applying an edit only updates the polygon in your browser session. To write it back to Fieldforce permanently, you must click <strong>💾 Save to Fieldforce</strong> after applying.</div>
+      </div>
+
+      <!-- 6 SAVING -->
+      <div class="hb-sec" id="hb-save">
+        <div class="hb-sec-title">6 — Saving to Fieldforce</div>
+        <div class="hb-h3">Write-back</div>
+        <div class="hb-p">Click <strong>💾 Save to Fieldforce</strong> to write the current polygon boundary back to the <code>ccs_polygongeojson_plot</code> field on the plot record in Dataverse. A confirmation dialog shows the plot name and GUID before saving.</div>
+        <div class="hb-p">The button turns green and shows <strong>✓ Saved to Fieldforce!</strong> on success, then resets after 4 seconds.</div>
+        <div class="hb-warn">⚠ This action permanently overwrites the polygon in Fieldforce. It cannot be undone from this tool. Make sure the polygon is correct before saving.</div>
+        <div class="hb-h3">Permissions required</div>
+        <div class="hb-p">You must have <strong>write access</strong> to the <code>ccs_plot</code> table in Dataverse. If save fails with a 403 error, contact your Fieldforce administrator to request write permissions.</div>
+      </div>
+
+      <!-- 7 PLOT CATALOG -->
+      <div class="hb-sec" id="hb-catalog">
+        <div class="hb-sec-title">7 — Plot Catalog</div>
+        <div class="hb-h3">Opening the catalog</div>
+        <div class="hb-p">Click <strong>⊞ Plot Catalog</strong> in the header (visible after connecting to Fieldforce). The catalog shows all plots as a visual grid of satellite maps with their polygon boundaries and trees plotted.</div>
+        <div class="hb-h3">Size toggle — S / M / L</div>
+        <table class="hb-tbl">
+          <tr><th>Size</th><th>Cards per page</th><th>Best for</th></tr>
+          <tr><td><strong>S</strong></td><td>60</td><td>Quick overview of many plots at once</td></tr>
+          <tr><td><strong>M</strong></td><td>30</td><td>Balanced — polygon and trees clearly visible</td></tr>
+          <tr><td><strong>L</strong></td><td>15</td><td>Detailed inspection — trees and compliance % per card</td></tr>
+        </table>
+        <div class="hb-h3">Filters &amp; search</div>
+        <div class="hb-p">Use the dropdown to show <strong>All plots</strong>, <strong>With polygon ✓</strong>, or <strong>No polygon ✗</strong>. Use the search box to filter by plot name. Pagination controls (← Prev / Next →) navigate between pages.</div>
+        <div class="hb-h3">Expanding a card (Lightbox)</div>
+        <div class="hb-p">Click any card to open a large lightbox view of that plot with full zoom and pan, both <span class="bc">RefCenter (blue)</span> and <span class="pc">MeasuredCenter (purple)</span> markers, tree dots, and compliance percentage. Click <strong>Open Plot →</strong> to load it in the main reviewer, or <strong>✕</strong> to close back to the catalog.</div>
+        <div class="hb-tip">💡 The card footer shows trees inside vs total (e.g. 14/15 inside — 93%) colour-coded green/amber/red. Trees data loads once when the catalog opens and is shared across all cards.</div>
+      </div>
+
+      <!-- 8 PDF EXPORT -->
+      <div class="hb-sec" id="hb-pdf">
+        <div class="hb-sec-title">8 — PDF Export</div>
+        <div class="hb-h3">Single plot PDF</div>
+        <div class="hb-p">After running analysis on a plot, click <strong>⬇ Download PDF</strong> to export a single-page report for that plot. The PDF includes the satellite map with polygon and tree markers, all measurements, and tree list.</div>
+        <div class="hb-h3">Batch PDF</div>
+        <div class="hb-p">Add multiple plots to the batch queue using the <strong>+ Add to Batch</strong> button. The batch counter in the header shows how many plots are queued. Click <strong>⬇ Download All PDF</strong> to generate a multi-page PDF with one page per plot.</div>
+        <div class="hb-p">Plots can be removed from the batch queue individually using the <strong>✕</strong> button next to each entry in the batch list.</div>
+        <div class="hb-tip">💡 Batch PDF is useful for generating a review pack for a full set of plots before a field visit — load each plot, verify it looks correct, add it to batch, then download all at once.</div>
+      </div>
+
+      <!-- 9 LEGEND -->
+      <div class="hb-sec" id="hb-legend">
+        <div class="hb-sec-title">9 — Legend</div>
+        <div class="hb-h3">Map markers</div>
+        <table class="hb-tbl">
+          <tr><th>Marker</th><th>Meaning</th></tr>
+          <tr><td><span class="gc">● Green numbered</span></td><td>Tree inside the plot polygon</td></tr>
+          <tr><td><span class="rc">● Red numbered</span></td><td>Tree outside the plot polygon</td></tr>
+          <tr><td><span class="ac">◆ Yellow vertex</span></td><td>Draggable polygon corner (edit mode only)</td></tr>
+          <tr><td><span class="bc">● Blue dot</span></td><td>RefCenter — GPS survey reference point</td></tr>
+          <tr><td><span class="pc">● Purple dot</span></td><td>MeasuredCenter — field officer centre point</td></tr>
+          <tr><td><span style="color:#fbbf24">M</span> marker</td><td>MeasuredCenter marker on map (large M icon)</td></tr>
+          <tr><td>Green dashed outline</td><td>Plot polygon boundary</td></tr>
+        </table>
+        <div class="hb-h3">Compliance colours (catalog cards)</div>
+        <table class="hb-tbl">
+          <tr><th>Colour</th><th>Threshold</th><th>Meaning</th></tr>
+          <tr><td><span class="gc">Green</span></td><td>≥ 90%</td><td>Most trees inside polygon — good boundary</td></tr>
+          <tr><td><span class="ac">Amber</span></td><td>70–89%</td><td>Some trees outside — review polygon placement</td></tr>
+          <tr><td><span class="rc">Red</span></td><td>&lt; 70%</td><td>Many trees outside — polygon likely misplaced</td></tr>
+        </table>
+        <div class="hb-h3">Side length labels</div>
+        <table class="hb-tbl">
+          <tr><th>Colour</th><th>Meaning</th></tr>
+          <tr><td><span class="gc">Green</span></td><td>Side within acceptable range of target (~20m)</td></tr>
+          <tr><td><span class="rc">Red</span></td><td>Side significantly off target — review boundary</td></tr>
+        </table>
+      </div>
+
+      <!-- 10 HOW IT WORKS -->
+      <div class="hb-sec" id="hb-how">
+        <div class="hb-sec-title">10 — How It Works</div>
+        <div class="hb-h3">What is a plot polygon?</div>
+        <div class="hb-p">A plot polygon is a GPS boundary drawn around a registered planting plot — a digital fence tracing the outline of the plot area on a map. The system checks whether each tree's GPS pin falls inside or outside that fence.</div>
+        <div class="hb-h3">Inside vs Outside</div>
+        <div class="hb-p">The system uses a <strong>point-in-polygon</strong> algorithm: for each tree coordinate, it checks whether the point lies inside the polygon boundary. Trees inside are <span class="gc">green</span>; trees outside are <span class="rc">red</span>.</div>
+        <div class="hb-h3">What causes trees to appear outside?</div>
+        <div class="hb-p"><strong>Most common: the polygon is in the wrong place.</strong> If a plot polygon was drawn incorrectly or is offset from its true location, trees with accurate GPS coordinates will fall outside. The trees are correct — the polygon needs correcting.</div>
+        <div class="hb-p"><strong>Second cause: GPS error at planting.</strong> Occasionally a tree's GPS coordinate was recorded with significant error. If only one or two trees are outside while the rest are inside, this is more likely the cause than a boundary issue.</div>
+        <div class="hb-h3">RefCenter vs MeasuredCenter offset</div>
+        <div class="hb-p">A large distance between the RefCenter (survey GPS) and MeasuredCenter (field officer GPS) often indicates the polygon was drawn at the survey point but trees were planted at a different physical location — or vice versa. Use this as a diagnostic signal before deciding which boundary to move.</div>
+        <div class="hb-tip">💡 When every tree in a plot is outside the polygon, it almost always means the polygon needs to be redrawn — not that all the trees are in the wrong place.</div>
+      </div>
+
+    </div><!-- end hb-body -->
+  </div><!-- end hb-drawer -->
+</div><!-- end hb-overlay -->
 
 <div class="main">
   <!-- LEFT -->
@@ -1570,20 +1777,41 @@ async function fetchCatalogTrees() {
 
 function setCatalogSize(sz) {
   catalogSize = sz;
-  catalogPage = 1;
+  // Update button styles
   ['s','m','l'].forEach(s => {
     const btn = document.getElementById('catSize' + s.toUpperCase());
     if (!btn) return;
-    btn.style.background = s === sz ? 'var(--accent)' : 'var(--bg)';
-    btn.style.color      = s === sz ? '#000' : 'var(--muted)';
+    btn.style.background = s === sz ? '#4ade80' : 'var(--bg)';
+    btn.style.color      = s === sz ? '#000'    : 'var(--muted)';
   });
-  const colMap = {
-    s: 'repeat(auto-fill,minmax(140px,1fr))',
-    m: 'repeat(auto-fill,minmax(220px,1fr))',
-    l: 'repeat(auto-fill,minmax(340px,1fr))',
-  };
+  // Update grid columns and map heights
   const grid = document.getElementById('catalogGrid');
-  if (grid) grid.style.gridTemplateColumns = colMap[sz] || colMap.m;
+  const sizes = {
+    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '110px', perPage: 80 },
+    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '160px', perPage: 48 },
+    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '240px', perPage: 24 },
+  };
+  const cfg = sizes[sz];
+  grid.style.gridTemplateColumns = cfg.cols;
+  // Destroy maps and re-render with new sizes
+  Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
+  catalogMaps={};
+  if(catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
+  catalogPage = 1;
+  renderCatalog();
+}
+
+function setCatalogSize(size) {
+  catalogSize = size;
+  catalogPage = 1;
+  // Update button styles
+  ['s','m','l'].forEach(s => {
+    const btn = document.getElementById('catSize' + s.toUpperCase());
+    if (!btn) return;
+    btn.style.background = s === size ? 'var(--accent)' : 'var(--bg)';
+    btn.style.color      = s === size ? '#000' : 'var(--muted)';
+  });
+  // Destroy old maps
   Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
   catalogMaps = {};
   if (catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
@@ -1599,9 +1827,7 @@ function changeCatalogPage(dir) {
     if (filter === 'no_geo'  &&  p.geoJSON) return false;
     return true;
   });
-  const perPageMap = { s: 60, m: 30, l: 15 };
-  const perPage = perPageMap[catalogSize] || 30;
-  const tp = Math.ceil(plots.length / perPage);
+  const tp = Math.ceil(plots.length / CAT_PAGE_SIZE);
   catalogPage = Math.max(1, Math.min(tp, catalogPage + dir));
   Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
   catalogMaps = {};
@@ -1622,7 +1848,7 @@ function renderCatalog() {
   });
 
   // Reset to page 1 on filter/search change
-  const sizeMap = { s: { mapH: '140px', perPage: 60 }, m: { mapH: '220px', perPage: 30 }, l: { mapH: '340px', perPage: 15 } };
+  const sizeMap = { s: { mapH: '110px', perPage: 80 }, m: { mapH: '160px', perPage: 48 }, l: { mapH: '240px', perPage: 24 } };
   const szCfg   = sizeMap[catalogSize] || sizeMap['m'];
   const perPage = szCfg.perPage;
   const tp = Math.ceil(allPlots.length / perPage);
@@ -1652,21 +1878,21 @@ function renderCatalog() {
   catalogMaps = {};
   if (catalogObserver) { catalogObserver.disconnect(); catalogObserver = null; }
 
+  // Reset page on search/filter
   const grid = document.getElementById('catalogGrid');
   grid.innerHTML = plots.map((p, i) => {
     const hasGeo = !!p.geoJSON;
-    const globalIdx = plotsData.indexOf(p);
     return `<div class="catalog-card" style="background:#1a1d27;border:1px solid #2a2d3a;
       border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s;display:flex;flex-direction:column"
       onmouseenter="this.style.borderColor='#4ade80'"
       onmouseleave="this.style.borderColor='#2a2d3a'"
-      onclick="expandCatalogCard(${globalIdx})">
+      onclick="openPlotFromCatalog(${plotsData.indexOf(p)})">
       ${hasGeo
-        ? `<div style="width:100%;aspect-ratio:1/1;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
+        ? `<div style="width:100%;height:${sizeMap[catalogSize]?.mapH||"160px"};min-height:${(CAT_SIZE_CONFIG[catalogSize]||CAT_SIZE_CONFIG.m).mapH}px;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
                color:#4a6480;font-size:10px;font-family:monospace">Loading map…</div>
            </div>`
-        : `<div style="width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+        : `<div style="width:100%;height:60px;display:flex;align-items:center;justify-content:center;
              background:#1a1d27;color:#4a6480;font-size:10px;font-family:monospace">
              No polygon geometry
            </div>`
@@ -1678,8 +1904,6 @@ function renderCatalog() {
         </div>
         ${p.refLat ? `<div style="font-size:9px;color:#4a6480;font-family:'Courier New',monospace">
           Ref: ${parseFloat(p.refLat).toFixed(5)}, ${parseFloat(p.refLng).toFixed(5)}</div>` : ''}
-        ${p.measLat ? `<div style="font-size:9px;color:#a78bfa;font-family:'Courier New',monospace">
-          Meas: ${parseFloat(p.measLat).toFixed(5)}, ${parseFloat(p.measLng).toFixed(5)}</div>` : ''}
         <div style="font-size:9px;color:${hasGeo?'#4ade80':'#f87171'};margin-top:3px;font-weight:700">
           ${hasGeo ? '✓ Has polygon' : '✗ No polygon'}
         </div>
@@ -1713,9 +1937,6 @@ function renderCatalog() {
 
 function initCatalogMap(container, plot, idx) {
   container.innerHTML = '';
-  // Force square: height = actual rendered width
-  const w = container.offsetWidth || 240;
-  container.style.height = w + 'px';
   try {
     const ring = parsePolygon(plot.geoJSON);
     if (!ring) {
@@ -1774,13 +1995,9 @@ function initCatalogMap(container, plot, idx) {
       L.marker([plot.refLat, plot.refLng], { icon }).addTo(m);
     }
 
-    const bounds = poly.getBounds();
+    m.fitBounds(poly.getBounds(), { padding:[4,4] });
     catalogMaps[`cmap-${idx}`] = m;
-    const fitIt = () => { try { m.invalidateSize(); m.fitBounds(bounds, { padding:[40,40] }); } catch(e){} };
-    fitIt();
-    setTimeout(fitIt, 120);
-    setTimeout(fitIt, 400);
-    setTimeout(fitIt, 900);
+    setTimeout(()=>{ try{ m.invalidateSize(); m.fitBounds(poly.getBounds(),{padding:[4,4]}); }catch(e){} }, 150);
   } catch(e) {
     container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Map error</div>';
   }
@@ -2365,113 +2582,39 @@ async function savePolygonToFieldforce() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CATALOG LIGHTBOX — expand card into large map overlay
-// ═══════════════════════════════════════════════════════════════════════════
-
-let lbMap = null;
-
-function expandCatalogCard(globalIdx) {
-  const p = plotsData[globalIdx];
-  if (!p) return;
-  window._lbIdx = globalIdx;
-
-  const lb = document.getElementById('catLightbox');
-  lb.style.display = 'flex';
-
-  document.getElementById('lbPlotName').textContent = p.plotId;
-
-  // Footer info
-  const footer = document.getElementById('lbFooter');
-  const parts = [];
-  if (p.refLat)  parts.push(`<span style="color:#60a5fa">● Ref: ${parseFloat(p.refLat).toFixed(6)}, ${parseFloat(p.refLng).toFixed(6)}</span>`);
-  if (p.measLat) parts.push(`<span style="color:#a78bfa">◆ Meas: ${parseFloat(p.measLat).toFixed(6)}, ${parseFloat(p.measLng).toFixed(6)}</span>`);
-  footer.innerHTML = parts.join('<span style="color:#2a2d3a">│</span>');
-
-  // Destroy previous lightbox map
-  if (lbMap) { try { lbMap.remove(); } catch(e){} lbMap = null; }
-
-  const container = document.getElementById('lbMap');
-  container.innerHTML = '';
-
-  if (!p.geoJSON) {
-    container.style.display = 'flex';
-    container.innerHTML = '<div style="color:#4a6480;font-size:13px;font-family:monospace;margin:auto">No polygon geometry</div>';
-    return;
-  }
-
-  try {
-    const ring = parsePolygon(p.geoJSON);
-    if (!ring) return;
-
-    lbMap = L.map(container, { zoomControl:true, attributionControl:false });
-    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      subdomains:['mt0','mt1','mt2','mt3'], maxZoom:21
-    }).addTo(lbMap);
-
-    const latLngs = ring.map(c => [c[1], c[0]]);
-    const poly = L.polygon(latLngs, {
-      color:'#4ade80', weight:2.5, fillColor:'#4ade80', fillOpacity:0.08, dashArray:'6,4'
-    }).addTo(lbMap);
-
-    // Trees
-    const trees = catalogTreesByPlot[p.guid] || [];
-    trees.forEach(t => {
-      const inside = pip(t.lat, t.lng, ring);
-      L.circleMarker([t.lat, t.lng], {
-        radius:4, color:'rgba(255,255,255,0.5)', weight:0.5,
-        fillColor: inside ? '#4ade80' : '#f87171', fillOpacity:0.9
-      }).addTo(lbMap);
-    });
-
-    // RefCenter marker
-    if (p.refLat) {
-      const icon = L.divIcon({ className:'',
-        html:'<div style="background:#60a5fa;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.7)"></div>',
-        iconSize:[10,10], iconAnchor:[5,5]
-      });
-      L.marker([p.refLat, p.refLng], { icon })
-        .bindPopup(`<b>RefCenter</b><br>${parseFloat(p.refLat).toFixed(6)}, ${parseFloat(p.refLng).toFixed(6)}`)
-        .addTo(lbMap);
-    }
-
-    // MeasuredCenter marker
-    if (p.measLat) {
-      const icon = L.divIcon({ className:'',
-        html:'<div style="background:#a78bfa;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.7)"></div>',
-        iconSize:[10,10], iconAnchor:[5,5]
-      });
-      L.marker([p.measLat, p.measLng], { icon })
-        .bindPopup(`<b>MeasuredCenter</b><br>${parseFloat(p.measLat).toFixed(6)}, ${parseFloat(p.measLng).toFixed(6)}`)
-        .addTo(lbMap);
-    }
-
-    // Tree count in footer
-    if (trees.length > 0) {
-      const inside = trees.filter(t => pip(t.lat, t.lng, ring)).length;
-      const pct = Math.round(inside / trees.length * 100);
-      const col = pct >= 90 ? '#4ade80' : pct >= 70 ? '#fbbf24' : '#f87171';
-      footer.innerHTML += `<span style="color:${col};font-weight:700">🌳 ${inside}/${trees.length} inside (${pct}%)</span>`;
-    }
-
-    const fitIt = () => { try { lbMap.invalidateSize(); lbMap.fitBounds(poly.getBounds(), { padding:[48,48] }); } catch(e){} };
-    fitIt();
-    setTimeout(fitIt, 150);
-    setTimeout(fitIt, 500);
-  } catch(e) {
-    container.innerHTML = '<div style="color:#f87171;font-size:12px;margin:auto">Map error</div>';
-  }
+// ── User Handbook ──────────────────────────────────────────────────────────
+function openHandbook() {
+  document.getElementById('hbOverlay').classList.add('open');
+  document.getElementById('hbSearch').focus();
 }
-
-function closeLightbox() {
-  document.getElementById('catLightbox').style.display = 'none';
-  if (lbMap) { try { lbMap.remove(); } catch(e){} lbMap = null; }
+function closeHandbook() {
+  document.getElementById('hbOverlay').classList.remove('open');
 }
+function hbGo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function searchHandbook(q) {
+  const body = document.getElementById('hbBody');
+  body.querySelectorAll('.hb-hl').forEach(el => { el.outerHTML = el.textContent; });
+  if (!q || q.length < 2) return;
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+  nodes.forEach(node => {
+    if (!node.textContent.match(re)) return;
+    const span = document.createElement('span');
+    span.innerHTML = node.textContent.replace(re, m => `<span class="hb-hl">${m}</span>`);
+    node.parentNode.replaceChild(span, node);
+  });
+  const first = body.querySelector('.hb-hl');
+  if (first) first.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHandbook(); });
 
-// Close lightbox on backdrop click
-document.getElementById('catLightbox').addEventListener('click', function(e) {
-  if (e.target === this) closeLightbox();
-});
+// ── Show edit row after analysis ─────────────────────────────────────────────
+// editRow is shown directly inside the original runAnalysis via the dlRow check below
 
 </script>
 </body>
