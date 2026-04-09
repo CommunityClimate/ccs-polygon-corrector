@@ -1467,9 +1467,9 @@ let catalogTreesLoaded = false;
 let catalogPage = 1;
 let catalogSize = 'm';
 const CAT_SIZE_CONFIG = {
-  s: { perPage: 60, mapH: 200, cols: 'repeat(auto-fill,minmax(220px,1fr))' },
-  m: { perPage: 30, mapH: 260, cols: 'repeat(auto-fill,minmax(320px,1fr))' },
-  l: { perPage: 15, mapH: 360, cols: 'repeat(auto-fill,minmax(440px,1fr))' },
+  s: { perPage: 60, mapH: 160, cols: 'repeat(auto-fill,minmax(160px,1fr))' },
+  m: { perPage: 30, mapH: 240, cols: 'repeat(auto-fill,minmax(240px,1fr))' },
+  l: { perPage: 15, mapH: 360, cols: 'repeat(auto-fill,minmax(360px,1fr))' },
 };
 const CAT_PAGE_SIZE = 48;
 
@@ -1556,9 +1556,9 @@ function setCatalogSize(sz) {
   // Update grid columns and map heights
   const grid = document.getElementById('catalogGrid');
   const sizes = {
-    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '160px', perPage: 80 },
-    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '220px', perPage: 48 },
-    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '320px', perPage: 24 },
+    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '160px', perPage: 60 },
+    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '240px', perPage: 30 },
+    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '360px', perPage: 15 },
   };
   const cfg = sizes[sz];
   grid.style.gridTemplateColumns = cfg.cols;
@@ -1617,7 +1617,7 @@ function renderCatalog() {
   });
 
   // Reset to page 1 on filter/search change
-  const sizeMap = { s: { mapH: '160px', perPage: 80 }, m: { mapH: '220px', perPage: 48 }, l: { mapH: '320px', perPage: 24 } };
+  const sizeMap = { s: { mapH: '160px', perPage: 60 }, m: { mapH: '240px', perPage: 30 }, l: { mapH: '360px', perPage: 15 } };
   const szCfg   = sizeMap[catalogSize] || sizeMap['m'];
   const perPage = szCfg.perPage;
   const tp = Math.ceil(allPlots.length / perPage);
@@ -1766,13 +1766,11 @@ function initCatalogMap(container, plot, idx) {
 
     const bounds = poly.getBounds();
     catalogMaps[`cmap-${idx}`] = m;
-    // invalidateSize FIRST so Leaflet knows real container dimensions, then fitBounds.
-    // Repeat at increasing intervals to handle slow/lazy renders.
-    const fitIt = () => { try { m.invalidateSize(); m.fitBounds(bounds, { padding:[24,24] }); } catch(e){} };
+    const fitIt = () => { try { m.invalidateSize(); m.fitBounds(bounds, { padding:[48,48] }); } catch(e){} };
     fitIt();
-    setTimeout(fitIt, 100);
-    setTimeout(fitIt, 350);
-    setTimeout(fitIt, 800);
+    setTimeout(fitIt, 120);
+    setTimeout(fitIt, 400);
+    setTimeout(fitIt, 900);
   } catch(e) {
     container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Map error</div>';
   }
