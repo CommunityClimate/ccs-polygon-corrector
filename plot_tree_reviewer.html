@@ -1467,9 +1467,9 @@ let catalogTreesLoaded = false;
 let catalogPage = 1;
 let catalogSize = 'm';
 const CAT_SIZE_CONFIG = {
-  s: { perPage: 60, mapH: 200, cols: 'repeat(auto-fill,minmax(220px,1fr))' },
-  m: { perPage: 30, mapH: 280, cols: 'repeat(auto-fill,minmax(320px,1fr))' },
-  l: { perPage: 15, mapH: 380, cols: 'repeat(auto-fill,minmax(440px,1fr))' },
+  s: { perPage: 60, mapH: 280, cols: 'repeat(auto-fill,minmax(220px,1fr))' },
+  m: { perPage: 30, mapH: 380, cols: 'repeat(auto-fill,minmax(320px,1fr))' },
+  l: { perPage: 15, mapH: 500, cols: 'repeat(auto-fill,minmax(440px,1fr))' },
 };
 const CAT_PAGE_SIZE = 48;
 
@@ -1556,9 +1556,9 @@ function setCatalogSize(sz) {
   // Update grid columns and map heights
   const grid = document.getElementById('catalogGrid');
   const sizes = {
-    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '110px', perPage: 80 },
-    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '160px', perPage: 48 },
-    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '240px', perPage: 24 },
+    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '180px', perPage: 80 },
+    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '260px', perPage: 48 },
+    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '380px', perPage: 24 },
   };
   const cfg = sizes[sz];
   grid.style.gridTemplateColumns = cfg.cols;
@@ -1617,7 +1617,7 @@ function renderCatalog() {
   });
 
   // Reset to page 1 on filter/search change
-  const sizeMap = { s: { mapH: '110px', perPage: 80 }, m: { mapH: '160px', perPage: 48 }, l: { mapH: '240px', perPage: 24 } };
+  const sizeMap = { s: { mapH: '180px', perPage: 80 }, m: { mapH: '260px', perPage: 48 }, l: { mapH: '380px', perPage: 24 } };
   const szCfg   = sizeMap[catalogSize] || sizeMap['m'];
   const perPage = szCfg.perPage;
   const tp = Math.ceil(allPlots.length / perPage);
