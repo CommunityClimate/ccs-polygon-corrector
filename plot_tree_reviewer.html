@@ -1777,41 +1777,20 @@ async function fetchCatalogTrees() {
 
 function setCatalogSize(sz) {
   catalogSize = sz;
-  // Update button styles
+  catalogPage = 1;
   ['s','m','l'].forEach(s => {
     const btn = document.getElementById('catSize' + s.toUpperCase());
     if (!btn) return;
-    btn.style.background = s === sz ? '#4ade80' : 'var(--bg)';
-    btn.style.color      = s === sz ? '#000'    : 'var(--muted)';
+    btn.style.background = s === sz ? 'var(--accent)' : 'var(--bg)';
+    btn.style.color      = s === sz ? '#000' : 'var(--muted)';
   });
-  // Update grid columns and map heights
-  const grid = document.getElementById('catalogGrid');
-  const sizes = {
-    s: { cols: 'repeat(auto-fill,minmax(160px,1fr))', mapH: '110px', perPage: 80 },
-    m: { cols: 'repeat(auto-fill,minmax(240px,1fr))', mapH: '160px', perPage: 48 },
-    l: { cols: 'repeat(auto-fill,minmax(360px,1fr))', mapH: '240px', perPage: 24 },
+  const colMap = {
+    s: 'repeat(auto-fill,minmax(140px,1fr))',
+    m: 'repeat(auto-fill,minmax(220px,1fr))',
+    l: 'repeat(auto-fill,minmax(340px,1fr))',
   };
-  const cfg = sizes[sz];
-  grid.style.gridTemplateColumns = cfg.cols;
-  // Destroy maps and re-render with new sizes
-  Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
-  catalogMaps={};
-  if(catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
-  catalogPage = 1;
-  renderCatalog();
-}
-
-function setCatalogSize(size) {
-  catalogSize = size;
-  catalogPage = 1;
-  // Update button styles
-  ['s','m','l'].forEach(s => {
-    const btn = document.getElementById('catSize' + s.toUpperCase());
-    if (!btn) return;
-    btn.style.background = s === size ? 'var(--accent)' : 'var(--bg)';
-    btn.style.color      = s === size ? '#000' : 'var(--muted)';
-  });
-  // Destroy old maps
+  const grid = document.getElementById('catalogGrid');
+  if (grid) grid.style.gridTemplateColumns = colMap[sz] || colMap.m;
   Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
   catalogMaps = {};
   if (catalogObserver){catalogObserver.disconnect();catalogObserver=null;}
@@ -1827,7 +1806,9 @@ function changeCatalogPage(dir) {
     if (filter === 'no_geo'  &&  p.geoJSON) return false;
     return true;
   });
-  const tp = Math.ceil(plots.length / CAT_PAGE_SIZE);
+  const perPageMap = { s: 60, m: 30, l: 15 };
+  const perPage = perPageMap[catalogSize] || 30;
+  const tp = Math.ceil(plots.length / perPage);
   catalogPage = Math.max(1, Math.min(tp, catalogPage + dir));
   Object.values(catalogMaps).forEach(m=>{try{m.remove();}catch(e){}});
   catalogMaps = {};
@@ -1848,7 +1829,7 @@ function renderCatalog() {
   });
 
   // Reset to page 1 on filter/search change
-  const sizeMap = { s: { mapH: '110px', perPage: 80 }, m: { mapH: '160px', perPage: 48 }, l: { mapH: '240px', perPage: 24 } };
+  const sizeMap = { s: { mapH: '140px', perPage: 60 }, m: { mapH: '220px', perPage: 30 }, l: { mapH: '340px', perPage: 15 } };
   const szCfg   = sizeMap[catalogSize] || sizeMap['m'];
   const perPage = szCfg.perPage;
   const tp = Math.ceil(allPlots.length / perPage);
@@ -1878,21 +1859,21 @@ function renderCatalog() {
   catalogMaps = {};
   if (catalogObserver) { catalogObserver.disconnect(); catalogObserver = null; }
 
-  // Reset page on search/filter
   const grid = document.getElementById('catalogGrid');
   grid.innerHTML = plots.map((p, i) => {
     const hasGeo = !!p.geoJSON;
+    const globalIdx = plotsData.indexOf(p);
     return `<div class="catalog-card" style="background:#1a1d27;border:1px solid #2a2d3a;
       border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s;display:flex;flex-direction:column"
       onmouseenter="this.style.borderColor='#4ade80'"
       onmouseleave="this.style.borderColor='#2a2d3a'"
-      onclick="openPlotFromCatalog(${plotsData.indexOf(p)})">
+      onclick="expandCatalogCard(${globalIdx})">
       ${hasGeo
-        ? `<div style="width:100%;height:${sizeMap[catalogSize]?.mapH||"160px"};min-height:${(CAT_SIZE_CONFIG[catalogSize]||CAT_SIZE_CONFIG.m).mapH}px;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
+        ? `<div style="width:100%;aspect-ratio:1/1;background:#0a0c12;overflow:hidden" id="cmap-${i}" data-idx="${i}">
              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
                color:#4a6480;font-size:10px;font-family:monospace">Loading map…</div>
            </div>`
-        : `<div style="width:100%;height:60px;display:flex;align-items:center;justify-content:center;
+        : `<div style="width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
              background:#1a1d27;color:#4a6480;font-size:10px;font-family:monospace">
              No polygon geometry
            </div>`
@@ -1904,6 +1885,8 @@ function renderCatalog() {
         </div>
         ${p.refLat ? `<div style="font-size:9px;color:#4a6480;font-family:'Courier New',monospace">
           Ref: ${parseFloat(p.refLat).toFixed(5)}, ${parseFloat(p.refLng).toFixed(5)}</div>` : ''}
+        ${p.measLat ? `<div style="font-size:9px;color:#a78bfa;font-family:'Courier New',monospace">
+          Meas: ${parseFloat(p.measLat).toFixed(5)}, ${parseFloat(p.measLng).toFixed(5)}</div>` : ''}
         <div style="font-size:9px;color:${hasGeo?'#4ade80':'#f87171'};margin-top:3px;font-weight:700">
           ${hasGeo ? '✓ Has polygon' : '✗ No polygon'}
         </div>
@@ -1937,6 +1920,9 @@ function renderCatalog() {
 
 function initCatalogMap(container, plot, idx) {
   container.innerHTML = '';
+  // Force square: height = actual rendered width
+  const w = container.offsetWidth || 240;
+  container.style.height = w + 'px';
   try {
     const ring = parsePolygon(plot.geoJSON);
     if (!ring) {
@@ -1995,9 +1981,13 @@ function initCatalogMap(container, plot, idx) {
       L.marker([plot.refLat, plot.refLng], { icon }).addTo(m);
     }
 
-    m.fitBounds(poly.getBounds(), { padding:[4,4] });
+    const bounds = poly.getBounds();
     catalogMaps[`cmap-${idx}`] = m;
-    setTimeout(()=>{ try{ m.invalidateSize(); m.fitBounds(poly.getBounds(),{padding:[4,4]}); }catch(e){} }, 150);
+    const fitIt = () => { try { m.invalidateSize(); m.fitBounds(bounds, { padding:[40,40] }); } catch(e){} };
+    fitIt();
+    setTimeout(fitIt, 120);
+    setTimeout(fitIt, 400);
+    setTimeout(fitIt, 900);
   } catch(e) {
     container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Map error</div>';
   }
