@@ -285,6 +285,13 @@
                     <button class="btn btn-outline-warning btn-sm" id="correctBtn">
                         <i class="bi bi-tools"></i> Auto-Correct This Field
                     </button>
+                    <!-- FIELDFORCE WRITE-BACK -->
+                    <button class="btn btn-sm" id="btnSaveToFieldforce" onclick="saveCurrentFieldToFieldforce()"
+                        style="background:linear-gradient(135deg,#0078d4,#005a9e);color:white;border:none;
+                        display:none;align-items:center;justify-content:center;gap:6px;font-weight:600">
+                        <i class="bi bi-cloud-upload-fill"></i> Save to Fieldforce
+                    </button>
+                    <div id="dvSaveStatus" style="font-size:10px;min-height:14px;display:none"></div>
                 </div>
             </div>
             
@@ -714,7 +721,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
     
     <!-- Catalog Script -->
     <script>
@@ -1002,25 +1009,25 @@
         const DV_API   = `${DV_ENV}/api/data/v9.2`;
         const DV_SCOPE = [`${DV_ENV}/user_impersonation`];
 
-        // Columns to fetch — covers all columns the app needs
-        // Logical names follow the ccs_ prefix convention seen in the tree table
         const DV_SELECT = [
-            'ccs_fieldid',          // CCS Field ID
-            'ccs_fieldowner_field', // Field Owner
-            'ccs_zone_field',       // Zone
-            'ccs_fieldsizem2',      // Field Size (m2)
+            'ccs_ccsfieldid',
+            'ccs_fieldgeojson',
+            'ccs_fieldowner',
+            'ccs_zone',
+            'ccs_fieldsize',
+            'ccs_fieldid',
             'createdon'
         ].join(',');
 
-        // GeoJSON column — will be detected from first record
-        const DV_GEO_CANDIDATES = [
-            'ccs_fieldgeojson', 'ccs_fieldgeojson_field', 'ccs_wkt',
-            'ccs_fieldspolygon', 'ccs_fieldspolygon_field',
-            'ccs_fieldesrijson', 'ccs_fieldpolygon'
-        ];
+        let msalApp    = null;
+        let dvAccount  = null;
 
-        let msalApp = null;
-        let dvAccount = null;
+        // ── GUID map: fieldId → Dataverse record GUID ─────────────────────
+        // Used by write-back to know which record to PATCH
+        window._dvFieldGuids = {}; // e.g. { 'FLD-X3B0D-Y6R7D-001': 'xxxxxxxx-xxxx-...' }
+        window._dvCurrentFieldId   = null; // currently selected CCS Field ID
+        window._dvCurrentFieldGuid = null; // its Dataverse GUID
+        window._dvToken            = null; // cached token for write-back
 
         function getMSAL() {
             if (!msalApp) msalApp = new msal.PublicClientApplication(MSAL_CONFIG);
@@ -1035,10 +1042,12 @@
             try {
                 const r = await app.acquireTokenSilent(req);
                 dvAccount = r.account;
+                window._dvToken = r.accessToken;
                 return r.accessToken;
             } catch(e) {
                 const r = await app.acquireTokenPopup(req);
                 dvAccount = r.account;
+                window._dvToken = r.accessToken;
                 return r.accessToken;
             }
         }
@@ -1046,6 +1055,11 @@
         function setDvStatus(msg, color) {
             const el = document.getElementById('dvStatus');
             if (el) { el.textContent = msg; el.style.color = color || '#6c757d'; }
+        }
+
+        function setSaveStatus(msg, color) {
+            const el = document.getElementById('dvSaveStatus');
+            if (el) { el.textContent = msg; el.style.color = color || '#6c757d'; el.style.display = 'block'; }
         }
 
         window.connectFieldforce = async function() {
@@ -1070,58 +1084,96 @@
         };
 
         async function fetchAllFields(token) {
-            // Step 1: probe one record with NO $select to get all available column names
-            setDvStatus('⬇ Detecting field schema…', '#0078d4');
-            const probeRes = await fetch(
-                `${DV_API}/ccs_fields?$top=1&$filter=statecode eq 0`,
-                { headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'OData-MaxVersion': '4.0', 'OData-Version': '4.0'
-                }}
-            );
-            if (!probeRes.ok) throw new Error(`Schema probe HTTP ${probeRes.status}: ${await probeRes.text()}`);
-            const probeData = await probeRes.json();
-            const sample = probeData.value?.[0] || {};
-            // Confirmed exact column names from Dataverse schema probe 2026-04-01
-            const idCol    = 'ccs_cssfieldid_field';
-            const geoCol   = 'ccs_fieldgeojson_field';
-            const ownerCol = 'ccs_contactid_field';
-            const sizeCol  = 'ccs_fieldsizem2_field';
-
-            const selectCols = [idCol, geoCol, ownerCol, sizeCol, 'createdon'].join(',');
-            let url = `${DV_API}/ccs_fields?$select=${selectCols}&$filter=statecode eq 0`;
+            let url = `${DV_API}/ccs_fields?$select=${DV_SELECT}&$filter=statecode eq 0&$top=5000`;
             const rows = [];
             let page = 0;
 
             while (url) {
                 page++;
                 setDvStatus(`⬇ Fetching page ${page} — ${rows.length.toLocaleString()} fields so far…`, '#0078d4');
+
                 let res = await fetch(url, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Accept': 'application/json',
-                        'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0',
                         'Prefer': 'odata.maxpagesize=5000'
                     }
                 });
+
                 if (res.status === 401) {
                     token = await getToken();
-                    continue;
+                    res = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json',
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Prefer': 'odata.maxpagesize=5000'
+                        }
+                    });
                 }
-                if (!res.ok) throw new Error(`HTTP ${res.status} — ${(await res.text()).substring(0, 300)}`);
+
+                if (!res.ok) {
+                    const body = await res.text();
+                    throw new Error(`HTTP ${res.status} — ${body.substring(0, 200)}`);
+                }
+
                 const data = await res.json();
                 rows.push(...(data.value || []));
                 url = data['@odata.nextLink'] || null;
             }
 
+            // ── Store GUID map for write-back ──────────────────────────────
+            window._dvFieldGuids = {};
+            rows.forEach(r => {
+                const fieldId = (r.ccs_ccsfieldid || '').trim();
+                const guid    = (r.ccs_fieldid    || '').trim();
+                if (fieldId && guid) window._dvFieldGuids[fieldId] = guid;
+            });
+
             setDvStatus(`✓ ${rows.length.toLocaleString()} fields loaded — converting…`, '#198754');
-            injectAsCSV(rows, idCol, geoCol, ownerCol, null, sizeCol);
+            injectAsCSV(rows);
+
+            // ── URL parameter auto-load ─────────────────────────────────────
+            // If opened with ?fieldId=FLD-XXX, auto-select and load that field
+            const urlParams   = new URLSearchParams(window.location.search);
+            const preloadId   = urlParams.get('fieldId');
+            if (preloadId) {
+                setTimeout(() => autoLoadFieldFromUrl(preloadId), 800);
+            }
         }
 
-        function injectAsCSV(rows, idCol, geoCol, ownerCol, zoneCol, sizeCol) {
-            // Convert Dataverse rows → CSV matching what app.js expects
-            // Header names match the column detection in app.js
+        function autoLoadFieldFromUrl(targetFieldId) {
+            const sel = document.getElementById('fieldSelect');
+            if (!sel) return;
+
+            // Find the option matching the field ID
+            let found = false;
+            for (let i = 0; i < sel.options.length; i++) {
+                const opt = sel.options[i];
+                if (opt.value && (opt.value === targetFieldId || opt.text.includes(targetFieldId))) {
+                    sel.selectedIndex = i;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) {
+                // Auto-click Load Field
+                const loadBtn = document.getElementById('loadFieldBtn');
+                if (loadBtn) {
+                    loadBtn.click();
+                    setDvStatus(`✓ Auto-loaded field: ${targetFieldId}`, '#198754');
+                }
+            } else {
+                setDvStatus(`⚠ Field ${targetFieldId} not found — check Field ID or re-connect`, '#ffc107');
+            }
+        }
+
+        function injectAsCSV(rows) {
             const headers = [
                 'CCS Field ID',
                 'Field GeoJSON',
@@ -1140,20 +1192,19 @@
             const csvRows = [headers.join(',')];
             for (const r of rows) {
                 csvRows.push([
-                    escape(idCol    ? (r[idCol]    || '') : ''),
-                    escape(geoCol   ? (r[geoCol]   || '') : ''),
-                    escape(ownerCol ? (r[ownerCol] || '') : ''),
-                    escape(zoneCol  ? (r[zoneCol]  || '') : ''),
-                    escape(sizeCol  ? (r[sizeCol]  || '') : ''),
-                    escape(idCol    ? (r[idCol]    || '') : '')
+                    escape(r.ccs_ccsfieldid   || r.ccs_fieldid || ''),
+                    escape(r.ccs_fieldgeojson || ''),
+                    escape(r.ccs_fieldowner   || ''),
+                    escape(r.ccs_zone         || ''),
+                    escape(r.ccs_fieldsize    || ''),
+                    escape(r.ccs_fieldid      || '')
                 ].join(','));
             }
 
-            const csv     = csvRows.join('\n');
-            const blob    = new Blob([csv], { type: 'text/csv' });
-            const file    = new File([blob], 'active_fields_fieldforce.csv', { type: 'text/csv' });
+            const csv   = csvRows.join('\n');
+            const blob  = new Blob([csv], { type: 'text/csv' });
+            const file  = new File([blob], 'active_fields_fieldforce.csv', { type: 'text/csv' });
 
-            // Inject into the fileInput that app.js is watching
             const input = document.getElementById('fileInput');
             const dt    = new DataTransfer();
             dt.items.add(file);
@@ -1162,6 +1213,172 @@
 
             setDvStatus(`✓ ${rows.length.toLocaleString()} fields ready — click Process All Fields`, '#198754');
         }
+
+        // ── Track current field selection ──────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            const sel = document.getElementById('fieldSelect');
+            if (sel) {
+                sel.addEventListener('change', () => {
+                    const fieldId = sel.options[sel.selectedIndex]?.text?.split(' — ')[0]?.trim()
+                                 || sel.options[sel.selectedIndex]?.value?.trim()
+                                 || '';
+                    window._dvCurrentFieldId   = fieldId;
+                    window._dvCurrentFieldGuid = window._dvFieldGuids[fieldId] || null;
+                    // Show/hide the Save to Fieldforce button
+                    const saveBtn = document.getElementById('btnSaveToFieldforce');
+                    if (saveBtn) {
+                        saveBtn.style.display = window._dvCurrentFieldGuid && Object.keys(window._dvFieldGuids).length ? 'flex' : 'none';
+                    }
+                });
+            }
+
+            // Also intercept saveChangesBtn to offer auto write-back
+            const saveChgBtn = document.getElementById('saveChangesBtn');
+            if (saveChgBtn) {
+                saveChgBtn.addEventListener('click', () => {
+                    // Wait for app.js to finish saving, then prompt for Fieldforce write-back
+                    setTimeout(() => {
+                        if (window._dvCurrentFieldGuid) {
+                            // Request current GeoJSON from app.js via custom event
+                            document.dispatchEvent(new CustomEvent('requestCurrentGeoJSON', {
+                                detail: { fieldId: window._dvCurrentFieldId }
+                            }));
+                        }
+                    }, 600);
+                });
+            }
+        });
+
+        // ── Listen for GeoJSON response from app.js ────────────────────────
+        // app.js should dispatch 'fieldGeoJSONReady' with { fieldId, geojson }
+        // Add to app.js:
+        //   document.addEventListener('requestCurrentGeoJSON', (e) => {
+        //       const geojson = getCurrentFieldGeoJSON(); // your internal function
+        //       document.dispatchEvent(new CustomEvent('fieldGeoJSONReady', {
+        //           detail: { fieldId: e.detail.fieldId, geojson }
+        //       }));
+        //   });
+        document.addEventListener('fieldGeoJSONReady', async (e) => {
+            const { fieldId, geojson } = e.detail;
+            if (!geojson || !fieldId) return;
+            const guid = window._dvFieldGuids[fieldId];
+            if (!guid) return;
+            await performFieldforceSave(guid, fieldId, geojson, false); // silent = false = show confirm
+        });
+
+        // ── WRITE-BACK: PATCH ccs_fields in Dataverse ─────────────────────
+        window.saveCurrentFieldToFieldforce = async function() {
+            const fieldId = window._dvCurrentFieldId;
+            const guid    = window._dvCurrentFieldGuid;
+
+            if (!guid) {
+                setSaveStatus('⚠ No Fieldforce connection — connect first', '#dc3545');
+                return;
+            }
+            if (!fieldId) {
+                setSaveStatus('⚠ No field selected', '#dc3545');
+                return;
+            }
+
+            // Request GeoJSON from app.js
+            setSaveStatus('Requesting polygon data…', '#0078d4');
+            document.dispatchEvent(new CustomEvent('requestCurrentGeoJSON', {
+                detail: { fieldId }
+            }));
+
+            // Fallback: if app.js doesn't respond within 1.5s, prompt for manual input
+            const timeout = setTimeout(() => {
+                const geojson = prompt(
+                    `Paste the corrected GeoJSON for:\n${fieldId}\n\n` +
+                    `(Export the field first, then paste the GeoJSON here):`
+                );
+                if (geojson && geojson.trim().startsWith('{')) {
+                    performFieldforceSave(guid, fieldId, geojson.trim(), true);
+                } else {
+                    setSaveStatus('Save cancelled', '#6c757d');
+                }
+            }, 1500);
+
+            // If app.js responds, cancel the fallback prompt
+            document.addEventListener('fieldGeoJSONReady', () => clearTimeout(timeout), { once: true });
+        };
+
+        async function performFieldforceSave(guid, fieldId, geojson, silent) {
+            if (!silent) {
+                const ok = confirm(
+                    `⚠ SAVE TO FIELDFORCE\n\n` +
+                    `Field: ${fieldId}\n` +
+                    `GUID:  ${guid}\n\n` +
+                    `This will permanently update ccs_fieldgeojson in Fieldforce.\n` +
+                    `This action cannot be undone from this tool.\n\n` +
+                    `Continue?`
+                );
+                if (!ok) { setSaveStatus('Save cancelled', '#6c757d'); return; }
+            }
+
+            const btn = document.getElementById('btnSaveToFieldforce');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…'; }
+            setSaveStatus('Saving to Fieldforce…', '#0078d4');
+
+            try {
+                const token = await getToken();
+
+                const res = await fetch(`${DV_API}/ccs_fields(${guid})`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization':    `Bearer ${token}`,
+                        'Content-Type':     'application/json',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version':    '4.0'
+                    },
+                    body: JSON.stringify({ ccs_fieldgeojson: geojson })
+                });
+
+                if (res.status === 401) {
+                    const freshToken = await getToken();
+                    const retry = await fetch(`${DV_API}/ccs_fields(${guid})`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Authorization':    `Bearer ${freshToken}`,
+                            'Content-Type':     'application/json',
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version':    '4.0'
+                        },
+                        body: JSON.stringify({ ccs_fieldgeojson: geojson })
+                    });
+                    if (!retry.ok) throw new Error(`HTTP ${retry.status}`);
+                } else if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+                }
+
+                setSaveStatus(`✓ ${fieldId} saved to Fieldforce`, '#198754');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Saved!';
+                    btn.style.background = 'linear-gradient(135deg,#198754,#146c43)';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="bi bi-cloud-upload-fill me-1"></i> Save to Fieldforce';
+                        btn.style.background = 'linear-gradient(135deg,#0078d4,#005a9e)';
+                    }, 4000);
+                }
+
+            } catch(e) {
+                setSaveStatus('❌ Save failed: ' + e.message, '#dc3545');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-cloud-upload-fill me-1"></i> Save to Fieldforce';
+                }
+            }
+        }
+
+        // Expose for app.js to call directly after a correction is saved:
+        // window.onFieldCorrectionSaved(fieldId, geojson) — auto-saves to Fieldforce
+        window.onFieldCorrectionSaved = async function(fieldId, geojson) {
+            const guid = window._dvFieldGuids[fieldId];
+            if (!guid || !geojson) return;
+            await performFieldforceSave(guid, fieldId, geojson, false);
+        };
+
     })();
     </script>
 
