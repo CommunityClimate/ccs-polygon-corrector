@@ -1084,7 +1084,7 @@
         };
 
         async function fetchAllFields(token) {
-            let url = `${DV_API}/ccs_fields?$select=${DV_SELECT}&$filter=statecode eq 0&$top=5000`;
+            let url = `${DV_API}/ccs_fields?$select=${DV_SELECT}&$filter=statecode eq 0`;
             const rows = [];
             let page = 0;
 
@@ -1098,7 +1098,7 @@
                         'Accept': 'application/json',
                         'OData-MaxVersion': '4.0',
                         'OData-Version': '4.0',
-                        'Prefer': 'odata.maxpagesize=5000'
+                        'Prefer': 'odata.maxpagesize=5000,odata.include-annotations="OData.Community.Display.V1.FormattedValue"'
                     }
                 });
 
@@ -1110,7 +1110,7 @@
                             'Accept': 'application/json',
                             'OData-MaxVersion': '4.0',
                             'OData-Version': '4.0',
-                            'Prefer': 'odata.maxpagesize=5000'
+                            'Prefer': 'odata.maxpagesize=5000,odata.include-annotations="OData.Community.Display.V1.FormattedValue"'
                         }
                     });
                 }
