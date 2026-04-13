@@ -1009,13 +1009,13 @@
         const DV_API   = `${DV_ENV}/api/data/v9.2`;
         const DV_SCOPE = [`${DV_ENV}/user_impersonation`];
 
+        // Columns — confirmed against Fieldforce schema April 2026
         const DV_SELECT = [
-            'ccs_ccsfieldid',
-            'ccs_fieldgeojson',
-            'ccs_fieldowner',
-            'ccs_zone',
-            'ccs_fieldsize',
-            'ccs_fieldid',
+            'ccs_cssfieldid_field',   // CCS Field ID (human-readable, e.g. FLD-XXX)
+            'ccs_fieldgeojson_field', // Field GeoJSON polygon
+            '_ccs_fieldowner_field_value', // Field Owner (contact lookup)
+            'ccs_fieldsizem2_field',  // Field Size m²
+            'ccs_fieldid',            // Dataverse record GUID
             'createdon'
         ].join(',');
 
@@ -1128,8 +1128,8 @@
             // ── Store GUID map for write-back ──────────────────────────────
             window._dvFieldGuids = {};
             rows.forEach(r => {
-                const fieldId = (r.ccs_ccsfieldid || '').trim();
-                const guid    = (r.ccs_fieldid    || '').trim();
+                const fieldId = (r.ccs_cssfieldid_field || '').trim();
+                const guid    = (r.ccs_fieldid          || '').trim();
                 if (fieldId && guid) window._dvFieldGuids[fieldId] = guid;
             });
 
@@ -1192,12 +1192,12 @@
             const csvRows = [headers.join(',')];
             for (const r of rows) {
                 csvRows.push([
-                    escape(r.ccs_ccsfieldid   || r.ccs_fieldid || ''),
-                    escape(r.ccs_fieldgeojson || ''),
-                    escape(r.ccs_fieldowner   || ''),
-                    escape(r.ccs_zone         || ''),
-                    escape(r.ccs_fieldsize    || ''),
-                    escape(r.ccs_fieldid      || '')
+                    escape(r.ccs_cssfieldid_field || r.ccs_fieldid || ''),
+                    escape(r.ccs_fieldgeojson_field || ''),
+                    escape(r['_ccs_fieldowner_field_value@OData.Community.Display.V1.FormattedValue'] || ''),
+                    escape(''), // Zone — schema name unconfirmed, left blank
+                    escape(r.ccs_fieldsizem2_field || ''),
+                    escape(r.ccs_fieldid || '')
                 ].join(','));
             }
 
@@ -1309,7 +1309,7 @@
                     `⚠ SAVE TO FIELDFORCE\n\n` +
                     `Field: ${fieldId}\n` +
                     `GUID:  ${guid}\n\n` +
-                    `This will permanently update ccs_fieldgeojson in Fieldforce.\n` +
+                    `This will permanently update ccs_fieldgeojson_field in Fieldforce.\n` +
                     `This action cannot be undone from this tool.\n\n` +
                     `Continue?`
                 );
@@ -1331,7 +1331,7 @@
                         'OData-MaxVersion': '4.0',
                         'OData-Version':    '4.0'
                     },
-                    body: JSON.stringify({ ccs_fieldgeojson: geojson })
+                    body: JSON.stringify({ ccs_fieldgeojson_field: geojson })
                 });
 
                 if (res.status === 401) {
@@ -1344,7 +1344,7 @@
                             'OData-MaxVersion': '4.0',
                             'OData-Version':    '4.0'
                         },
-                        body: JSON.stringify({ ccs_fieldgeojson: geojson })
+                        body: JSON.stringify({ ccs_fieldgeojson_field: geojson })
                     });
                     if (!retry.ok) throw new Error(`HTTP ${retry.status}`);
                 } else if (!res.ok) {
