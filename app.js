@@ -103,6 +103,22 @@ class FieldPolygonApp {
             console.log(`🗺️ Switching map to ${layerType} layer...`);
             this.mapManager.switchBaseLayer(layerType);
         });
+
+        // ── Fieldforce write-back: respond to GeoJSON request from index.html ──
+        // index.html dispatches 'requestCurrentGeoJSON' when Save to Fieldforce is clicked
+        document.addEventListener('requestCurrentGeoJSON', (e) => {
+            if (!this.currentField) return;
+            const coords = this.currentField.correctedCoordinates || this.currentField.originalCoordinates;
+            if (!coords) return;
+            const geojson = JSON.stringify({
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Polygon', coordinates: [coords] }
+            });
+            document.dispatchEvent(new CustomEvent('fieldGeoJSONReady', {
+                detail: { fieldId: this.currentField.ccsFieldId, geojson }
+            }));
+        });
         
         // Listen for manual flag updates from catalog
         document.addEventListener('saveManualFlagsToIndexedDB', async (e) => {
@@ -950,6 +966,24 @@ IMPORT SUMMARY:
         
         // Track in progress (1 manual correction applied)
         ProgressTracker.updateSession({ correctionsApplied: 1 });
+
+        // ── Fieldforce write-back ─────────────────────────────────────────
+        // Notify index.html that a correction is ready — triggers PATCH to Dataverse
+        // if the user connected via Fieldforce (window._dvFieldGuids is populated)
+        if (this.currentField && this.currentField.correctedCoordinates) {
+            const fieldId = this.currentField.ccsFieldId;
+            const geojson = JSON.stringify({
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [this.currentField.correctedCoordinates]
+                }
+            });
+            document.dispatchEvent(new CustomEvent('fieldGeoJSONReady', {
+                detail: { fieldId, geojson }
+            }));
+        }
     }
     
     /**
