@@ -67,6 +67,8 @@ export class ManualEditor {
         this.mapManager.clearAll();
         
         this.isEditMode = false;
+        this.removeVertexMode = false;
+        this.addVertexMode = false;
         this.changeHistory = [];
         
         console.log('Manual edit mode disabled');
