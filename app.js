@@ -105,15 +105,16 @@ class FieldPolygonApp {
         });
 
         // ── Fieldforce write-back: respond to GeoJSON request from index.html ──
-        // index.html dispatches 'requestCurrentGeoJSON' when Save to Fieldforce is clicked
         document.addEventListener('requestCurrentGeoJSON', (e) => {
             if (!this.currentField) return;
             const coords = this.currentField.correctedCoordinates || this.currentField.originalCoordinates;
             if (!coords) return;
+            // Convert from Leaflet [lat,lng] → GeoJSON standard [lng,lat]
+            const geoCoords = coords.map(c => [c[1], c[0]]);
             const geojson = JSON.stringify({
                 type: 'Feature',
                 properties: {},
-                geometry: { type: 'Polygon', coordinates: [coords] }
+                geometry: { type: 'Polygon', coordinates: [geoCoords] }
             });
             document.dispatchEvent(new CustomEvent('fieldGeoJSONReady', {
                 detail: { fieldId: this.currentField.ccsFieldId, geojson }
@@ -968,16 +969,16 @@ IMPORT SUMMARY:
         ProgressTracker.updateSession({ correctionsApplied: 1 });
 
         // ── Fieldforce write-back ─────────────────────────────────────────
-        // Notify index.html that a correction is ready — triggers PATCH to Dataverse
-        // if the user connected via Fieldforce (window._dvFieldGuids is populated)
+        // Convert from Leaflet [lat,lng] → GeoJSON standard [lng,lat] before saving
         if (this.currentField && this.currentField.correctedCoordinates) {
             const fieldId = this.currentField.ccsFieldId;
+            const geoCoords = this.currentField.correctedCoordinates.map(c => [c[1], c[0]]);
             const geojson = JSON.stringify({
                 type: 'Feature',
                 properties: {},
                 geometry: {
                     type: 'Polygon',
-                    coordinates: [this.currentField.correctedCoordinates]
+                    coordinates: [geoCoords]
                 }
             });
             document.dispatchEvent(new CustomEvent('fieldGeoJSONReady', {
