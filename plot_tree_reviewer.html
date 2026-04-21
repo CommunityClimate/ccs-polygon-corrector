@@ -2023,7 +2023,7 @@ function buildCharts() {
   const donutData = [
     { label:'All Inside',  val:allInside,  col:'#4ade80' },
     { label:'Mixed',       val:mixed,      col:'#fbbf24' },
-    { label:'All Outside', val:allOutside, col:'#f87171' },
+    { label:'All Outside', val:allOutside, col:'#ef4444' },
     { label:'No Trees',    val:noTrees,    col:'#64748b' },
     { label:'No Polygon',  val:noPolygon,  col:'#475569' },
   ].filter(d => d.val > 0);
@@ -2040,6 +2040,10 @@ function buildCharts() {
     dctx.closePath();
     dctx.fillStyle = d.col;
     dctx.fill();
+    // Segment border
+    dctx.strokeStyle = '#0f1117';
+    dctx.lineWidth = 2;
+    dctx.stroke();
     angle += slice;
   });
 
@@ -2049,15 +2053,19 @@ function buildCharts() {
   dctx.fillStyle = '#0f1117';
   dctx.fill();
 
-  // Centre text
-  const compPct = donutTotal > 0 ? Math.round(allInside / donutTotal * 100) : 0;
-  dctx.fillStyle = '#e2e8f0';
-  dctx.font = 'bold 22px Courier New';
+  // Centre — show compliant % and outside counts
+  const compPct   = donutTotal > 0 ? Math.round(allInside / donutTotal * 100) : 0;
+  const outsidePct= donutTotal > 0 ? Math.round((mixed + allOutside) / donutTotal * 100) : 0;
   dctx.textAlign = 'center';
-  dctx.fillText(compPct + '%', cx, cy + 6);
-  dctx.font = '10px Segoe UI';
+  dctx.fillStyle = '#4ade80';
+  dctx.font = 'bold 20px Courier New';
+  dctx.fillText(compPct + '%', cx, cy - 4);
+  dctx.font = '9px Segoe UI';
   dctx.fillStyle = '#64748b';
-  dctx.fillText('compliant', cx, cy + 20);
+  dctx.fillText('compliant', cx, cy + 10);
+  dctx.fillStyle = '#f87171';
+  dctx.font = 'bold 11px Courier New';
+  dctx.fillText((mixed + allOutside).toLocaleString() + ' issues', cx, cy + 26);
 
   // Legend
   const legend = document.getElementById('chartDonutLegend');
@@ -2085,24 +2093,28 @@ function buildCharts() {
   const maxVal   = top10[0].outsideN;
 
   top10.forEach((p, i) => {
-    const x   = padL + i * (barWidth + barGap);
-    const pct = p.outsideN / maxVal;
-    const bh  = Math.max(4, pct * chartH);
-    const y   = padT + chartH - bh;
+    const x    = padL + i * (barWidth + barGap);
+    const pct  = p.outsideN / maxVal;
+    const bh   = Math.max(4, pct * chartH);
+    const y    = padT + chartH - bh;
+    // Colour: red = all outside, amber = mixed
+    const isAllOut = p.outsideN === p.total;
+    const barCol   = isAllOut ? '#ef4444' : '#fbbf24';
+    const barColDim= isAllOut ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)';
 
-    // Bar background
-    bctx.fillStyle = 'rgba(248,113,113,0.15)';
+    // Background track
+    bctx.fillStyle = barColDim;
     bctx.fillRect(x, padT, barWidth, chartH);
 
-    // Bar fill — gradient from amber to red
+    // Bar fill
     const grad = bctx.createLinearGradient(0, y, 0, padT + chartH);
-    grad.addColorStop(0, '#f87171');
-    grad.addColorStop(1, 'rgba(248,113,113,0.5)');
+    grad.addColorStop(0, barCol);
+    grad.addColorStop(1, barColDim);
     bctx.fillStyle = grad;
     bctx.fillRect(x, y, barWidth, bh);
 
     // Value label
-    bctx.fillStyle = '#f87171';
+    bctx.fillStyle = barCol;
     bctx.font = 'bold 10px Courier New';
     bctx.textAlign = 'center';
     bctx.fillText(p.outsideN, x + barWidth / 2, y - 4);
@@ -2114,11 +2126,22 @@ function buildCharts() {
     bctx.fillStyle = '#94a3b8';
     bctx.font = '9px Courier New';
     bctx.textAlign = 'left';
-    // Show last segment of plot ID only
     const shortId = p.id.split('-').slice(-2).join('-');
     bctx.fillText(shortId, 0, 0);
     bctx.restore();
   });
+
+  // Bar chart legend
+  bctx.fillStyle = '#ef4444';
+  bctx.fillRect(padL, padT + chartH + 62, 10, 10);
+  bctx.fillStyle = '#94a3b8';
+  bctx.font = '9px Segoe UI';
+  bctx.textAlign = 'left';
+  bctx.fillText('All Outside', padL + 14, padT + chartH + 71);
+  bctx.fillStyle = '#fbbf24';
+  bctx.fillRect(padL + 90, padT + chartH + 62, 10, 10);
+  bctx.fillStyle = '#94a3b8';
+  bctx.fillText('Mixed', padL + 104, padT + chartH + 71);
 }
 
 // ── CATALOG EXPORT ────────────────────────────────────────────────────────
