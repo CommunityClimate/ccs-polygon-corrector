@@ -280,7 +280,7 @@
       <option value="">All plots</option>
       <option value="has_geo" selected>With polygon ✓</option>
       <option value="no_geo">No polygon ✗</option>
-      <option value="has_outside">Has trees outside ✗</option>
+      <option value="has_outside">All trees outside ✗</option>
       <option value="all_inside">All trees inside ✓</option>
       <option value="no_trees">No trees recorded</option>
     </select>
@@ -307,11 +307,45 @@
         style="background:var(--border);color:var(--text);border:none;border-radius:4px;
         padding:4px 10px;font-size:11px;cursor:pointer">Next →</button>
     </div>
-    <button onclick="exportCatalogCSV()"
-      style="background:rgba(74,222,128,0.1);color:var(--accent);border:1px solid rgba(74,222,128,0.3);
-      border-radius:4px;padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">
-      ⬇ Export
-    </button>
+    <div style="position:relative" id="catExportWrap">
+      <button onclick="toggleCatExportMenu()"
+        style="background:rgba(74,222,128,0.1);color:var(--accent);border:1px solid rgba(74,222,128,0.3);
+        border-radius:4px;padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">
+        ⬇ Export ▾
+      </button>
+      <div id="catExportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);
+        background:var(--panel);border:1px solid var(--border);border-radius:6px;
+        min-width:220px;z-index:9100;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden">
+        <div onclick="exportCatalogCSV('','All_Plots')"
+          style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
+          border-bottom:1px solid var(--border);transition:background .12s"
+          onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <div style="font-weight:700;margin-bottom:1px">⬇ All Plots</div>
+          <div style="font-size:10px;color:var(--muted)">Every plot regardless of status</div>
+        </div>
+        <div onclick="exportCatalogCSV('has_outside','All_Trees_Outside')"
+          style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
+          border-bottom:1px solid var(--border);transition:background .12s"
+          onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <div style="font-weight:700;margin-bottom:1px;color:var(--outside)">⬇ All Trees Outside</div>
+          <div style="font-size:10px;color:var(--muted)">Plots with trees outside the boundary</div>
+        </div>
+        <div onclick="exportCatalogCSV('all_inside','All_Trees_Inside')"
+          style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
+          border-bottom:1px solid var(--border);transition:background .12s"
+          onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <div style="font-weight:700;margin-bottom:1px;color:var(--inside)">⬇ All Trees Inside</div>
+          <div style="font-size:10px;color:var(--muted)">Plots where every tree is inside</div>
+        </div>
+        <div onclick="exportCatalogCSV('no_trees','No_Trees_Recorded')"
+          style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
+          transition:background .12s"
+          onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <div style="font-weight:700;margin-bottom:1px;color:var(--muted)">⬇ No Trees Recorded</div>
+          <div style="font-size:10px;color:var(--muted)">Plots with no inventory trees loaded</div>
+        </div>
+      </div>
+    </div>
     <button onclick="toggleCatalog()"
       style="background:var(--border);color:var(--text);border:none;border-radius:4px;
       padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">✕ Close</button>
@@ -1875,20 +1909,36 @@ function initCatalogMap(container, plot, idx) {
 }
 
 // ── CATALOG EXPORT ────────────────────────────────────────────────────────
-function exportCatalogCSV() {
+function toggleCatExportMenu() {
+  const menu = document.getElementById('catExportMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  if (menu.style.display === 'block') {
+    setTimeout(() => document.addEventListener('click', closeCatExportMenu, { once: true }), 10);
+  }
+}
+
+function closeCatExportMenu() {
+  const menu = document.getElementById('catExportMenu');
+  if (menu) menu.style.display = 'none';
+}
+
+function exportCatalogCSV(forcedFilter, label) {
   if (!plotsData.length) {
     alert('No plots loaded. Connect to Fieldforce first.');
+    closeCatExportMenu();
     return;
   }
+  closeCatExportMenu();
 
-  const q      = (document.getElementById('catSearch').value || '').toLowerCase();
-  const filter = document.getElementById('catFilter').value || 'has_geo';
+  // Use forced filter for dedicated exports; fall back to current dropdown for current view
+  const filter = forcedFilter !== undefined ? forcedFilter
+                 : (document.getElementById('catFilter').value || '');
+  const q = (document.getElementById('catSearch').value || '').toLowerCase();
 
-  // Apply same filter logic as renderCatalog
   const filtered = plotsData.filter(p => {
     if (q && !p.plotId.toLowerCase().includes(q)) return false;
-    if (filter === 'has_geo' && !p.geoJSON) return false;
-    if (filter === 'no_geo'  &&  p.geoJSON) return false;
+    if (filter === 'has_geo'  && !p.geoJSON) return false;
+    if (filter === 'no_geo'   &&  p.geoJSON) return false;
     if (filter === 'has_outside' || filter === 'all_inside' || filter === 'no_trees') {
       const trees = catalogTreesByPlot[p.guid] || [];
       if (filter === 'no_trees') return trees.length === 0;
@@ -1903,20 +1953,9 @@ function exportCatalogCSV() {
   });
 
   if (!filtered.length) {
-    alert('No plots match the current filter.');
+    alert('No plots match this filter.');
     return;
   }
-
-  // Filter label for filename
-  const filterLabels = {
-    '':           'All_Plots',
-    'has_geo':    'With_Polygon',
-    'no_geo':     'No_Polygon',
-    'has_outside':'Has_Trees_Outside',
-    'all_inside': 'All_Trees_Inside',
-    'no_trees':   'No_Trees_Recorded',
-  };
-  const label = filterLabels[filter] || 'Filtered';
 
   const header = [
     'Plot ID',
@@ -1937,48 +1976,39 @@ function exportCatalogCSV() {
   const rows = filtered.map(p => {
     const ring  = p.geoJSON ? parsePolygon(p.geoJSON) : null;
     const trees = catalogTreesByPlot[p.guid] || [];
-
     let insideN = '', outsideN = '', pct = '', centLat = '', centLng = '';
-
     if (ring) {
-      const cLat = ring.reduce((s,c) => s + c[1], 0) / ring.length;
-      const cLng = ring.reduce((s,c) => s + c[0], 0) / ring.length;
-      centLat = cLat.toFixed(6);
-      centLng = cLng.toFixed(6);
+      centLat = (ring.reduce((s,c) => s + c[1], 0) / ring.length).toFixed(6);
+      centLng = (ring.reduce((s,c) => s + c[0], 0) / ring.length).toFixed(6);
       if (trees.length > 0) {
         insideN  = trees.filter(t => pip(t.lat, t.lng, ring)).length;
         outsideN = trees.length - insideN;
-        pct      = Math.round(insideN / trees.length * 100);
+        pct      = Math.round(insideN / trees.length * 100) + '%';
       }
     }
-
     return [
       p.plotId,
-      p.refLat  ? parseFloat(p.refLat).toFixed(6)  : '',
-      p.refLng  ? parseFloat(p.refLng).toFixed(6)  : '',
+      p.refLat  ? parseFloat(p.refLat).toFixed(6) : '',
+      p.refLng  ? parseFloat(p.refLng).toFixed(6) : '',
       ring ? 'Yes' : 'No',
       ring ? ring.length : '',
       p.geoJSON || '',
-      centLat,
-      centLng,
+      centLat, centLng,
       trees.length || '',
-      insideN,
-      outsideN,
-      pct !== '' ? pct + '%' : '',
+      insideN, outsideN, pct,
       p.species || '',
     ];
   });
 
-  const csvRows = [header, ...rows];
-  const csv = csvRows.map(r =>
-    r.map(v => `"${String(v === null || v === undefined ? '' : v).replace(/"/g, '""')}"`).join(',')
+  const csv = [header, ...rows].map(r =>
+    r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
   ).join('\n');
 
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url;
-  a.download = `CCS_Plots_${label}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `CCS_Plots_${label || 'Export'}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
 }
