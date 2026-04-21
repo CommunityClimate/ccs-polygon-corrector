@@ -312,14 +312,15 @@
       border-radius:4px;padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">
       📊 Charts
     </button>
-      <button onclick="toggleCatExportMenu()"
+    <div style="position:relative;display:inline-block">
+      <button onclick="toggleCatExportMenu(event)"
         style="background:rgba(74,222,128,0.1);color:var(--accent);border:1px solid rgba(74,222,128,0.3);
         border-radius:4px;padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">
         ⬇ Export ▾
       </button>
       <div id="catExportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);
         background:var(--panel);border:1px solid var(--border);border-radius:6px;
-        min-width:220px;z-index:9100;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden">
+        min-width:230px;z-index:9100;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden">
         <div onclick="exportCatalogCSV('','All_Plots')"
           style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
           border-bottom:1px solid var(--border);transition:background .12s"
@@ -331,8 +332,15 @@
           style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
           border-bottom:1px solid var(--border);transition:background .12s"
           onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
-          <div style="font-weight:700;margin-bottom:1px;color:var(--outside)">⬇ All Trees Outside</div>
-          <div style="font-size:10px;color:var(--muted)">Plots with trees outside the boundary</div>
+          <div style="font-weight:700;margin-bottom:1px;color:var(--outside)">⬇ Trees Outside (incl. Mixed)</div>
+          <div style="font-size:10px;color:var(--muted)">Plots with any trees outside boundary</div>
+        </div>
+        <div onclick="exportCatalogCSV('mixed','Mixed_Inside_Outside')"
+          style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
+          border-bottom:1px solid var(--border);transition:background .12s"
+          onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <div style="font-weight:700;margin-bottom:1px;color:var(--warn)">⬇ Mixed Only</div>
+          <div style="font-size:10px;color:var(--muted)">Plots with both inside and outside trees</div>
         </div>
         <div onclick="exportCatalogCSV('all_inside','All_Trees_Inside')"
           style="padding:9px 14px;font-size:11px;cursor:pointer;color:var(--text);
@@ -1751,7 +1759,7 @@ function changeCatalogPage(dir) {
     if (q && !p.plotId.toLowerCase().includes(q)) return false;
     if (filter === 'has_geo'  && !p.geoJSON) return false;
     if (filter === 'no_geo'   &&  p.geoJSON) return false;
-    if (filter === 'has_outside' || filter === 'all_inside' || filter === 'no_trees') {
+    if (filter === 'has_outside' || filter === 'mixed' || filter === 'all_inside' || filter === 'no_trees') {
       const trees = catalogTreesByPlot[p.guid] || [];
       if (filter === 'no_trees') return trees.length === 0;
       if (!p.geoJSON) return false;
@@ -1759,6 +1767,7 @@ function changeCatalogPage(dir) {
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
       if (filter === 'has_outside') return outsideCount > 0;
+      if (filter === 'mixed')       return outsideCount > 0 && outsideCount < trees.length;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
     return true;
@@ -1782,7 +1791,7 @@ function renderCatalog() {
     if (filter === 'no_geo'   &&  p.geoJSON) return false;
 
     // Tree-based filters — require catalogTreesByPlot to be loaded
-    if (filter === 'has_outside' || filter === 'all_inside' || filter === 'no_trees') {
+    if (filter === 'has_outside' || filter === 'mixed' || filter === 'all_inside' || filter === 'no_trees') {
       const trees = catalogTreesByPlot[p.guid] || [];
       if (filter === 'no_trees') return trees.length === 0;
       if (!p.geoJSON) return false; // need polygon to check inside/outside
@@ -1790,6 +1799,7 @@ function renderCatalog() {
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
       if (filter === 'has_outside') return outsideCount > 0;
+      if (filter === 'mixed')       return outsideCount > 0 && outsideCount < trees.length;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
 
@@ -2112,10 +2122,12 @@ function buildCharts() {
 }
 
 // ── CATALOG EXPORT ────────────────────────────────────────────────────────
-function toggleCatExportMenu() {
+function toggleCatExportMenu(e) {
+  if (e) e.stopPropagation();
   const menu = document.getElementById('catExportMenu');
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-  if (menu.style.display === 'block') {
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
     setTimeout(() => document.addEventListener('click', closeCatExportMenu, { once: true }), 10);
   }
 }
@@ -2142,7 +2154,7 @@ function exportCatalogCSV(forcedFilter, label) {
     if (q && !p.plotId.toLowerCase().includes(q)) return false;
     if (filter === 'has_geo'  && !p.geoJSON) return false;
     if (filter === 'no_geo'   &&  p.geoJSON) return false;
-    if (filter === 'has_outside' || filter === 'all_inside' || filter === 'no_trees') {
+    if (filter === 'has_outside' || filter === 'mixed' || filter === 'all_inside' || filter === 'no_trees') {
       const trees = catalogTreesByPlot[p.guid] || [];
       if (filter === 'no_trees') return trees.length === 0;
       if (!p.geoJSON) return false;
@@ -2150,6 +2162,7 @@ function exportCatalogCSV(forcedFilter, label) {
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
       if (filter === 'has_outside') return outsideCount > 0;
+      if (filter === 'mixed')       return outsideCount > 0 && outsideCount < trees.length;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
     return true;
