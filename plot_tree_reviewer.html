@@ -307,7 +307,11 @@
         style="background:var(--border);color:var(--text);border:none;border-radius:4px;
         padding:4px 10px;font-size:11px;cursor:pointer">Next →</button>
     </div>
-    <div style="position:relative" id="catExportWrap">
+    <button onclick="toggleCatCharts()"
+      style="background:rgba(96,165,250,0.1);color:var(--blue);border:1px solid rgba(96,165,250,0.3);
+      border-radius:4px;padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">
+      📊 Charts
+    </button>
       <button onclick="toggleCatExportMenu()"
         style="background:rgba(74,222,128,0.1);color:var(--accent);border:1px solid rgba(74,222,128,0.3);
         border-radius:4px;padding:6px 14px;font-weight:700;font-size:11px;cursor:pointer">
@@ -391,6 +395,46 @@
         <button class="cat-lb-btn secondary" onclick="closeCatLightbox()">Close</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ── CHARTS MODAL ──────────────────────────────────────────────────── -->
+<div id="catChartsModal" onclick="if(event.target===this)toggleCatCharts()"
+  style="display:none;position:fixed;inset:0;z-index:6500;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    width:min(860px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 24px 64px rgba(0,0,0,.6)">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <span style="font-size:13px;font-weight:700;color:var(--blue);letter-spacing:1px">
+        📊 Plot Compliance Overview
+      </span>
+      <button onclick="toggleCatCharts()"
+        style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;
+        padding:2px 6px;border-radius:4px">✕</button>
+    </div>
+    <!-- Charts grid -->
+    <div style="padding:20px;overflow-y:auto;display:grid;
+      grid-template-columns:1fr 1fr;gap:20px">
+      <!-- Donut -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted);
+          text-transform:uppercase;margin-bottom:12px">Compliance Status Breakdown</div>
+        <canvas id="chartDonut" width="340" height="260"></canvas>
+        <div id="chartDonutLegend" style="margin-top:12px;display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+      <!-- Bar -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted);
+          text-transform:uppercase;margin-bottom:12px">Top 10 Plots — Trees Outside</div>
+        <canvas id="chartBar" width="340" height="320"></canvas>
+      </div>
+    </div>
+    <!-- Summary strip -->
+    <div id="chartSummaryStrip" style="display:flex;gap:0;border-top:1px solid var(--border);
+      flex-shrink:0;overflow:hidden;border-radius:0 0 10px 10px"></div>
   </div>
 </div>
 
@@ -1714,7 +1758,7 @@ function changeCatalogPage(dir) {
       const ring = parsePolygon(p.geoJSON);
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
-      if (filter === 'has_outside') return trees.length > 0 && outsideCount === trees.length;
+      if (filter === 'has_outside') return outsideCount > 0;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
     return true;
@@ -1745,7 +1789,7 @@ function renderCatalog() {
       const ring = parsePolygon(p.geoJSON);
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
-      if (filter === 'has_outside') return trees.length > 0 && outsideCount === trees.length;
+      if (filter === 'has_outside') return outsideCount > 0;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
 
@@ -1908,6 +1952,165 @@ function initCatalogMap(container, plot, idx) {
   }
 }
 
+// ── CHARTS ────────────────────────────────────────────────────────────────
+function toggleCatCharts() {
+  const modal = document.getElementById('catChartsModal');
+  const isOpen = modal.style.display === 'flex';
+  modal.style.display = isOpen ? 'none' : 'flex';
+  if (!isOpen) buildCharts();
+}
+
+function buildCharts() {
+  if (!plotsData.length) return;
+
+  // ── Compute status for every plot ──────────────────────────────────────
+  let allInside = 0, mixed = 0, allOutside = 0, noTrees = 0, noPolygon = 0;
+  const topOutside = [];
+
+  plotsData.forEach(p => {
+    const ring  = p.geoJSON ? parsePolygon(p.geoJSON) : null;
+    const trees = catalogTreesByPlot[p.guid] || [];
+    if (!ring)            { noPolygon++; return; }
+    if (!trees.length)    { noTrees++;   return; }
+    const outsideN = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
+    if      (outsideN === 0)             allInside++;
+    else if (outsideN === trees.length)  allOutside++;
+    else                                 mixed++;
+    if (outsideN > 0) topOutside.push({ id: p.plotId, outsideN, total: trees.length });
+  });
+
+  topOutside.sort((a,b) => b.outsideN - a.outsideN);
+  const top10 = topOutside.slice(0, 10);
+
+  // ── Summary strip ──────────────────────────────────────────────────────
+  const strip = document.getElementById('chartSummaryStrip');
+  const total = plotsData.length;
+  const items = [
+    { label:'All Inside',   val:allInside,  col:'#4ade80' },
+    { label:'Mixed',        val:mixed,      col:'#fbbf24' },
+    { label:'All Outside',  val:allOutside, col:'#f87171' },
+    { label:'No Trees',     val:noTrees,    col:'#64748b' },
+    { label:'No Polygon',   val:noPolygon,  col:'#475569' },
+  ];
+  strip.innerHTML = items.map(it => `
+    <div style="flex:1;text-align:center;padding:10px 6px;border-right:1px solid var(--border)">
+      <div style="font-size:18px;font-weight:800;color:${it.col};font-family:'Courier New',monospace">
+        ${it.val.toLocaleString()}
+      </div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">
+        ${it.label}
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:1px">
+        ${total > 0 ? Math.round(it.val/total*100) : 0}%
+      </div>
+    </div>`).join('');
+
+  // ── Donut chart ────────────────────────────────────────────────────────
+  const dc = document.getElementById('chartDonut');
+  const dctx = dc.getContext('2d');
+  dctx.clearRect(0, 0, dc.width, dc.height);
+
+  const donutData = [
+    { label:'All Inside',  val:allInside,  col:'#4ade80' },
+    { label:'Mixed',       val:mixed,      col:'#fbbf24' },
+    { label:'All Outside', val:allOutside, col:'#f87171' },
+    { label:'No Trees',    val:noTrees,    col:'#64748b' },
+    { label:'No Polygon',  val:noPolygon,  col:'#475569' },
+  ].filter(d => d.val > 0);
+
+  const donutTotal = donutData.reduce((s,d) => s + d.val, 0);
+  const cx = dc.width / 2, cy = 130, r = 100, ri = 58;
+  let angle = -Math.PI / 2;
+
+  donutData.forEach(d => {
+    const slice = (d.val / donutTotal) * Math.PI * 2;
+    dctx.beginPath();
+    dctx.moveTo(cx, cy);
+    dctx.arc(cx, cy, r, angle, angle + slice);
+    dctx.closePath();
+    dctx.fillStyle = d.col;
+    dctx.fill();
+    angle += slice;
+  });
+
+  // Hole
+  dctx.beginPath();
+  dctx.arc(cx, cy, ri, 0, Math.PI * 2);
+  dctx.fillStyle = '#0f1117';
+  dctx.fill();
+
+  // Centre text
+  const compPct = donutTotal > 0 ? Math.round(allInside / donutTotal * 100) : 0;
+  dctx.fillStyle = '#e2e8f0';
+  dctx.font = 'bold 22px Courier New';
+  dctx.textAlign = 'center';
+  dctx.fillText(compPct + '%', cx, cy + 6);
+  dctx.font = '10px Segoe UI';
+  dctx.fillStyle = '#64748b';
+  dctx.fillText('compliant', cx, cy + 20);
+
+  // Legend
+  const legend = document.getElementById('chartDonutLegend');
+  legend.innerHTML = donutData.map(d => `
+    <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+      <div style="width:10px;height:10px;border-radius:2px;background:${d.col};flex-shrink:0"></div>
+      <span style="color:var(--muted);flex:1">${d.label}</span>
+      <span style="font-family:'Courier New',monospace;font-weight:700;color:var(--text)">${d.val.toLocaleString()}</span>
+      <span style="color:var(--muted);font-size:10px;width:36px;text-align:right">${Math.round(d.val/donutTotal*100)}%</span>
+    </div>`).join('');
+
+  // ── Bar chart ──────────────────────────────────────────────────────────
+  if (!top10.length) return;
+  const bc = document.getElementById('chartBar');
+  const bctx = bc.getContext('2d');
+  bctx.clearRect(0, 0, bc.width, bc.height);
+
+  const barW = bc.width, barH = bc.height;
+  const padL = 12, padR = 8, padT = 10, padB = 80;
+  const chartW = barW - padL - padR;
+  const chartH = barH - padT - padB;
+  const barCount = top10.length;
+  const barGap   = 6;
+  const barWidth = (chartW - barGap * (barCount - 1)) / barCount;
+  const maxVal   = top10[0].outsideN;
+
+  top10.forEach((p, i) => {
+    const x   = padL + i * (barWidth + barGap);
+    const pct = p.outsideN / maxVal;
+    const bh  = Math.max(4, pct * chartH);
+    const y   = padT + chartH - bh;
+
+    // Bar background
+    bctx.fillStyle = 'rgba(248,113,113,0.15)';
+    bctx.fillRect(x, padT, barWidth, chartH);
+
+    // Bar fill — gradient from amber to red
+    const grad = bctx.createLinearGradient(0, y, 0, padT + chartH);
+    grad.addColorStop(0, '#f87171');
+    grad.addColorStop(1, 'rgba(248,113,113,0.5)');
+    bctx.fillStyle = grad;
+    bctx.fillRect(x, y, barWidth, bh);
+
+    // Value label
+    bctx.fillStyle = '#f87171';
+    bctx.font = 'bold 10px Courier New';
+    bctx.textAlign = 'center';
+    bctx.fillText(p.outsideN, x + barWidth / 2, y - 4);
+
+    // Plot ID label — rotated
+    bctx.save();
+    bctx.translate(x + barWidth / 2, padT + chartH + 8);
+    bctx.rotate(Math.PI / 4);
+    bctx.fillStyle = '#94a3b8';
+    bctx.font = '9px Courier New';
+    bctx.textAlign = 'left';
+    // Show last segment of plot ID only
+    const shortId = p.id.split('-').slice(-2).join('-');
+    bctx.fillText(shortId, 0, 0);
+    bctx.restore();
+  });
+}
+
 // ── CATALOG EXPORT ────────────────────────────────────────────────────────
 function toggleCatExportMenu() {
   const menu = document.getElementById('catExportMenu');
@@ -1946,7 +2149,7 @@ function exportCatalogCSV(forcedFilter, label) {
       const ring = parsePolygon(p.geoJSON);
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
-      if (filter === 'has_outside') return trees.length > 0 && outsideCount === trees.length;
+      if (filter === 'has_outside') return outsideCount > 0;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
     return true;
@@ -1970,13 +2173,14 @@ function exportCatalogCSV(forcedFilter, label) {
     'Trees Inside',
     'Trees Outside',
     'Compliance (%)',
+    'Status',
     'Species',
   ];
 
   const rows = filtered.map(p => {
     const ring  = p.geoJSON ? parsePolygon(p.geoJSON) : null;
     const trees = catalogTreesByPlot[p.guid] || [];
-    let insideN = '', outsideN = '', pct = '', centLat = '', centLng = '';
+    let insideN = 0, outsideN = 0, pct = '', centLat = '', centLng = '', status = '';
     if (ring) {
       centLat = (ring.reduce((s,c) => s + c[1], 0) / ring.length).toFixed(6);
       centLng = (ring.reduce((s,c) => s + c[0], 0) / ring.length).toFixed(6);
@@ -1984,23 +2188,35 @@ function exportCatalogCSV(forcedFilter, label) {
         insideN  = trees.filter(t => pip(t.lat, t.lng, ring)).length;
         outsideN = trees.length - insideN;
         pct      = Math.round(insideN / trees.length * 100) + '%';
+        if      (outsideN === trees.length) status = 'All outside';
+        else if (outsideN > 0)              status = 'Mixed — some outside';
+        else                                status = 'All inside';
       }
+    } else {
+      status = 'No polygon';
     }
-    return [
-      p.plotId,
-      p.refLat  ? parseFloat(p.refLat).toFixed(6) : '',
-      p.refLng  ? parseFloat(p.refLng).toFixed(6) : '',
-      ring ? 'Yes' : 'No',
-      ring ? ring.length : '',
-      p.geoJSON || '',
-      centLat, centLng,
-      trees.length || '',
-      insideN, outsideN, pct,
-      p.species || '',
-    ];
+    return {
+      row: [
+        p.plotId,
+        p.refLat  ? parseFloat(p.refLat).toFixed(6) : '',
+        p.refLng  ? parseFloat(p.refLng).toFixed(6) : '',
+        ring ? 'Yes' : 'No',
+        ring ? ring.length : '',
+        p.geoJSON || '',
+        centLat, centLng,
+        trees.length || '',
+        insideN || '', outsideN || '', pct,
+        status,
+        p.species || '',
+      ],
+      outsideN
+    };
   });
 
-  const csv = [header, ...rows].map(r =>
+  // Sort: All outside first, then Mixed sorted by Trees Outside descending
+  rows.sort((a, b) => b.outsideN - a.outsideN);
+
+  const csv = [header, ...rows.map(r => r.row)].map(r =>
     r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
   ).join('\n');
 
