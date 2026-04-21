@@ -1714,7 +1714,7 @@ function changeCatalogPage(dir) {
       const ring = parsePolygon(p.geoJSON);
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
-      if (filter === 'has_outside') return outsideCount > 0;
+      if (filter === 'has_outside') return trees.length > 0 && outsideCount === trees.length;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
     return true;
@@ -1745,7 +1745,7 @@ function renderCatalog() {
       const ring = parsePolygon(p.geoJSON);
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
-      if (filter === 'has_outside') return outsideCount > 0;
+      if (filter === 'has_outside') return trees.length > 0 && outsideCount === trees.length;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
 
@@ -1946,7 +1946,7 @@ function exportCatalogCSV(forcedFilter, label) {
       const ring = parsePolygon(p.geoJSON);
       if (!ring) return false;
       const outsideCount = trees.filter(t => !pip(t.lat, t.lng, ring)).length;
-      if (filter === 'has_outside') return outsideCount > 0;
+      if (filter === 'has_outside') return trees.length > 0 && outsideCount === trees.length;
       if (filter === 'all_inside')  return trees.length > 0 && outsideCount === 0;
     }
     return true;
