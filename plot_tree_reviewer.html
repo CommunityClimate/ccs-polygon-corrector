@@ -122,7 +122,7 @@
   .batch-remove:hover{color:var(--outside);}
 
   /* Map area */
-  #mapWrapper{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+  #mapWrapper{flex:1;display:flex;flex-direction:column;overflow:hidden;}
   .map-placeholder{flex:1;display:flex;align-items:center;justify-content:center;background:#0a0c12;color:var(--muted);font-size:13px;text-align:center;line-height:2;}
   #map{width:100%;flex:1;display:none;}
 
@@ -625,14 +625,15 @@ Paste the PolygonGeoJSON field directly.'></textarea>
 
   <!-- MAP + MEASUREMENTS -->
   <div id="mapWrapper">
-    <div class="map-toolbar" id="mapToolbar" style="display:none">
-      <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📐 Side lengths</button>
-      <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📏 A→B ruler</button>
-      <button class="map-tool-btn" id="btnClearMeasure" onclick="clearMeasure()" style="display:none">✕ Ruler</button>
-    </div>
     <!-- Inner row: map + measurements side by side -->
-    <div style="display:flex;flex:1;overflow:hidden">
-      <div style="flex:1;display:flex;flex-direction:column;position:relative">
+    <div style="display:flex;flex:1;overflow:hidden;height:100%">
+      <div style="flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden">
+        <!-- Toolbar sits inside map container — positions relative to map only -->
+        <div class="map-toolbar" id="mapToolbar" style="display:none">
+          <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📐 Side lengths</button>
+          <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📏 A→B ruler</button>
+          <button class="map-tool-btn" id="btnClearMeasure" onclick="clearMeasure()" style="display:none">✕ Ruler</button>
+        </div>
         <div class="map-placeholder" id="mapPlaceholder">Run an analysis to see the satellite map</div>
         <div id="map" style="flex:1;display:none"></div>
         <div class="capture-overlay" id="captureOverlay" style="display:none">
@@ -641,9 +642,9 @@ Paste the PolygonGeoJSON field directly.'></textarea>
           <div class="co-sub">Please wait, rendering satellite tiles</div>
         </div>
       </div>
-      <!-- Measurements panel — alongside the map -->
+      <!-- Measurements panel — alongside the map, no inner scroll -->
       <div class="measure-panel" id="measurePanel" style="display:none;width:220px;flex-shrink:0;
-        border-left:1px solid var(--border);overflow-y:auto">
+        border-left:1px solid var(--border)">
         <div class="measure-panel-title">📐 Measurements</div>
         <div class="measure-grid" id="measureGrid"></div>
       </div>
