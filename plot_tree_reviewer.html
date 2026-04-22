@@ -551,32 +551,41 @@ Paste the PolygonGeoJSON field directly.'></textarea>
       <div class="ff-status" id="ffTreeStatus">Click to load inventory trees for the selected plot</div>
     </div>
 
-    <div class="or-divider"><span>OR UPLOAD</span></div>
-
-    <div class="upload-section">
-      <label>📊 Trees — Upload Excel export</label>
-      <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])"/>
-        <div style="font-size:18px;margin-bottom:3px;">📂</div>
-        <div class="upload-text">Drop .xlsx / .csv here or click to browse<br><span style="font-size:9px;opacity:.6;">Columns auto-detected — or map manually if needed</span></div>
+    <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:0 0 4px 0" id="uploadCollapseWrap">
+      <div onclick="toggleUploadSection()"
+        style="display:flex;align-items:center;justify-content:space-between;
+        padding:8px 12px;cursor:pointer;background:var(--panel);user-select:none">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;
+          color:var(--muted);text-transform:uppercase">📊 Upload Trees — Excel / CSV</span>
+        <span id="uploadSectionChevron"
+          style="font-size:10px;color:var(--muted);transition:transform .2s">▼ Show</span>
       </div>
-      <div class="upload-status" id="uploadStatus"></div>
-      <div class="col-picker" id="colPicker" style="display:none">
-        <div class="col-picker-title">📋 Map columns manually</div>
-        <div class="col-picker-file" id="colPickerFile"></div>
-        <div class="col-picker-row">
-          <label>Latitude col</label>
-          <select id="colPickerLat"></select>
+      <div id="uploadSectionBody" style="display:none">
+        <div class="upload-section" style="border-top:1px solid var(--border)">
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])"/>
+            <div style="font-size:18px;margin-bottom:3px;">📂</div>
+            <div class="upload-text">Drop .xlsx / .csv here or click to browse<br><span style="font-size:9px;opacity:.6;">Columns auto-detected — or map manually if needed</span></div>
+          </div>
+          <div class="upload-status" id="uploadStatus"></div>
+          <div class="col-picker" id="colPicker" style="display:none">
+            <div class="col-picker-title">📋 Map columns manually</div>
+            <div class="col-picker-file" id="colPickerFile"></div>
+            <div class="col-picker-row">
+              <label>Latitude col</label>
+              <select id="colPickerLat"></select>
+            </div>
+            <div class="col-picker-row">
+              <label>Longitude col</label>
+              <select id="colPickerLng"></select>
+            </div>
+            <div class="col-picker-row">
+              <label>Tree UID col</label>
+              <select id="colPickerUid"></select>
+            </div>
+            <button class="btn-apply-cols" onclick="applyPickerColumns()">✓ Apply Column Mapping</button>
+          </div>
         </div>
-        <div class="col-picker-row">
-          <label>Longitude col</label>
-          <select id="colPickerLng"></select>
-        </div>
-        <div class="col-picker-row">
-          <label>Tree UID col</label>
-          <select id="colPickerUid"></select>
-        </div>
-        <button class="btn-apply-cols" onclick="applyPickerColumns()">✓ Apply Column Mapping</button>
       </div>
     </div>
 
@@ -1975,12 +1984,21 @@ function initCatalogMap(container, plot, idx) {
 }
 
 function toggleManualInput() {
-  const body     = document.getElementById('manualInputBody');
-  const chevron  = document.getElementById('manualInputChevron');
-  const isOpen   = body.style.display !== 'none';
-  body.style.display   = isOpen ? 'none' : 'block';
-  chevron.textContent  = isOpen ? '▼ Show' : '▲ Hide';
-  chevron.style.color  = isOpen ? 'var(--muted)' : 'var(--warn)';
+  const body    = document.getElementById('manualInputBody');
+  const chevron = document.getElementById('manualInputChevron');
+  const isOpen  = body.style.display !== 'none';
+  body.style.display  = isOpen ? 'none' : 'block';
+  chevron.textContent = isOpen ? '▼ Show' : '▲ Hide';
+  chevron.style.color = isOpen ? 'var(--muted)' : 'var(--warn)';
+}
+
+function toggleUploadSection() {
+  const body    = document.getElementById('uploadSectionBody');
+  const chevron = document.getElementById('uploadSectionChevron');
+  const isOpen  = body.style.display !== 'none';
+  body.style.display  = isOpen ? 'none' : 'block';
+  chevron.textContent = isOpen ? '▼ Show' : '▲ Hide';
+  chevron.style.color = isOpen ? 'var(--muted)' : 'var(--blue)';
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────
@@ -2672,6 +2690,14 @@ function loadPlotFromFieldforce() {
   }
   // Show the Fetch Trees from Fieldforce button
   document.getElementById('ffTreeSection').style.display = 'block';
+  // Auto-collapse upload section — not needed when connected to Fieldforce
+  const uploadBody    = document.getElementById('uploadSectionBody');
+  const uploadChevron = document.getElementById('uploadSectionChevron');
+  if (uploadBody && uploadBody.style.display !== 'none') {
+    uploadBody.style.display  = 'none';
+    uploadChevron.textContent = '▼ Show';
+    uploadChevron.style.color = 'var(--muted)';
+  }
   // Show refresh button
   document.getElementById('btnRefreshPlot').style.display = 'block';
   document.getElementById('ffTreeStatus').textContent = `Click to load inventory trees for ${plot.plotId}`;
