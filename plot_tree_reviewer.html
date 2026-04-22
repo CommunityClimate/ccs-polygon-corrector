@@ -643,7 +643,7 @@ Paste the PolygonGeoJSON field directly.'></textarea>
         </div>
       </div>
       <!-- Measurements panel — alongside the map, no inner scroll -->
-      <div class="measure-panel" id="measurePanel" style="display:none;width:220px;flex-shrink:0;
+      <div class="measure-panel" id="measurePanel" style="display:none;width:240px;flex-shrink:0;
         border-left:1px solid var(--border)">
         <div class="measure-panel-title">📐 Measurements</div>
         <div class="measure-grid" id="measureGrid"></div>
@@ -806,6 +806,27 @@ function fmtDist(m) {
   return (m/1000).toFixed(3) + ' km';
 }
 
+// Perpendicular distance (metres) from a lat/lng point to a polygon edge
+function pointToEdgeDistM(pLat, pLng, aLat, aLng, bLat, bLng) {
+  const R = 111320;
+  const cosLat = Math.cos(pLat * Math.PI / 180);
+  const ax = (aLng - pLng) * R * cosLat, ay = (aLat - pLat) * R;
+  const bx = (bLng - pLng) * R * cosLat, by = (bLat - pLat) * R;
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq === 0) return Math.sqrt(ax*ax + ay*ay);
+  const t = Math.max(0, Math.min(1, ((-ax)*dx + (-ay)*dy) / lenSq));
+  return Math.sqrt((ax+t*dx)**2 + (ay+t*dy)**2);
+}
+
+// Cardinal direction from center point to edge midpoint
+function edgeCardinal(pLat, pLng, aLat, aLng, bLat, bLng) {
+  const dLat = ((aLat+bLat)/2) - pLat;
+  const dLng = ((aLng+bLng)/2) - pLng;
+  const angle = Math.atan2(dLng, dLat) * 180 / Math.PI;
+  return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((angle+360)%360)/45)%8];
+}
+
 // ── Measured center live status ───────────────────────────────────────────────
 ['measLat','measLng'].forEach(id=>document.getElementById(id).addEventListener('input',updateMeasStatus));
 function updateMeasStatus(){
@@ -868,6 +889,53 @@ function renderMeasurements(ring, refResult) {
     }
   }
 
+  // ── Centre → each side distances ─────────────────────────────────────────
+  function sideDistCards(centerLat, centerLng, label, colour) {
+    // Build edges from ring (exclude closing duplicate)
+    const verts = ring[0][0] === ring[ring.length-1][0] &&
+                  ring[0][1] === ring[ring.length-1][1]
+                  ? ring.slice(0, -1) : ring;
+    const edges = verts.map((v, i) => {
+      const next = verts[(i+1) % verts.length];
+      const aLat = v[1],  aLng = v[0];
+      const bLat = next[1], bLng = next[0];
+      const dist = pointToEdgeDistM(centerLat, centerLng, aLat, aLng, bLat, bLng);
+      const dir  = edgeCardinal(centerLat, centerLng, aLat, aLng, bLat, bLng);
+      return { dist, dir };
+    });
+    // Sort by direction for consistent ordering N→E→S→W
+    const order = ['N','NE','E','SE','S','SW','W','NW'];
+    edges.sort((a,b) => order.indexOf(a.dir) - order.indexOf(b.dir));
+    const TARGET_HALF = 10; // 10m from centre to each side of a 20×20 plot
+    return `
+      <div class="measure-card full" style="border-color:${colour}33;background:${colour}08">
+        <div class="mc-label" style="color:${colour};margin-bottom:8px">
+          ${label} → sides
+        </div>
+        ${edges.map(e => {
+          const ok = Math.abs(e.dist - TARGET_HALF) < TARGET_HALF * 0.3;
+          return `<div style="display:flex;justify-content:space-between;
+            align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+            font-size:11px">
+            <span style="color:var(--muted);font-size:10px;width:28px">${e.dir}</span>
+            <span style="font-family:'Courier New',monospace;font-weight:700;
+              color:${ok?'var(--inside)':'var(--outside)'}">${e.dist.toFixed(1)} m</span>
+            <span style="font-size:9px;color:var(--muted)">${ok?'✓':'⚠'}</span>
+          </div>`;
+        }).join('')}
+        <div style="font-size:9px;color:var(--muted);margin-top:6px">
+          Target: ~10 m per side (20×20 plot)
+        </div>
+      </div>`;
+  }
+
+  const refSidesHtml  = refResult
+    ? sideDistCards(refResult.lat, refResult.lng,  'RefCenter',  '#60a5fa')
+    : '';
+  const measSidesHtml = hasMeas
+    ? sideDistCards(measLatV,      measLngV,        'MeasCenter', '#fbbf24')
+    : '';
+
   grid.innerHTML = `
     <div class="measure-card ${areaOk?'ok':'warn'}">
       <div class="mc-label">Area</div>
@@ -881,6 +949,8 @@ function renderMeasurements(ring, refResult) {
       <div class="mc-sub">Target: ~80 m</div>
     </div>
     ${centreDistHtml}
+    ${refSidesHtml}
+    ${measSidesHtml}
   `;
   panel.style.display='flex';
   panel.style.flexDirection='column';
