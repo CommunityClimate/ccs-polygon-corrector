@@ -112,7 +112,7 @@
   .btn-copy-num{padding:4px 10px;background:var(--accent);color:#000;border:none;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;}
 
   /* Batch list */
-  .batch-list{padding:12px 14px;border-bottom:1px solid var(--border);max-height:260px;overflow-y:auto;}
+  .batch-list{padding:12px 14px;border-bottom:1px solid var(--border);}
   .batch-list-header{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--warn);text-transform:uppercase;margin-bottom:10px;}
   .batch-item{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
   .batch-item-name{color:var(--text);}
@@ -122,7 +122,7 @@
   .batch-remove:hover{color:var(--outside);}
 
   /* Map area */
-  #mapWrapper{flex:1;display:flex;flex-direction:column;position:relative;}
+  #mapWrapper{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}
   .map-placeholder{flex:1;display:flex;align-items:center;justify-content:center;background:#0a0c12;color:var(--muted);font-size:13px;text-align:center;line-height:2;}
   #map{width:100%;flex:1;display:none;}
 
@@ -173,9 +173,9 @@
   .meas-status.set{color:var(--warn);}
 
   /* Measurements panel */
-  .measure-panel{padding:14px 14px 16px;border-bottom:1px solid var(--border);background:rgba(15,17,23,0.6);}
+  .measure-panel{padding:14px 12px 16px;background:rgba(15,17,23,0.6);}
   .measure-panel-title{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
-  .measure-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .measure-grid{display:grid;grid-template-columns:1fr;gap:10px;}
   .measure-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:11px 13px;}
   .measure-card.warn{border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.05);}
   .measure-card.ok{border-color:rgba(74,222,128,0.3);background:rgba(74,222,128,0.04);}
@@ -606,12 +606,6 @@ Paste the PolygonGeoJSON field directly.'></textarea>
       <div class="edit-hint" id="editHint">Drag vertices to reshape. Click Save when done.</div>
     </div>
 
-    <!-- Measurements panel — shown after analysis -->
-    <div class="measure-panel" id="measurePanel" style="display:none">
-      <div class="measure-panel-title">📐 Measurements</div>
-      <div class="measure-grid" id="measureGrid"></div>
-    </div>
-
     <!-- Batch list -->
     <div class="batch-list" id="batchListWrap" style="display:none">
       <div class="batch-list-header">📦 Batch queue</div>
@@ -629,19 +623,30 @@ Paste the PolygonGeoJSON field directly.'></textarea>
 
   </div>
 
-  <!-- MAP -->
+  <!-- MAP + MEASUREMENTS -->
   <div id="mapWrapper">
-    <div class="map-placeholder" id="mapPlaceholder">Run an analysis to see the satellite map</div>
     <div class="map-toolbar" id="mapToolbar" style="display:none">
       <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📐 Side lengths</button>
       <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📏 A→B ruler</button>
       <button class="map-tool-btn" id="btnClearMeasure" onclick="clearMeasure()" style="display:none">✕ Ruler</button>
     </div>
-    <div id="map"></div>
-    <div class="capture-overlay" id="captureOverlay" style="display:none">
-      <div class="spinner"></div>
-      <div class="co-text">Capturing map…</div>
-      <div class="co-sub">Please wait, rendering satellite tiles</div>
+    <!-- Inner row: map + measurements side by side -->
+    <div style="display:flex;flex:1;overflow:hidden">
+      <div style="flex:1;display:flex;flex-direction:column;position:relative">
+        <div class="map-placeholder" id="mapPlaceholder">Run an analysis to see the satellite map</div>
+        <div id="map" style="flex:1;display:none"></div>
+        <div class="capture-overlay" id="captureOverlay" style="display:none">
+          <div class="spinner"></div>
+          <div class="co-text">Capturing map…</div>
+          <div class="co-sub">Please wait, rendering satellite tiles</div>
+        </div>
+      </div>
+      <!-- Measurements panel — alongside the map -->
+      <div class="measure-panel" id="measurePanel" style="display:none;width:220px;flex-shrink:0;
+        border-left:1px solid var(--border);overflow-y:auto">
+        <div class="measure-panel-title">📐 Measurements</div>
+        <div class="measure-grid" id="measureGrid"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -876,7 +881,10 @@ function renderMeasurements(ring, refResult) {
     </div>
     ${centreDistHtml}
   `;
-  panel.style.display='block';
+  panel.style.display='flex';
+  panel.style.flexDirection='column';
+  // Redraw map to account for narrowed width
+  setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
   document.getElementById('mapToolbar').style.display='flex';
 }
 
@@ -1633,6 +1641,7 @@ function clearCurrent(){
   updateMeasStatus();
   document.getElementById('measurePanel').style.display='none';
   document.getElementById('mapToolbar').style.display='none';
+  setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
   if(typeof clearMeasure==="function") clearMeasure();
   if(typeof clearSideLabels==="function") clearSideLabels();
   if(map){mapLayers.forEach(l=>map.removeLayer(l));mapLayers=[];}
