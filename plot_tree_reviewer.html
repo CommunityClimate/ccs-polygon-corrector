@@ -482,11 +482,32 @@
       <input id="plotNameInput" type="text" placeholder="e.g. PLT_Kasanka_49" style="font-family:'Segoe UI',sans-serif;font-size:12px;"/>
     </div>
 
-    <div class="section">
-      <label>PolygonGeoJSON — from Plot record</label>
-      <textarea id="polygonInput" placeholder='{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[lng,lat],...]]}}
+    <!-- ── COLLAPSIBLE MANUAL INPUT ──────────────────────────────────── -->
+    <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:0 0 4px 0">
+      <div onclick="toggleManualInput()"
+        style="display:flex;align-items:center;justify-content:space-between;
+        padding:8px 12px;cursor:pointer;background:var(--panel);user-select:none"
+        id="manualInputHeader">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;
+          color:var(--muted);text-transform:uppercase">⚠ Manual Input — Advanced Only</span>
+        <span id="manualInputChevron"
+          style="font-size:10px;color:var(--muted);transition:transform .2s">▼ Show</span>
+      </div>
+      <div id="manualInputBody" style="display:none">
+        <div class="section" style="border-top:1px solid var(--border);margin:0;padding:10px 12px">
+          <label>PolygonGeoJSON — from Plot record</label>
+          <textarea id="polygonInput" placeholder='{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[lng,lat],...]]}}
 
 Paste the PolygonGeoJSON field directly.'></textarea>
+        </div>
+        <div class="or-divider" style="margin:0"><span>OR PASTE</span></div>
+        <div class="section" style="margin:0;padding:10px 12px">
+          <label>Tree Coordinates — manual (one per line)</label>
+          <textarea id="treesInput" placeholder="-12.9065946200, 30.9553237600
+30.9553063600  -12.9065684700"></textarea>
+          <div class="hint">Lat/lng auto-detected. Comma or space separator fine.</div>
+        </div>
+      </div>
     </div>
 
     <div class="ref-section">
@@ -557,15 +578,6 @@ Paste the PolygonGeoJSON field directly.'></textarea>
         </div>
         <button class="btn-apply-cols" onclick="applyPickerColumns()">✓ Apply Column Mapping</button>
       </div>
-    </div>
-
-    <div class="or-divider"><span>OR PASTE</span></div>
-
-    <div class="section">
-      <label>Tree Coordinates — manual (one per line)</label>
-      <textarea id="treesInput" placeholder="-12.9065946200, 30.9553237600
-30.9553063600  -12.9065684700"></textarea>
-      <div class="hint">Lat/lng auto-detected. Comma or space separator fine.</div>
     </div>
 
     <div class="btn-row">
@@ -1960,6 +1972,15 @@ function initCatalogMap(container, plot, idx) {
   } catch(e) {
     container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:10px">Map error</div>';
   }
+}
+
+function toggleManualInput() {
+  const body     = document.getElementById('manualInputBody');
+  const chevron  = document.getElementById('manualInputChevron');
+  const isOpen   = body.style.display !== 'none';
+  body.style.display   = isOpen ? 'none' : 'block';
+  chevron.textContent  = isOpen ? '▼ Show' : '▲ Hide';
+  chevron.style.color  = isOpen ? 'var(--muted)' : 'var(--warn)';
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────
