@@ -141,7 +141,7 @@
   .cat-lb-close:hover{color:var(--text);}
   .cat-lb-map{width:100%;height:300px;flex-shrink:0;}
   .cat-lb-body{padding:14px 16px;overflow-y:auto;flex:1;}
-  .cat-lb-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+  .cat-lb-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:0;}
   .cat-lb-stat{background:var(--bg);border:1px solid var(--border);border-radius:6px;
     padding:8px 10px;text-align:center;}
   .cat-lb-stat .val{font-size:20px;font-weight:800;font-family:'Courier New',monospace;}
@@ -376,6 +376,7 @@
     </div>
     <div class="cat-lb-map" id="catLbMap"></div>
     <div class="cat-lb-body">
+      <!-- Tree stats row -->
       <div class="cat-lb-stats">
         <div class="cat-lb-stat blue">
           <div class="val" id="catLbTotal">—</div>
@@ -394,8 +395,24 @@
           <div class="lbl">Compliance</div>
         </div>
       </div>
+      <!-- Measurement stats row -->
+      <div class="cat-lb-stats" style="margin-top:8px">
+        <div class="cat-lb-stat" style="border-color:rgba(96,165,250,0.3)">
+          <div class="val" id="catLbArea" style="font-size:14px;color:var(--blue)">—</div>
+          <div class="lbl">Area (m²)</div>
+        </div>
+        <div class="cat-lb-stat" style="border-color:rgba(96,165,250,0.3)">
+          <div class="val" id="catLbPerim" style="font-size:14px;color:var(--blue)">—</div>
+          <div class="lbl">Perimeter</div>
+        </div>
+        <div class="cat-lb-stat" style="grid-column:span 2;border-color:rgba(251,191,36,0.3)">
+          <div class="val" id="catLbCentDist" style="font-size:14px;color:var(--warn)">—</div>
+          <div class="lbl" id="catLbCentLbl">Ref → Meas Centre</div>
+        </div>
+      </div>
+      <!-- MeasCenter coordinates -->
       <div id="catLbMeta" style="font-size:11px;color:var(--muted);margin-bottom:12px;
-        font-family:'Courier New',monospace;line-height:1.8"></div>
+        margin-top:10px;font-family:'Courier New',monospace;line-height:1.8"></div>
       <div class="cat-lb-actions">
         <button class="cat-lb-btn primary" id="catLbOpenBtn" onclick="openPlotFromLightbox()">
           ✏ Open Plot in Editor →
@@ -2396,12 +2413,6 @@ function openCatLightbox(idx) {
   // Header
   document.getElementById('catLbTitle').textContent = p.plotId;
 
-  // Meta info
-  const meta = [];
-  if (p.refLat) meta.push(`Ref centre: ${parseFloat(p.refLat).toFixed(5)}, ${parseFloat(p.refLng).toFixed(5)}`);
-  if (p.species) meta.push(`Species: ${p.species}`);
-  document.getElementById('catLbMeta').textContent = meta.join('  ·  ');
-
   // Tree stats
   const ring  = p.geoJSON ? parsePolygon(p.geoJSON) : null;
   const trees = catalogTreesByPlot[p.guid] || [];
@@ -2417,12 +2428,44 @@ function openCatLightbox(idx) {
       pct >= 90 ? 'var(--inside)' : pct >= 70 ? 'var(--warn)' : 'var(--outside)';
   } else {
     ['catLbTotal','catLbInside','catLbOutside','catLbPct'].forEach(id => {
-      document.getElementById(id).textContent = trees.length > 0 ? trees.length : '—';
+      document.getElementById(id).textContent = '—';
     });
-    document.getElementById('catLbInside').textContent  = '—';
-    document.getElementById('catLbOutside').textContent = '—';
-    document.getElementById('catLbPct').textContent     = ring ? '—' : 'No polygon';
+    document.getElementById('catLbPct').textContent = ring ? '—' : 'No polygon';
   }
+
+  // Measurements — Area, Perimeter
+  if (ring) {
+    const area = polygonArea(ring);
+    const perim = polygonPerimeter(ring);
+    document.getElementById('catLbArea').textContent  = area.toFixed(1);
+    document.getElementById('catLbPerim').textContent = fmtDist(perim);
+  } else {
+    document.getElementById('catLbArea').textContent  = '—';
+    document.getElementById('catLbPerim').textContent = '—';
+  }
+
+  // RefCenter → MeasCenter distance
+  const hasMeas = p.measLat !== null && p.measLat !== undefined &&
+                  p.measLng !== null && p.measLng !== undefined;
+  const hasRef  = p.refLat  !== null && p.refLat  !== undefined;
+  if (hasMeas && hasRef) {
+    const cd   = haversine(parseFloat(p.refLat), parseFloat(p.refLng),
+                           parseFloat(p.measLat), parseFloat(p.measLng));
+    const cdOk = cd < 5;
+    document.getElementById('catLbCentDist').textContent = fmtDist(cd);
+    document.getElementById('catLbCentDist').style.color = cdOk ? 'var(--inside)' : 'var(--outside)';
+    document.getElementById('catLbCentLbl').textContent  =
+      cdOk ? 'Centres align well ✓' : 'Ref → Meas Centre ⚠';
+  } else {
+    document.getElementById('catLbCentDist').textContent = '—';
+    document.getElementById('catLbCentLbl').textContent  = 'Ref → Meas Centre';
+  }
+
+  // Meta — show MeasCenter coordinates (replacing RefCenter)
+  const meta = [];
+  if (hasMeas) meta.push(`MeasCenter: ${parseFloat(p.measLat).toFixed(5)}, ${parseFloat(p.measLng).toFixed(5)}`);
+  if (p.species) meta.push(`Species: ${p.species}`);
+  document.getElementById('catLbMeta').textContent = meta.join('  ·  ');
 
   // Show overlay
   const overlay = document.getElementById('catLightbox');
@@ -2462,13 +2505,14 @@ function openCatLightbox(idx) {
       }).addTo(catLbMap);
     });
 
-    // RefCenter
-    if (p.refLat) {
-      L.marker([p.refLat, p.refLng], { icon: L.divIcon({
+    // MeasCenter marker (amber) — replacing RefCenter
+    if (hasMeas) {
+      L.marker([parseFloat(p.measLat), parseFloat(p.measLng)], { icon: L.divIcon({
         className:'',
-        html:'<div style="background:#60a5fa;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6)"></div>',
-        iconSize:[10,10], iconAnchor:[5,5]
-      })}).addTo(catLbMap);
+        html:'<div style="background:#fbbf24;color:#000;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:8px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6)">M</div>',
+        iconSize:[14,14], iconAnchor:[7,7]
+      })}).bindPopup(`<b>MeasCenter</b><br>${parseFloat(p.measLat).toFixed(6)}, ${parseFloat(p.measLng).toFixed(6)}`)
+        .addTo(catLbMap);
     }
 
     catLbMap.fitBounds(poly.getBounds(), { padding:[20,20] });
