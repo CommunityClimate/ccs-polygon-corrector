@@ -244,7 +244,6 @@
   }
   @media (max-width: 1200px) {
     .left { width: 260px; }
-    #measurePanel { display: none !important; }
   }
 </style>
 </head>
@@ -2120,17 +2119,25 @@ function toggleMeasPanel() {
 
 function toggleMeasurePanel_show() {
   // Called after analysis — show panel and reveal toggle button
+  // Auto-collapse on narrow effective viewports (e.g. 150% scaling)
+  const narrow = window.innerWidth < 1200;
   const panel  = document.getElementById('measurePanel');
   const btn    = document.getElementById('btnToggleMeasPanel');
-  panel.style.display = 'flex';
-  panel.style.flexDirection = 'column';
+  if (!narrow) {
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+  }
   if (btn) {
     btn.style.display = 'inline-flex';
-    btn.style.background = 'rgba(96,165,250,0.2)';
-    btn.style.borderColor = 'rgba(96,165,250,0.5)';
+    if (!narrow) {
+      btn.style.background  = 'rgba(96,165,250,0.2)';
+      btn.style.borderColor = 'rgba(96,165,250,0.5)';
+    }
   }
   setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
 }
+
+function toggleManualInput() {
   const body    = document.getElementById('manualInputBody');
   const chevron = document.getElementById('manualInputChevron');
   const isOpen  = body.style.display !== 'none';
