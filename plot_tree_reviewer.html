@@ -40,7 +40,7 @@
   .main{display:flex;flex:1;overflow:hidden;}
 
   /* LEFT PANEL */
-  .left{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--panel);overflow-y:auto;}
+  .left{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--panel);overflow-y:auto;}
   .section{padding:12px 14px;border-bottom:1px solid var(--border);}
   .section label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;}
   input[type=text],textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Courier New',monospace;font-size:11px;padding:6px 8px;outline:none;transition:border-color 0.2s;}
@@ -238,6 +238,14 @@
   .col-picker-row select:focus{border-color:var(--blue);}
   .btn-apply-cols{width:100%;margin-top:6px;padding:7px;background:var(--blue);color:#000;border:none;border-radius:4px;font-weight:700;font-size:11px;cursor:pointer;letter-spacing:.5px;}
   .btn-apply-cols:hover{opacity:0.85;}
+  /* ── Responsive: narrow effective viewport (e.g. 150% scaling on 2256px) ── */
+  @media (max-width: 1400px) {
+    .left { width: 280px; }
+  }
+  @media (max-width: 1200px) {
+    .left { width: 260px; }
+    #measurePanel { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -667,6 +675,7 @@ Paste the PolygonGeoJSON field directly.'></textarea>
           <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📐 Side lengths</button>
           <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📏 A→B ruler</button>
           <button class="map-tool-btn" id="btnClearMeasure" onclick="clearMeasure()" style="display:none">✕ Ruler</button>
+          <button class="map-tool-btn" id="btnToggleMeasPanel" onclick="toggleMeasPanel()" title="Show/hide measurements panel" style="display:none">📊 Measurements</button>
         </div>
         <div class="map-placeholder" id="mapPlaceholder">Run an analysis to see the satellite map</div>
         <div id="map" style="flex:1;display:none"></div>
@@ -677,7 +686,7 @@ Paste the PolygonGeoJSON field directly.'></textarea>
         </div>
       </div>
       <!-- Measurements panel — alongside the map, no inner scroll -->
-      <div class="measure-panel" id="measurePanel" style="display:none;width:240px;flex-shrink:0;
+      <div class="measure-panel" id="measurePanel" style="display:none;width:200px;flex-shrink:0;
         border-left:1px solid var(--border)">
         <div class="measure-panel-title">📐 Measurements</div>
         <div class="measure-grid" id="measureGrid"></div>
@@ -986,8 +995,7 @@ function renderMeasurements(ring, refResult) {
     ${refSidesHtml}
     ${measSidesHtml}
   `;
-  panel.style.display='flex';
-  panel.style.flexDirection='column';
+  toggleMeasurePanel_show();
   // Redraw map to account for narrowed width
   setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
   document.getElementById('mapToolbar').style.display='flex';
@@ -1746,6 +1754,8 @@ function clearCurrent(){
   updateMeasStatus();
   document.getElementById('measurePanel').style.display='none';
   document.getElementById('mapToolbar').style.display='none';
+  const btn = document.getElementById('btnToggleMeasPanel');
+  if (btn) { btn.style.display='none'; btn.style.background=''; btn.style.borderColor=''; }
   setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
   if(typeof clearMeasure==="function") clearMeasure();
   if(typeof clearSideLabels==="function") clearSideLabels();
@@ -2097,7 +2107,30 @@ function initCatalogMap(container, plot, idx) {
   }
 }
 
-function toggleManualInput() {
+function toggleMeasPanel() {
+  const panel   = document.getElementById('measurePanel');
+  const btn     = document.getElementById('btnToggleMeasPanel');
+  const isOpen  = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  if (!isOpen) panel.style.flexDirection = 'column';
+  btn.style.background = isOpen ? '' : 'rgba(96,165,250,0.2)';
+  btn.style.borderColor = isOpen ? '' : 'rgba(96,165,250,0.5)';
+  setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
+}
+
+function toggleMeasurePanel_show() {
+  // Called after analysis — show panel and reveal toggle button
+  const panel  = document.getElementById('measurePanel');
+  const btn    = document.getElementById('btnToggleMeasPanel');
+  panel.style.display = 'flex';
+  panel.style.flexDirection = 'column';
+  if (btn) {
+    btn.style.display = 'inline-flex';
+    btn.style.background = 'rgba(96,165,250,0.2)';
+    btn.style.borderColor = 'rgba(96,165,250,0.5)';
+  }
+  setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 50);
+}
   const body    = document.getElementById('manualInputBody');
   const chevron = document.getElementById('manualInputChevron');
   const isOpen  = body.style.display !== 'none';
