@@ -395,19 +395,36 @@
           <div class="lbl">Compliance</div>
         </div>
       </div>
-      <!-- Measurement stats row -->
-      <div class="cat-lb-stats" style="margin-top:8px">
-        <div class="cat-lb-stat" style="border-color:rgba(96,165,250,0.3)">
-          <div class="val" id="catLbArea" style="font-size:14px;color:var(--blue)">—</div>
-          <div class="lbl">Area (m²)</div>
+      <!-- Measurement stats row — full detail matching main page -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <!-- Area -->
+        <div class="cat-lb-stat" id="catLbAreaCard"
+          style="text-align:left;border-color:rgba(96,165,250,0.3)">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;
+            letter-spacing:1px;margin-bottom:4px">Area</div>
+          <div id="catLbArea" style="font-size:16px;font-weight:800;
+            font-family:'Courier New',monospace;color:var(--blue)">—</div>
+          <div id="catLbAreaSub" style="font-size:9px;color:var(--muted);margin-top:4px"></div>
+          <div style="font-size:9px;color:var(--warn);margin-top:2px">Target: 400 m² (20×20)</div>
         </div>
-        <div class="cat-lb-stat" style="border-color:rgba(96,165,250,0.3)">
-          <div class="val" id="catLbPerim" style="font-size:14px;color:var(--blue)">—</div>
-          <div class="lbl">Perimeter</div>
+        <!-- Perimeter -->
+        <div class="cat-lb-stat"
+          style="text-align:left;border-color:rgba(96,165,250,0.3)">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;
+            letter-spacing:1px;margin-bottom:4px">Perimeter</div>
+          <div id="catLbPerim" style="font-size:16px;font-weight:800;
+            font-family:'Courier New',monospace;color:var(--blue)">—</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px">Target: ~80 m</div>
         </div>
-        <div class="cat-lb-stat" style="grid-column:span 2;border-color:rgba(251,191,36,0.3)">
-          <div class="val" id="catLbCentDist" style="font-size:14px;color:var(--warn)">—</div>
-          <div class="lbl" id="catLbCentLbl">Ref → Meas Centre</div>
+        <!-- RefCenter → MeasCenter distance — full width -->
+        <div class="cat-lb-stat" id="catLbCentCard"
+          style="grid-column:span 2;text-align:left;border-color:rgba(251,191,36,0.3)">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;
+            letter-spacing:1px;margin-bottom:4px">RefCenter → MeasuredCenter distance</div>
+          <div id="catLbCentDist" style="font-size:16px;font-weight:800;
+            font-family:'Courier New',monospace;color:var(--warn)">—</div>
+          <div id="catLbCentLbl" style="font-size:9px;margin-top:4px;
+            color:var(--muted)">—</div>
         </div>
       </div>
       <!-- MeasCenter coordinates -->
@@ -2435,13 +2452,20 @@ function openCatLightbox(idx) {
 
   // Measurements — Area, Perimeter
   if (ring) {
-    const area = polygonArea(ring);
+    const area  = polygonArea(ring);
     const perim = polygonPerimeter(ring);
-    document.getElementById('catLbArea').textContent  = area.toFixed(1);
-    document.getElementById('catLbPerim').textContent = fmtDist(perim);
+    const side  = Math.sqrt(area);
+    const areaOk = Math.abs(area - 400) < 80; // within 20% of 400m²
+    document.getElementById('catLbArea').textContent    = area.toFixed(1) + ' m²';
+    document.getElementById('catLbArea').style.color    = areaOk ? 'var(--inside)' : 'var(--outside)';
+    document.getElementById('catLbAreaCard').style.borderColor =
+      areaOk ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)';
+    document.getElementById('catLbAreaSub').textContent = `Equiv. ${side.toFixed(1)} × ${side.toFixed(1)} m`;
+    document.getElementById('catLbPerim').textContent   = fmtDist(perim);
   } else {
-    document.getElementById('catLbArea').textContent  = '—';
-    document.getElementById('catLbPerim').textContent = '—';
+    document.getElementById('catLbArea').textContent    = '—';
+    document.getElementById('catLbAreaSub').textContent = '';
+    document.getElementById('catLbPerim').textContent   = '—';
   }
 
   // RefCenter → MeasCenter distance
@@ -2452,13 +2476,18 @@ function openCatLightbox(idx) {
     const cd   = haversine(parseFloat(p.refLat), parseFloat(p.refLng),
                            parseFloat(p.measLat), parseFloat(p.measLng));
     const cdOk = cd < 5;
-    document.getElementById('catLbCentDist').textContent = fmtDist(cd);
-    document.getElementById('catLbCentDist').style.color = cdOk ? 'var(--inside)' : 'var(--outside)';
-    document.getElementById('catLbCentLbl').textContent  =
-      cdOk ? 'Centres align well ✓' : 'Ref → Meas Centre ⚠';
+    document.getElementById('catLbCentDist').textContent  = fmtDist(cd);
+    document.getElementById('catLbCentDist').style.color  = cdOk ? 'var(--inside)' : 'var(--outside)';
+    document.getElementById('catLbCentLbl').textContent   = cdOk
+      ? '✓ Centres align well'
+      : '⚠ Large offset between ref and measured centre';
+    document.getElementById('catLbCentLbl').style.color   = cdOk ? 'var(--inside)' : 'var(--outside)';
+    document.getElementById('catLbCentCard').style.borderColor =
+      cdOk ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)';
   } else {
     document.getElementById('catLbCentDist').textContent = '—';
-    document.getElementById('catLbCentLbl').textContent  = 'Ref → Meas Centre';
+    document.getElementById('catLbCentLbl').textContent  = 'No MeasCenter or RefCenter data';
+    document.getElementById('catLbCentLbl').style.color  = 'var(--muted)';
   }
 
   // Meta — show MeasCenter coordinates (replacing RefCenter)
