@@ -28,6 +28,11 @@ class FieldPolygonApp {
         this.progressPanel = new ProgressPanel();
         this.currentField = null;
         this.filteredFields = null; // Track currently filtered fields for export
+
+        // ── Tree overlay state ───────────────────────────────────────────────
+        this.treeData = [];            // [{code, lat, lng}, ...]
+        this.treeLayer = null;         // L.LayerGroup of circleMarkers
+        this._treeColorInterval = null; // handle for live-recolour loop
     }
     
     // Initialize application
@@ -97,6 +102,14 @@ class FieldPolygonApp {
             console.log('   ✅ Data loaded successfully (memory mode - no localStorage quota limits)');
         });
         
+        // ── Tree overlay: receive trees fetched by index.html ─────────────────
+        document.addEventListener('treesLoaded', (e) => {
+            const { trees, fieldGuid } = e.detail;
+            console.log(`🌳 treesLoaded: ${trees.length} trees for GUID ${fieldGuid}`);
+            this.treeData = trees;
+            this.drawTreeOverlay(trees);
+        });
+
         // Listen for map layer switching
         document.addEventListener('switchMapLayer', (e) => {
             const { layerType } = e.detail;
@@ -587,6 +600,9 @@ IMPORT SUMMARY:
         if (field.verraCompliance) {
             this.uiManager.updateVerraCompliance(field.verraCompliance);
         }
+
+        // Re-colour tree overlay to match this polygon
+        if (this.treeLayer) this.colorTreeDots();
     }
     
     /**
@@ -754,6 +770,12 @@ IMPORT SUMMARY:
     
     // Clear map
     clearMap() {
+        this._stopTreeColorInterval();
+        if (this.treeLayer) {
+            this.mapManager.map?.removeLayer(this.treeLayer);
+            this.treeLayer = null;
+        }
+        this.treeData = [];
         this.mapManager.clearAll();
         this.currentField = null;
         this.uiManager.setCurrentField(null);
@@ -887,6 +909,9 @@ IMPORT SUMMARY:
         
         // Enable edit mode with current coordinates
         this.manualEditor.enableEditMode(this.currentField.originalCoordinates);
+
+        // Start live tree-colour updates while vertices are being dragged
+        this._startTreeColorInterval();
         
         // Update UI
         this.toggleEditModeUI(true);
@@ -1040,7 +1065,9 @@ IMPORT SUMMARY:
         if (!this.manualEditor.isInEditMode()) {
             return;
         }
-        
+
+        this._stopTreeColorInterval();
+
         // Disable edit mode
         this.manualEditor.disableEditMode();
         
@@ -1543,6 +1570,144 @@ IMPORT SUMMARY:
         }
     }
     
+    // === TREE OVERLAY ===
+
+    /**
+     * Draw all trees for the current field as circleMarkers.
+     * Green = inside polygon, red = outside.  Called once per treesLoaded event.
+     * @param {Array<{code:string, lat:number, lng:number}>} trees
+     */
+    drawTreeOverlay(trees) {
+        const map = this.mapManager?.map;
+        if (!map) return;
+
+        // Remove previous tree layer if any
+        if (this.treeLayer) {
+            map.removeLayer(this.treeLayer);
+            this.treeLayer = null;
+        }
+
+        if (!trees || trees.length === 0) {
+            this._updateTreeBadge(0, 0);
+            return;
+        }
+
+        this.treeLayer = L.layerGroup().addTo(map);
+
+        trees.forEach(tree => {
+            const marker = L.circleMarker([tree.lat, tree.lng], {
+                radius: 5,
+                color: '#ffffff',
+                weight: 1.5,
+                fillColor: '#6c757d', // grey until colorTreeDots() runs
+                fillOpacity: 0.9
+            });
+            marker.bindTooltip(tree.code || 'Tree', { permanent: false, direction: 'top', offset: [0, -4] });
+            marker._treeData = tree;
+            this.treeLayer.addLayer(marker);
+        });
+
+        // Initial colouring
+        this.colorTreeDots();
+        console.log(`🌳 Drew ${trees.length} tree dots on map`);
+    }
+
+    /**
+     * Run point-in-polygon for every tree dot and set fill to green (inside)
+     * or red (outside).  Safe to call at high frequency — bails early if no data.
+     */
+    colorTreeDots() {
+        if (!this.treeLayer) return;
+
+        // 1. Try to get live coordinates from ManualEditor during a drag session
+        let coords = null;
+        if (this.manualEditor?.isInEditMode()) {
+            coords = this.manualEditor.editCoords       // common property name
+                  || this.manualEditor.currentCoords
+                  || this.manualEditor.vertexCoords
+                  || null;
+        }
+
+        // 2. Fall back to stored field coordinates (corrected > original)
+        if (!coords || coords.length < 3) {
+            coords = this.currentField?.correctedCoordinates
+                  || this.currentField?.originalCoordinates
+                  || null;
+        }
+
+        if (!coords || coords.length < 3) {
+            // No polygon data yet — colour all grey
+            this.treeLayer.eachLayer(m => m.setStyle({ fillColor: '#6c757d' }));
+            return;
+        }
+
+        // Leaflet stores [lat, lng]; turf expects [lng, lat]
+        const ring = coords.map(c => [c[1], c[0]]);
+        // Ensure ring is closed
+        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
+            ring.push(ring[0]);
+        }
+
+        let turfPoly;
+        try {
+            turfPoly = window.turf?.polygon([ring]);
+        } catch (_) {
+            return;
+        }
+        if (!turfPoly) return;
+
+        let inside = 0;
+        let outside = 0;
+
+        this.treeLayer.eachLayer(marker => {
+            const tree = marker._treeData;
+            if (!tree) return;
+            try {
+                const pt = window.turf.point([tree.lng, tree.lat]);
+                const isInside = window.turf.booleanPointInPolygon(pt, turfPoly);
+                marker.setStyle({ fillColor: isInside ? '#28a745' : '#dc3545' });
+                isInside ? inside++ : outside++;
+            } catch (_) { /* silent */ }
+        });
+
+        this._updateTreeBadge(inside, outside);
+    }
+
+    /**
+     * Update the tree count badge in the map header (if present).
+     */
+    _updateTreeBadge(inside, outside) {
+        const badge = document.getElementById('treeBadge');
+        if (!badge) return;
+        const total = inside + outside;
+        if (total === 0) {
+            badge.style.display = 'none';
+            return;
+        }
+        badge.style.display = 'inline-flex';
+        badge.innerHTML =
+            `<i class="bi bi-tree-fill" style="margin-right:4px;color:#28a745"></i>` +
+            `<span style="color:#28a745;font-weight:700">${inside}</span>` +
+            `<span style="color:#6c757d;margin:0 3px">/</span>` +
+            `<span style="color:#dc3545;font-weight:700">${outside}</span>` +
+            `<span style="color:#6c757d;font-size:10px;margin-left:4px">trees</span>`;
+    }
+
+    /** Start a 150 ms interval that re-colours tree dots while edit mode is active. */
+    _startTreeColorInterval() {
+        this._stopTreeColorInterval();
+        if (!this.treeLayer) return;
+        this._treeColorInterval = setInterval(() => this.colorTreeDots(), 150);
+    }
+
+    /** Clear the live re-colour interval. */
+    _stopTreeColorInterval() {
+        if (this._treeColorInterval) {
+            clearInterval(this._treeColorInterval);
+            this._treeColorInterval = null;
+        }
+    }
+
     // === MAP DISPLAY ===
     
     /**
