@@ -1424,8 +1424,11 @@
                 if (msg.includes('Original polygon drawn successfully')) {
                     // Debounce — only fetch if no more drawing starts within 800ms
                     if (_drawDebounce) clearTimeout(_drawDebounce);
+                    origLog('[Trees] ✅ Draw detected — starting 800ms debounce');
                     _drawDebounce = setTimeout(() => {
                         _drawDebounce = null;
+                        origLog('[Trees] 🌳 Debounce settled — fetching trees');
+                        origLog('[Trees] fieldId:', window._dvCurrentFieldId, '| guid:', window._dvCurrentFieldGuid);
                         const fieldId = window._dvCurrentFieldId;
                         const guid    = window._dvCurrentFieldGuid;
                         if (fieldId && guid) {
