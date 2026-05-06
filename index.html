@@ -1476,20 +1476,44 @@
                 if (loadBtn && !document.getElementById('btnLoadTrees')) {
                     const btn = document.createElement('button');
                     btn.id = 'btnLoadTrees';
-                    btn.className = loadBtn.className; // match Load Field styling
+                    btn.className = loadBtn.className;
                     btn.style.cssText = 'background:rgba(34,197,94,0.15) !important;' +
                         'color:#22c55e !important;border-color:rgba(34,197,94,0.5) !important;' +
                         'margin-top:4px';
                     btn.innerHTML = '🌳 Load Trees';
-                    btn.onclick = () => {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        btn.innerHTML = '⏳ Loading…';
+
+                        // Log all state for diagnosis
+                        console.log('[Trees BTN] _dvCurrentFieldId:', window._dvCurrentFieldId);
+                        console.log('[Trees BTN] _dvCurrentFieldGuid:', window._dvCurrentFieldGuid);
+                        console.log('[Trees BTN] _dvToken:', window._dvToken ? 'present' : 'MISSING');
+                        console.log('[Trees BTN] _dvFieldGuids keys:', Object.keys(window._dvFieldGuids || {}).slice(0,5));
+
+                        // Extract field ID — try multiple sources
+                        const rawId   = window._dvCurrentFieldId || '';
+                        const fieldId = rawId.split(/\s+[-—]\s+/)[0].trim();
+                        const guid    = window._dvCurrentFieldGuid
+                                     || (window._dvFieldGuids && window._dvFieldGuids[fieldId])
+                                     || null;
+
+                        console.log('[Trees BTN] resolved fieldId:', fieldId, '| guid:', guid);
+
+                        if (!fieldId || !guid) {
+                            console.error('[Trees BTN] Cannot fetch — missing fieldId or guid');
+                            btn.innerHTML = '🌳 Load Trees';
+                            return;
+                        }
+
                         _lastTreeFieldId = null;
-                        triggerTreeFetch();
-                        btn.textContent = '⏳ Loading…';
-                        setTimeout(() => { btn.innerHTML = '🌳 Load Trees'; }, 5000);
+                        fetchAndDrawTrees(fieldId, guid);
+                        setTimeout(() => { btn.innerHTML = '🌳 Load Trees'; }, 6000);
                     };
                     loadBtn.parentNode.insertBefore(btn, loadBtn.nextSibling);
                 }
-            }, 1500); // wait for DOM to be fully ready
+            }, 1500);
         });
 
         function pip(lat, lng, ring) {
