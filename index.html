@@ -1297,19 +1297,28 @@
 
         // Find the Leaflet map — searches all known locations including map-manager
         function getLeafletMap() {
-            // Try window globals first
             if (window.map       instanceof L.Map) return window.map;
             if (window._map      instanceof L.Map) return window._map;
             if (window.leafletMap instanceof L.Map) return window.leafletMap;
             if (window.appMap    instanceof L.Map) return window.appMap;
-            // Try map-manager exposed object
+            if (window.fieldMap  instanceof L.Map) return window.fieldMap;
             if (window.mapManager?.map instanceof L.Map) return window.mapManager.map;
             if (window.MapManager?.map instanceof L.Map) return window.MapManager.map;
-            if (window.mapManager?.leafletMap instanceof L.Map) return window.mapManager.leafletMap;
-            // Search all Leaflet map containers in the DOM
+            // Search all Leaflet map containers — Leaflet stores map on the element
             const containers = document.querySelectorAll('.leaflet-container');
             for (const el of containers) {
-                if (el._leaflet_map instanceof L.Map) return el._leaflet_map;
+                // Leaflet sets _leaflet_map on the container element
+                if (el._leaflet_map) return el._leaflet_map;
+                // Also try the internal Leaflet map registry
+                for (const key of Object.keys(el)) {
+                    if (key.startsWith('_leaflet') && el[key] instanceof L.Map) return el[key];
+                }
+            }
+            // Last resort — search window for any L.Map instance
+            for (const key of Object.keys(window)) {
+                try {
+                    if (window[key] instanceof L.Map) return window[key];
+                } catch(e) {}
             }
             return null;
         }
@@ -1500,6 +1509,12 @@
                                      || null;
 
                         console.log('[Trees BTN] resolved fieldId:', fieldId, '| guid:', guid);
+                        console.log('[Trees BTN] map found:', getLeafletMap() ? 'YES' : 'NO');
+                        const containers = document.querySelectorAll('.leaflet-container');
+                        console.log('[Trees BTN] leaflet containers:', containers.length);
+                        containers.forEach((el, i) => {
+                            console.log(`  container[${i}] _leaflet_map:`, el._leaflet_map ? 'present' : 'missing');
+                        });
 
                         if (!fieldId || !guid) {
                             console.error('[Trees BTN] Cannot fetch — missing fieldId or guid');
