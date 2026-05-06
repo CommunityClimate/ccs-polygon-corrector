@@ -972,6 +972,7 @@
 
                 // Show banner if opened with ?fieldId= from Field Tree Catalog
                 const preload = new URLSearchParams(window.location.search).get('fieldId');
+                window._autoLoadFired = false; // reset guard flag
                 if (preload) {
                     const banner = document.createElement('div');
                     banner.id = 'autoLoadBanner';
@@ -1168,54 +1169,47 @@
 
         function autoLoadFieldFromUrl(targetFieldId) {
             const sel = document.getElementById('fieldSelect');
-            if (!sel) return;
+            if (!sel || window._autoLoadFired) return;
 
-            // Use exact match on the field ID part of the option text (format: "FLD-XXX — Owner")
             let found = false;
             for (let i = 0; i < sel.options.length; i++) {
-                const opt      = sel.options[i];
-                const optFieldId = (opt.text || '').split(' — ')[0].trim();
-                if (optFieldId === targetFieldId || opt.value === targetFieldId) {
+                const optFieldId = (sel.options[i].text || '').split(/\s+[-—]\s+/)[0].trim();
+                if (optFieldId === targetFieldId) {
                     sel.selectedIndex = i;
                     sel.dispatchEvent(new Event('change', { bubbles: true }));
                     found = true;
+                    window._autoLoadFired = true;
+                    setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
+                    if (window._removeBanner) window._removeBanner();
+                    // Start polling for trees after field loads
+                    setTimeout(pollForTreeFetch, 3000);
                     break;
                 }
             }
 
-            if (found) {
-                setTimeout(() => {
-                    const loadBtn = document.getElementById('loadFieldBtn');
-                    if (loadBtn) {
-                        loadBtn.click();
-                        setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
-                        if (window._removeBanner) window._removeBanner();
-                    }
-                }, 300);
-            } else {
-                // Dropdown not ready yet — poll every 500ms up to 20 seconds
+            if (!found) {
+                // Dropdown not ready yet — poll until field appears
                 let attempts = 0;
                 const poll = setInterval(() => {
                     attempts++;
+                    if (attempts > 40) { clearInterval(poll); return; }
                     const s = document.getElementById('fieldSelect');
-                    if (!s || attempts > 40) { clearInterval(poll); return; }
+                    if (!s) return;
                     for (let i = 0; i < s.options.length; i++) {
-                        const optFieldId = (s.options[i].text || '').split(' — ')[0].trim();
-                        if (optFieldId === targetFieldId || s.options[i].value === targetFieldId) {
+                        const optFieldId = (s.options[i].text || '').split(/\s+[-—]\s+/)[0].trim();
+                        if (optFieldId === targetFieldId) {
                             clearInterval(poll);
+                            if (window._autoLoadFired) return;
+                            window._autoLoadFired = true;
                             s.selectedIndex = i;
                             s.dispatchEvent(new Event('change', { bubbles: true }));
-                            setTimeout(() => {
-                                const loadBtn = document.getElementById('loadFieldBtn');
-                                if (loadBtn) {
-                                    loadBtn.click();
-                                    setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
-                                }
-                            }, 300);
+                            setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
+                            if (window._removeBanner) window._removeBanner();
+                            setTimeout(pollForTreeFetch, 3000);
                             return;
                         }
                     }
-                    setDvStatus(`⏳ Waiting for field list… searching for ${targetFieldId}`, '#0078d4');
+                    setDvStatus(`⏳ Searching for ${targetFieldId}…`, '#0078d4');
                 }, 500);
             }
         }
