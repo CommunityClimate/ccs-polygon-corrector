@@ -1263,7 +1263,6 @@
 
         // ── TREE OVERLAY ───────────────────────────────────────────────────
         let _treeLayerGroup = null;
-        let _treeFetchDone  = false; // prevent duplicate fetches
 
         function pip(lat, lng, ring) {
             let inside = false;
@@ -1398,26 +1397,45 @@
 
         // ── Intercept console.log to detect when polygon is drawn ──────────
         // map-manager.js logs "✅ Original polygon drawn successfully" — use
-        // this as the trigger to fetch trees, avoiding any timing guesswork.
+        // this as the trigger to fetch trees. Use debounce because the polygon
+        // draws twice in sequence (clear → draw → clear → draw). Wait 1 second
+        // after the last draw before fetching.
         (function() {
             const origLog = console.log.bind(console);
+            let _drawDebounce = null;
+
             console.log = function(...args) {
                 origLog(...args);
                 const msg = args.join(' ');
-                if (msg.includes('Original polygon drawn successfully') && !_treeFetchDone) {
-                    // Small delay to let the polygon fully render
-                    setTimeout(() => {
+
+                if (msg.includes('Clearing all layer groups')) {
+                    // Cancel any pending tree fetch — more drawing is coming
+                    if (_drawDebounce) { clearTimeout(_drawDebounce); _drawDebounce = null; }
+                    // Remove existing tree layer
+                    if (_treeLayerGroup) {
+                        const lmap = getLeafletMap();
+                        if (lmap) try { lmap.removeLayer(_treeLayerGroup); } catch(e) {}
+                        _treeLayerGroup = null;
+                    }
+                    const legend = document.getElementById('treeLegend');
+                    if (legend) legend.remove();
+                }
+
+                if (msg.includes('Original polygon drawn successfully')) {
+                    // Debounce — only fetch if no more drawing starts within 800ms
+                    if (_drawDebounce) clearTimeout(_drawDebounce);
+                    _drawDebounce = setTimeout(() => {
+                        _drawDebounce = null;
                         const fieldId = window._dvCurrentFieldId;
                         const guid    = window._dvCurrentFieldGuid;
                         if (fieldId && guid) {
                             fetchAndDrawTrees(fieldId, guid);
                         } else {
-                            console.warn('[Trees] Field ID or GUID not set yet — waiting');
-                            // Poll until GUID is available
-                            let attempts = 0;
+                            // GUID not set yet — poll briefly
+                            let n = 0;
                             const wait = setInterval(() => {
-                                attempts++;
-                                if (window._dvCurrentFieldGuid || attempts > 20) {
+                                n++;
+                                if (window._dvCurrentFieldGuid || n > 20) {
                                     clearInterval(wait);
                                     if (window._dvCurrentFieldGuid) {
                                         fetchAndDrawTrees(
@@ -1428,18 +1446,7 @@
                                 }
                             }, 300);
                         }
-                    }, 400);
-                }
-                // Reset fetch flag when a new field is selected
-                if (msg.includes('Clearing all layer groups')) {
-                    _treeFetchDone = false;
-                    if (_treeLayerGroup) {
-                        const lmap = getLeafletMap();
-                        if (lmap) try { lmap.removeLayer(_treeLayerGroup); } catch(e) {}
-                        _treeLayerGroup = null;
-                    }
-                    const legend = document.getElementById('treeLegend');
-                    if (legend) legend.remove();
+                    }, 800); // wait 800ms after last draw
                 }
             };
         })();
