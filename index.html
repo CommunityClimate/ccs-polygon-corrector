@@ -1262,10 +1262,187 @@
         }
 
         // ── TREE OVERLAY ───────────────────────────────────────────────────
-        // Fetches trees for the loaded field and draws them on the Leaflet map
-        // as colour-coded dots. Hooks into loadFieldBtn click.
-
         let _treeLayerGroup = null;
+        let _treeFetchDone  = false; // prevent duplicate fetches
+
+        function pip(lat, lng, ring) {
+            let inside = false;
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const xi = ring[i][0], yi = ring[i][1];
+                const xj = ring[j][0], yj = ring[j][1];
+                if (((yi > lat) !== (yj > lat)) &&
+                    (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi))
+                    inside = !inside;
+            }
+            return inside;
+        }
+
+        function parseRing(geoJSON) {
+            if (!geoJSON) return null;
+            try {
+                const obj = JSON.parse(geoJSON);
+                const geo = obj.geometry || obj;
+                if (geo.type === 'Polygon')      return geo.coordinates[0];
+                if (geo.type === 'MultiPolygon') return geo.coordinates[0][0];
+            } catch(e) {}
+            return null;
+        }
+
+        // Find the Leaflet map — searches all known locations including map-manager
+        function getLeafletMap() {
+            // Try window globals first
+            if (window.map       instanceof L.Map) return window.map;
+            if (window._map      instanceof L.Map) return window._map;
+            if (window.leafletMap instanceof L.Map) return window.leafletMap;
+            if (window.appMap    instanceof L.Map) return window.appMap;
+            // Try map-manager exposed object
+            if (window.mapManager?.map instanceof L.Map) return window.mapManager.map;
+            if (window.MapManager?.map instanceof L.Map) return window.MapManager.map;
+            if (window.mapManager?.leafletMap instanceof L.Map) return window.mapManager.leafletMap;
+            // Search all Leaflet map containers in the DOM
+            const containers = document.querySelectorAll('.leaflet-container');
+            for (const el of containers) {
+                if (el._leaflet_map instanceof L.Map) return el._leaflet_map;
+            }
+            return null;
+        }
+
+        async function fetchAndDrawTrees(fieldId, guid) {
+            if (!window._dvToken || !guid) {
+                console.warn('[Trees] No token or GUID — skipping tree fetch');
+                return;
+            }
+            _treeFetchDone = true;
+            const DV_API = 'https://fieldforce.crm14.dynamics.com/api/data/v9.2';
+            setDvStatus(`🌳 Loading trees for ${fieldId}…`, '#198754');
+            try {
+                const res = await fetch(
+                    `${DV_API}/ccs_trees?$select=ccs_treecode,ccs_treelatitude_tree,ccs_treelongitude_tree` +
+                    `&$filter=statecode eq 0 and _ccs_field_tree_value eq '${guid}'&$top=5000`,
+                    { headers: {
+                        'Authorization': `Bearer ${window._dvToken}`,
+                        'Accept': 'application/json',
+                        'OData-MaxVersion': '4.0', 'OData-Version': '4.0'
+                    }}
+                );
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data  = await res.json();
+                const trees = (data.value || [])
+                    .map(r => ({
+                        lat:  parseFloat(r.ccs_treelatitude_tree),
+                        lng:  parseFloat(r.ccs_treelongitude_tree),
+                        code: r.ccs_treecode || ''
+                    }))
+                    .filter(t => !isNaN(t.lat) && !isNaN(t.lng));
+                console.log(`[Trees] Fetched ${trees.length} trees for ${fieldId}`);
+                drawTreeDots(trees, fieldId);
+                setDvStatus(`✓ ${trees.length.toLocaleString()} trees loaded for ${fieldId}`, '#198754');
+            } catch(e) {
+                console.error('[Trees] Fetch error:', e);
+                setDvStatus(`⚠ Tree load failed: ${e.message}`, '#ffc107');
+            }
+        }
+
+        function drawTreeDots(trees, fieldId) {
+            const lmap = getLeafletMap();
+            if (!lmap) {
+                console.warn('[Trees] Map not found yet — retrying in 500ms');
+                setTimeout(() => drawTreeDots(trees, fieldId), 500);
+                return;
+            }
+
+            // Remove previous tree layer
+            if (_treeLayerGroup) {
+                try { lmap.removeLayer(_treeLayerGroup); } catch(e) {}
+            }
+            _treeLayerGroup = L.layerGroup().addTo(lmap);
+
+            // Find the current polygon ring
+            let ring = null;
+            lmap.eachLayer(layer => {
+                if (!ring && layer instanceof L.Polygon) {
+                    const lls = layer.getLatLngs();
+                    const flat = Array.isArray(lls[0]) ? lls[0] : lls;
+                    if (flat.length >= 3 && flat[0].lat !== undefined) {
+                        ring = flat.map(ll => [ll.lng, ll.lat]);
+                    }
+                }
+            });
+
+            trees.forEach(t => {
+                const inside = ring ? pip(t.lat, t.lng, ring) : null;
+                const color  = inside === null ? '#38bdf8' : inside ? '#22c55e' : '#ef4444';
+                L.circleMarker([t.lat, t.lng], {
+                    radius: 5, color: 'rgba(255,255,255,0.4)', weight: 1,
+                    fillColor: color, fillOpacity: 0.9
+                }).bindTooltip(t.code || 'No code', { sticky: true })
+                  .addTo(_treeLayerGroup);
+            });
+
+            // Legend
+            let legend = document.getElementById('treeLegend');
+            if (!legend) {
+                legend = document.createElement('div');
+                legend.id = 'treeLegend';
+                legend.style.cssText = `position:fixed;bottom:40px;right:10px;z-index:9000;
+                    background:rgba(0,0,0,0.8);color:#fff;padding:8px 12px;border-radius:6px;
+                    font-family:monospace;font-size:11px;border:1px solid rgba(255,255,255,0.2);
+                    line-height:2`;
+                document.body.appendChild(legend);
+            }
+            legend.innerHTML =
+                `<div style="font-weight:700">🌳 Trees: ${trees.length.toLocaleString()}</div>` +
+                `<div><span style="color:#22c55e">●</span> Inside</div>` +
+                `<div><span style="color:#ef4444">●</span> Outside</div>`;
+        }
+
+        // ── Intercept console.log to detect when polygon is drawn ──────────
+        // map-manager.js logs "✅ Original polygon drawn successfully" — use
+        // this as the trigger to fetch trees, avoiding any timing guesswork.
+        (function() {
+            const origLog = console.log.bind(console);
+            console.log = function(...args) {
+                origLog(...args);
+                const msg = args.join(' ');
+                if (msg.includes('Original polygon drawn successfully') && !_treeFetchDone) {
+                    // Small delay to let the polygon fully render
+                    setTimeout(() => {
+                        const fieldId = window._dvCurrentFieldId;
+                        const guid    = window._dvCurrentFieldGuid;
+                        if (fieldId && guid) {
+                            fetchAndDrawTrees(fieldId, guid);
+                        } else {
+                            console.warn('[Trees] Field ID or GUID not set yet — waiting');
+                            // Poll until GUID is available
+                            let attempts = 0;
+                            const wait = setInterval(() => {
+                                attempts++;
+                                if (window._dvCurrentFieldGuid || attempts > 20) {
+                                    clearInterval(wait);
+                                    if (window._dvCurrentFieldGuid) {
+                                        fetchAndDrawTrees(
+                                            window._dvCurrentFieldId,
+                                            window._dvCurrentFieldGuid
+                                        );
+                                    }
+                                }
+                            }, 300);
+                        }
+                    }, 400);
+                }
+                // Reset fetch flag when a new field is selected
+                if (msg.includes('Clearing all layer groups')) {
+                    _treeFetchDone = false;
+                    if (_treeLayerGroup) {
+                        const lmap = getLeafletMap();
+                        if (lmap) try { lmap.removeLayer(_treeLayerGroup); } catch(e) {}
+                        _treeLayerGroup = null;
+                    }
+                    const legend = document.getElementById('treeLegend');
+                    if (legend) legend.remove();
+                }
+            };
+        })();
 
         function pip(lat, lng, ring) {
             let inside = false;
@@ -1401,44 +1578,6 @@
             }
         }
 
-        // Hook into Load Field button
-        document.addEventListener('DOMContentLoaded', () => {
-            const loadBtn = document.getElementById('loadFieldBtn');
-            if (loadBtn) {
-                loadBtn.addEventListener('click', () => {
-                    // Wait for the field to render on the map, then fetch trees
-                    setTimeout(() => {
-                        const fieldId = window._dvCurrentFieldId;
-                        const guid    = window._dvCurrentFieldGuid;
-                        if (fieldId && guid) {
-                            fetchAndDrawTrees(fieldId, guid);
-                        }
-                    }, 2000);
-                });
-            }
-        });
-
-        // Also redraw trees when polygon vertices are dragged
-        // Poll for map and watch for edit events
-        function watchForEdits() {
-            const lmap = getLeafletMap();
-            if (!lmap) { setTimeout(watchForEdits, 1000); return; }
-            lmap.on('pm:update pm:edit', () => {
-                if (_treeLayerGroup && window._dvCurrentFieldId) {
-                    // Re-evaluate inside/outside with new polygon shape
-                    const trees = [];
-                    _treeLayerGroup.eachLayer(m => {
-                        if (m.getLatLng) {
-                            const ll = m.getLatLng();
-                            trees.push({ lat: ll.lat, lng: ll.lng,
-                                code: m.getTooltip()?.getContent() || '' });
-                        }
-                    });
-                    drawTreeDots(trees, window._dvCurrentFieldId);
-                }
-            });
-        }
-        setTimeout(watchForEdits, 3000);
         document.addEventListener('DOMContentLoaded', () => {
             const sel = document.getElementById('fieldSelect');
             if (sel) {
