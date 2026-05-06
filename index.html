@@ -1178,21 +1178,29 @@
                     sel.selectedIndex = i;
                     sel.dispatchEvent(new Event('change', { bubbles: true }));
                     found = true;
-                    window._autoLoadFired = true;
-                    setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
-                    if (window._removeBanner) window._removeBanner();
-                    // Start polling for trees after field loads
-                    setTimeout(pollForTreeFetch, 3000);
                     break;
                 }
             }
 
-            if (!found) {
-                // Dropdown not ready yet — poll until field appears
+            if (found) {
+                if (window._autoLoadFired) return;
+                window._autoLoadFired = true;
+                setTimeout(() => {
+                    const loadBtn = document.getElementById('loadFieldBtn');
+                    if (loadBtn) {
+                        loadBtn.click();
+                        setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
+                        if (window._removeBanner) window._removeBanner();
+                        setTimeout(pollForTreeFetch, 3000);
+                    }
+                }, 400);
+            } else {
+                // Dropdown not ready — poll until field appears
                 let attempts = 0;
                 const poll = setInterval(() => {
                     attempts++;
                     if (attempts > 40) { clearInterval(poll); return; }
+                    if (window._autoLoadFired) { clearInterval(poll); return; }
                     const s = document.getElementById('fieldSelect');
                     if (!s) return;
                     for (let i = 0; i < s.options.length; i++) {
@@ -1203,9 +1211,15 @@
                             window._autoLoadFired = true;
                             s.selectedIndex = i;
                             s.dispatchEvent(new Event('change', { bubbles: true }));
-                            setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
-                            if (window._removeBanner) window._removeBanner();
-                            setTimeout(pollForTreeFetch, 3000);
+                            setTimeout(() => {
+                                const loadBtn = document.getElementById('loadFieldBtn');
+                                if (loadBtn) {
+                                    loadBtn.click();
+                                    setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
+                                    if (window._removeBanner) window._removeBanner();
+                                    setTimeout(pollForTreeFetch, 3000);
+                                }
+                            }, 400);
                             return;
                         }
                     }
@@ -1446,15 +1460,22 @@
             let n = 0;
             const timer = setInterval(() => {
                 n++;
-                if (window._dvCurrentFieldGuid &&
-                    window._dvCurrentFieldId &&
-                    window._dvCurrentFieldId !== _lastTreeFieldId) {
-                    clearInterval(timer);
-                    // Small delay for map to finish drawing
-                    if (_treeDrawDebounce) clearTimeout(_treeDrawDebounce);
-                    _treeDrawDebounce = setTimeout(triggerTreeFetch, 1200);
-                }
-                if (n > 60) clearInterval(timer); // give up after 30s
+                if (n > 60) { clearInterval(timer); return; }
+
+                const rawId   = window._dvCurrentFieldId || '';
+                const fieldId = rawId.split(/\s+[-—]\s+/)[0].trim();
+                if (!fieldId) return;
+
+                // Accept GUID from either source — direct or lookup
+                const guid = window._dvCurrentFieldGuid
+                          || (window._dvFieldGuids && window._dvFieldGuids[fieldId]);
+                if (!guid) return;
+
+                if (fieldId === _lastTreeFieldId) { clearInterval(timer); return; }
+
+                clearInterval(timer);
+                if (_treeDrawDebounce) clearTimeout(_treeDrawDebounce);
+                _treeDrawDebounce = setTimeout(triggerTreeFetch, 500);
             }, 500);
         }
 
@@ -1472,22 +1493,25 @@
 
         // Manual Load Trees button — fallback if auto doesn't fire
         document.addEventListener('DOMContentLoaded', () => {
-            const sidebar = document.querySelector('.sidebar, #sidebar, .left-panel, aside');
-            if (sidebar) {
-                const btn = document.createElement('button');
-                btn.id = 'btnLoadTrees';
-                btn.className = 'btn btn-sm w-100 mt-2';
-                btn.style.cssText = 'background:rgba(34,197,94,0.15);color:#22c55e;' +
-                    'border:1px solid rgba(34,197,94,0.4);font-family:monospace;font-size:11px';
-                btn.innerHTML = '🌳 Load Trees';
-                btn.onclick = () => {
-                    _lastTreeFieldId = null;
-                    triggerTreeFetch();
-                };
+            setTimeout(() => {
                 const loadBtn = document.getElementById('loadFieldBtn');
-                if (loadBtn) loadBtn.parentNode.insertBefore(btn, loadBtn.nextSibling);
-                else sidebar.appendChild(btn);
-            }
+                if (loadBtn && !document.getElementById('btnLoadTrees')) {
+                    const btn = document.createElement('button');
+                    btn.id = 'btnLoadTrees';
+                    btn.className = loadBtn.className; // match Load Field styling
+                    btn.style.cssText = 'background:rgba(34,197,94,0.15) !important;' +
+                        'color:#22c55e !important;border-color:rgba(34,197,94,0.5) !important;' +
+                        'margin-top:4px';
+                    btn.innerHTML = '🌳 Load Trees';
+                    btn.onclick = () => {
+                        _lastTreeFieldId = null;
+                        triggerTreeFetch();
+                        btn.textContent = '⏳ Loading…';
+                        setTimeout(() => { btn.innerHTML = '🌳 Load Trees'; }, 5000);
+                    };
+                    loadBtn.parentNode.insertBefore(btn, loadBtn.nextSibling);
+                }
+            }, 1500); // wait for DOM to be fully ready
         });
 
         function pip(lat, lng, ring) {
