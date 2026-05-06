@@ -719,6 +719,19 @@
     
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    // ── Capture Leaflet map instance as soon as it's created ────────────────
+    // map-manager.js creates the map in a closed scope — we intercept
+    // L.Map.prototype.initialize to grab a reference the moment it's called.
+    (function() {
+        const origInit = L.Map.prototype.initialize;
+        L.Map.prototype.initialize = function(id, options) {
+            origInit.call(this, id, options);
+            window._capturedLeafletMap = this;
+            console.log('[Trees] 🗺️ Leaflet map captured');
+        };
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
@@ -1297,6 +1310,7 @@
 
         // Find the Leaflet map — searches all known locations including map-manager
         function getLeafletMap() {
+            if (window._capturedLeafletMap instanceof L.Map) return window._capturedLeafletMap;
             if (window.map       instanceof L.Map) return window.map;
             if (window._map      instanceof L.Map) return window._map;
             if (window.leafletMap instanceof L.Map) return window.leafletMap;
@@ -1304,21 +1318,15 @@
             if (window.fieldMap  instanceof L.Map) return window.fieldMap;
             if (window.mapManager?.map instanceof L.Map) return window.mapManager.map;
             if (window.MapManager?.map instanceof L.Map) return window.MapManager.map;
-            // Search all Leaflet map containers — Leaflet stores map on the element
             const containers = document.querySelectorAll('.leaflet-container');
             for (const el of containers) {
-                // Leaflet sets _leaflet_map on the container element
                 if (el._leaflet_map) return el._leaflet_map;
-                // Also try the internal Leaflet map registry
                 for (const key of Object.keys(el)) {
                     if (key.startsWith('_leaflet') && el[key] instanceof L.Map) return el[key];
                 }
             }
-            // Last resort — search window for any L.Map instance
             for (const key of Object.keys(window)) {
-                try {
-                    if (window[key] instanceof L.Map) return window[key];
-                } catch(e) {}
+                try { if (window[key] instanceof L.Map) return window[key]; } catch(e) {}
             }
             return null;
         }
