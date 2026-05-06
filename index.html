@@ -1424,36 +1424,14 @@
             const rawId   = window._dvCurrentFieldId || '';
             const fieldId = rawId.split(/\s+[-—]\s+/)[0].trim();
             const guid    = window._dvCurrentFieldGuid
-                         || window._dvFieldGuids[fieldId]
+                         || (window._dvFieldGuids && window._dvFieldGuids[fieldId])
                          || null;
             if (!fieldId) return;
             if (fieldId === _lastTreeFieldId) return;
             _lastTreeFieldId = fieldId;
-
-            document.dispatchEvent(new CustomEvent('requestCurrentGeoJSON', {
-                detail: { fieldId }
-            }));
+            // Fetch trees — drawTreeDots finds the ring from Leaflet layers directly
             fetchAndDrawTrees(fieldId, guid);
         }
-
-        // Listen for fieldGeoJSONReady to also update dot colours with real ring
-        document.addEventListener('fieldGeoJSONReady', (e) => {
-            const { geojson } = e.detail || {};
-            const ring = parseRing(geojson);
-            if (!ring || !_treeLayerGroup) return;
-            // Recolour existing dots with the actual polygon ring
-            const lmap = getLeafletMap();
-            if (!lmap) return;
-            const trees = [];
-            _treeLayerGroup.eachLayer(m => {
-                if (m.getLatLng) {
-                    const ll = m.getLatLng();
-                    trees.push({ lat: ll.lat, lng: ll.lng,
-                        code: m.getTooltip()?.getContent() || '' });
-                }
-            });
-            if (trees.length) drawTreeDots(trees, window._dvCurrentFieldId, ring);
-        });
 
         // Poll after auto-load settles — watch for GUID to be set
         function pollForTreeFetch() {
