@@ -1306,9 +1306,17 @@
             return null;
         }
 
-        async function fetchAndDrawTrees(fieldId, guid) {
-            if (!window._dvToken || !guid) {
-                console.warn('[Trees] No token or GUID — skipping tree fetch');
+        async function fetchAndDrawTrees(rawFieldId, guid) {
+            // Strip owner name — format can be "FLD-XXX - Owner" or "FLD-XXX — Owner"
+            const fieldId = (rawFieldId || '').split(/\s+[-—]\s+/)[0].trim();
+
+            // Look up GUID if not provided or null
+            const resolvedGuid = guid || window._dvFieldGuids[fieldId] || null;
+
+            if (!window._dvToken) { console.warn('[Trees] No token'); return; }
+            if (!resolvedGuid) {
+                console.warn('[Trees] No GUID for', fieldId,
+                    '— keys available:', Object.keys(window._dvFieldGuids).slice(0,3));
                 return;
             }
             _treeFetchDone = true;
@@ -1317,7 +1325,7 @@
             try {
                 const res = await fetch(
                     `${DV_API}/ccs_trees?$select=ccs_treecode,ccs_treelatitude_tree,ccs_treelongitude_tree` +
-                    `&$filter=statecode eq 0 and _ccs_field_tree_value eq '${guid}'&$top=5000`,
+                    `&$filter=statecode eq 0 and _ccs_field_tree_value eq '${resolvedGuid}'&$top=5000`,
                     { headers: {
                         'Authorization': `Bearer ${window._dvToken}`,
                         'Accept': 'application/json',
@@ -1342,31 +1350,31 @@
             }
         }
 
-        function drawTreeDots(trees, fieldId) {
+        function drawTreeDots(trees, fieldId, providedRing) {
             const lmap = getLeafletMap();
             if (!lmap) {
-                console.warn('[Trees] Map not found yet — retrying in 500ms');
-                setTimeout(() => drawTreeDots(trees, fieldId), 500);
+                setTimeout(() => drawTreeDots(trees, fieldId, providedRing), 500);
                 return;
             }
 
-            // Remove previous tree layer
             if (_treeLayerGroup) {
                 try { lmap.removeLayer(_treeLayerGroup); } catch(e) {}
             }
             _treeLayerGroup = L.layerGroup().addTo(lmap);
 
-            // Find the current polygon ring
-            let ring = null;
-            lmap.eachLayer(layer => {
-                if (!ring && layer instanceof L.Polygon) {
-                    const lls = layer.getLatLngs();
-                    const flat = Array.isArray(lls[0]) ? lls[0] : lls;
-                    if (flat.length >= 3 && flat[0].lat !== undefined) {
-                        ring = flat.map(ll => [ll.lng, ll.lat]);
+            // Use provided ring, or find it from the map layers
+            let ring = providedRing || null;
+            if (!ring) {
+                lmap.eachLayer(layer => {
+                    if (!ring && layer instanceof L.Polygon) {
+                        const lls = layer.getLatLngs();
+                        const flat = Array.isArray(lls[0]) ? lls[0] : lls;
+                        if (flat.length >= 3 && flat[0]?.lat !== undefined) {
+                            ring = flat.map(ll => [ll.lng, ll.lat]);
+                        }
                     }
-                }
-            });
+                });
+            }
 
             trees.forEach(t => {
                 const inside = ring ? pip(t.lat, t.lng, ring) : null;
@@ -1395,64 +1403,98 @@
                 `<div><span style="color:#ef4444">●</span> Outside</div>`;
         }
 
-        // ── Intercept console.log to detect when polygon is drawn ──────────
-        // map-manager.js logs "✅ Original polygon drawn successfully" — use
-        // this as the trigger to fetch trees. Use debounce because the polygon
-        // draws twice in sequence (clear → draw → clear → draw). Wait 1 second
-        // after the last draw before fetching.
-        (function() {
-            const origLog = console.log.bind(console);
-            let _drawDebounce = null;
+        // ── Tree fetch trigger via requestCurrentGeoJSON/fieldGeoJSONReady ──
+        // app.js communicates via custom events. After a field loads, we request
+        // its GeoJSON (which app.js has internally), use the ring to colour dots,
+        // and fetch trees from Fieldforce.
+        // We hook into the autoLoadFieldFromUrl completion and poll for the GUID.
 
-            console.log = function(...args) {
-                origLog(...args);
-                const msg = args.join(' ');
+        let _treeDrawDebounce = null;
+        let _lastTreeFieldId  = null;
 
-                if (msg.includes('Clearing all layer groups')) {
-                    // Cancel any pending tree fetch — more drawing is coming
-                    if (_drawDebounce) { clearTimeout(_drawDebounce); _drawDebounce = null; }
-                    // Remove existing tree layer
-                    if (_treeLayerGroup) {
-                        const lmap = getLeafletMap();
-                        if (lmap) try { lmap.removeLayer(_treeLayerGroup); } catch(e) {}
-                        _treeLayerGroup = null;
-                    }
-                    const legend = document.getElementById('treeLegend');
-                    if (legend) legend.remove();
+        function triggerTreeFetch() {
+            const rawId   = window._dvCurrentFieldId || '';
+            const fieldId = rawId.split(/\s+[-—]\s+/)[0].trim();
+            const guid    = window._dvCurrentFieldGuid
+                         || window._dvFieldGuids[fieldId]
+                         || null;
+            if (!fieldId) return;
+            if (fieldId === _lastTreeFieldId) return;
+            _lastTreeFieldId = fieldId;
+
+            document.dispatchEvent(new CustomEvent('requestCurrentGeoJSON', {
+                detail: { fieldId }
+            }));
+            fetchAndDrawTrees(fieldId, guid);
+        }
+
+        // Listen for fieldGeoJSONReady to also update dot colours with real ring
+        document.addEventListener('fieldGeoJSONReady', (e) => {
+            const { geojson } = e.detail || {};
+            const ring = parseRing(geojson);
+            if (!ring || !_treeLayerGroup) return;
+            // Recolour existing dots with the actual polygon ring
+            const lmap = getLeafletMap();
+            if (!lmap) return;
+            const trees = [];
+            _treeLayerGroup.eachLayer(m => {
+                if (m.getLatLng) {
+                    const ll = m.getLatLng();
+                    trees.push({ lat: ll.lat, lng: ll.lng,
+                        code: m.getTooltip()?.getContent() || '' });
                 }
+            });
+            if (trees.length) drawTreeDots(trees, window._dvCurrentFieldId, ring);
+        });
 
-                if (msg.includes('Original polygon drawn successfully')) {
-                    // Debounce — only fetch if no more drawing starts within 800ms
-                    if (_drawDebounce) clearTimeout(_drawDebounce);
-                    origLog('[Trees] ✅ Draw detected — starting 800ms debounce');
-                    _drawDebounce = setTimeout(() => {
-                        _drawDebounce = null;
-                        origLog('[Trees] 🌳 Debounce settled — fetching trees');
-                        origLog('[Trees] fieldId:', window._dvCurrentFieldId, '| guid:', window._dvCurrentFieldGuid);
-                        const fieldId = window._dvCurrentFieldId;
-                        const guid    = window._dvCurrentFieldGuid;
-                        if (fieldId && guid) {
-                            fetchAndDrawTrees(fieldId, guid);
-                        } else {
-                            // GUID not set yet — poll briefly
-                            let n = 0;
-                            const wait = setInterval(() => {
-                                n++;
-                                if (window._dvCurrentFieldGuid || n > 20) {
-                                    clearInterval(wait);
-                                    if (window._dvCurrentFieldGuid) {
-                                        fetchAndDrawTrees(
-                                            window._dvCurrentFieldId,
-                                            window._dvCurrentFieldGuid
-                                        );
-                                    }
-                                }
-                            }, 300);
-                        }
-                    }, 800); // wait 800ms after last draw
+        // Poll after auto-load settles — watch for GUID to be set
+        function pollForTreeFetch() {
+            let n = 0;
+            const timer = setInterval(() => {
+                n++;
+                if (window._dvCurrentFieldGuid &&
+                    window._dvCurrentFieldId &&
+                    window._dvCurrentFieldId !== _lastTreeFieldId) {
+                    clearInterval(timer);
+                    // Small delay for map to finish drawing
+                    if (_treeDrawDebounce) clearTimeout(_treeDrawDebounce);
+                    _treeDrawDebounce = setTimeout(triggerTreeFetch, 1200);
                 }
-            };
-        })();
+                if (n > 60) clearInterval(timer); // give up after 30s
+            }, 500);
+        }
+
+        // Also watch fieldSelect changes — manual field selection should load trees too
+        document.addEventListener('DOMContentLoaded', () => {
+            const sel = document.getElementById('fieldSelect');
+            if (sel) {
+                sel.addEventListener('change', () => {
+                    _lastTreeFieldId = null; // reset so new field triggers fetch
+                });
+            }
+            // Trigger poll shortly after page loads (for auto-load from URL)
+            setTimeout(pollForTreeFetch, 2000);
+        });
+
+        // Manual Load Trees button — fallback if auto doesn't fire
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.querySelector('.sidebar, #sidebar, .left-panel, aside');
+            if (sidebar) {
+                const btn = document.createElement('button');
+                btn.id = 'btnLoadTrees';
+                btn.className = 'btn btn-sm w-100 mt-2';
+                btn.style.cssText = 'background:rgba(34,197,94,0.15);color:#22c55e;' +
+                    'border:1px solid rgba(34,197,94,0.4);font-family:monospace;font-size:11px';
+                btn.innerHTML = '🌳 Load Trees';
+                btn.onclick = () => {
+                    _lastTreeFieldId = null;
+                    triggerTreeFetch();
+                };
+                const loadBtn = document.getElementById('loadFieldBtn');
+                if (loadBtn) loadBtn.parentNode.insertBefore(btn, loadBtn.nextSibling);
+                else sidebar.appendChild(btn);
+            }
+        });
 
         function pip(lat, lng, ring) {
             let inside = false;
