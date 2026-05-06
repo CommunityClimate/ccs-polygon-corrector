@@ -399,22 +399,6 @@
             <div class="map-panel-header">
                 <h5><i class="bi bi-map"></i> Interactive Map</h5>
                 
-                <!-- Tree Overlay Badge (shown after trees are loaded) -->
-                <span id="treeBadge" style="
-                    display:none;
-                    align-items:center;
-                    position:absolute;
-                    left:16px;
-                    bottom:8px;
-                    background:#f8f9fa;
-                    border:1px solid #dee2e6;
-                    border-radius:20px;
-                    padding:2px 10px;
-                    font-size:12px;
-                    line-height:1.6;
-                    white-space:nowrap;
-                " title="Green = inside boundary | Red = outside boundary"></span>
-                
                 <!-- Map Layer Switcher -->
                 <div style="position: absolute; right: 95px; top: 10px;">
                     <div class="btn-group btn-group-sm" role="group">
@@ -1153,11 +1137,14 @@
             injectAsCSV(rows);
 
             // ── URL parameter auto-load ─────────────────────────────────────
-            // If opened with ?fieldId=FLD-XXX, auto-select and load that field
-            const urlParams   = new URLSearchParams(window.location.search);
-            const preloadId   = urlParams.get('fieldId');
+            const urlParams = new URLSearchParams(window.location.search);
+            const preloadId = urlParams.get('fieldId');
             if (preloadId) {
-                setTimeout(() => autoLoadFieldFromUrl(preloadId), 800);
+                window._urlPreloadFieldId = preloadId;
+                // Show banner so user knows auto-load is coming
+                setDvStatus(`✓ ${rows.length.toLocaleString()} fields loaded — auto-loading ${preloadId}…`, '#198754');
+                // Give injectAsCSV time to fully populate the dropdown
+                setTimeout(() => autoLoadFieldFromUrl(preloadId), 1500);
             }
         }
 
@@ -1183,7 +1170,6 @@
                 if (loadBtn) {
                     loadBtn.click();
                     setDvStatus(`✓ Auto-loaded field: ${targetFieldId}`, '#198754');
-                    // Tree fetch is handled by the loadFieldBtn click listener above
                 }
             } else {
                 setDvStatus(`⚠ Field ${targetFieldId} not found — check Field ID or re-connect`, '#ffc107');
@@ -1262,20 +1248,6 @@
                             }));
                         }
                     }, 600);
-                });
-            }
-
-            // ── Tree overlay: fetch trees whenever a field is loaded ───────────
-            // Fires ~400 ms after Load Field is clicked, giving app.js time to
-            // draw the polygon before we dispatch treesLoaded.
-            const loadBtn = document.getElementById('loadFieldBtn');
-            if (loadBtn) {
-                loadBtn.addEventListener('click', () => {
-                    setTimeout(() => {
-                        if (window._dvCurrentFieldGuid) {
-                            window._fetchTreesForCurrentField?.();
-                        }
-                    }, 400);
                 });
             }
         });
@@ -1408,72 +1380,6 @@
             const guid = window._dvFieldGuids[fieldId];
             if (!guid || !geojson) return;
             await performFieldforceSave(guid, fieldId, geojson, false);
-        };
-
-        // ── TREE OVERLAY ─────────────────────────────────────────────────────
-        // Fetch trees for a field from ccs_trees, then fire 'treesLoaded' so
-        // app.js can draw the dots.  Uses the same getToken() / MSAL path.
-
-        async function fetchTreesForField(guid) {
-            if (!guid) return;
-            console.log(`🌳 Fetching trees for field GUID: ${guid}`);
-            try {
-                const token = await getToken();
-                const filter = `statecode eq 0 and _ccs_field_tree_value eq '${guid}'`;
-                const select = 'ccs_treecode,ccs_treelatitude_tree,ccs_treelongitude_tree';
-                const url = `${DV_API}/ccs_trees?$select=${select}&$filter=${encodeURIComponent(filter)}`;
-
-                let res = await fetch(url, {
-                    headers: {
-                        'Authorization':    `Bearer ${token}`,
-                        'Accept':           'application/json',
-                        'OData-MaxVersion': '4.0',
-                        'OData-Version':    '4.0'
-                    }
-                });
-
-                // Retry once on token expiry
-                if (res.status === 401) {
-                    const fresh = await getToken();
-                    res = await fetch(url, {
-                        headers: {
-                            'Authorization':    `Bearer ${fresh}`,
-                            'Accept':           'application/json',
-                            'OData-MaxVersion': '4.0',
-                            'OData-Version':    '4.0'
-                        }
-                    });
-                }
-
-                if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 150)}`);
-
-                const data = await res.json();
-                _dispatchTrees(data.value || [], guid);
-
-            } catch(e) {
-                console.warn('🌳 Tree fetch failed:', e.message);
-                // Silently skip — tree overlay is non-critical
-            }
-        }
-
-        function _dispatchTrees(rawTrees, guid) {
-            const trees = rawTrees
-                .map(t => ({
-                    code: t.ccs_treecode || '',
-                    lat:  parseFloat(t.ccs_treelatitude_tree),
-                    lng:  parseFloat(t.ccs_treelongitude_tree)
-                }))
-                .filter(t => !isNaN(t.lat) && !isNaN(t.lng));
-
-            console.log(`🌳 Dispatching treesLoaded: ${trees.length} valid trees`);
-            document.dispatchEvent(new CustomEvent('treesLoaded', {
-                detail: { trees, fieldGuid: guid }
-            }));
-        }
-
-        // Expose so the URL auto-load path (autoLoadFieldFromUrl) can also trigger it
-        window._fetchTreesForCurrentField = function() {
-            if (window._dvCurrentFieldGuid) fetchTreesForField(window._dvCurrentFieldGuid);
         };
 
     })();
