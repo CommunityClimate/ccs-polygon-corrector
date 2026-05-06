@@ -969,6 +969,24 @@
             window.addEventListener('DOMContentLoaded', function() {
                 setTimeout(updateHeroFromBreakdown, 3000);
                 console.log('📄 Page loaded - will check in 3 seconds');
+
+                // Show banner if opened with ?fieldId= from Field Tree Catalog
+                const preload = new URLSearchParams(window.location.search).get('fieldId');
+                if (preload) {
+                    const banner = document.createElement('div');
+                    banner.id = 'autoLoadBanner';
+                    banner.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:9999;
+                        background:#0078d4;color:#fff;font-family:monospace;font-size:12px;
+                        font-weight:700;padding:8px 16px;text-align:center;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.3)`;
+                    banner.textContent = `⚡ Auto-load ready for: ${preload} — Connect to Fieldforce to load it automatically`;
+                    document.body.insertBefore(banner, document.body.firstChild);
+                    // Remove banner after successful load
+                    window._removeBanner = () => {
+                        const b = document.getElementById('autoLoadBanner');
+                        if (b) b.remove();
+                    };
+                }
             });
             
             // Trigger 4: Hook into "Process All Fields" button
@@ -1152,11 +1170,12 @@
             const sel = document.getElementById('fieldSelect');
             if (!sel) return;
 
-            // Find the option matching the field ID
+            // Use exact match on the field ID part of the option text (format: "FLD-XXX — Owner")
             let found = false;
             for (let i = 0; i < sel.options.length; i++) {
-                const opt = sel.options[i];
-                if (opt.value && (opt.value === targetFieldId || opt.text.includes(targetFieldId))) {
+                const opt      = sel.options[i];
+                const optFieldId = (opt.text || '').split(' — ')[0].trim();
+                if (optFieldId === targetFieldId || opt.value === targetFieldId) {
                     sel.selectedIndex = i;
                     sel.dispatchEvent(new Event('change', { bubbles: true }));
                     found = true;
@@ -1165,14 +1184,39 @@
             }
 
             if (found) {
-                // Auto-click Load Field
-                const loadBtn = document.getElementById('loadFieldBtn');
-                if (loadBtn) {
-                    loadBtn.click();
-                    setDvStatus(`✓ Auto-loaded field: ${targetFieldId}`, '#198754');
-                }
+                setTimeout(() => {
+                    const loadBtn = document.getElementById('loadFieldBtn');
+                    if (loadBtn) {
+                        loadBtn.click();
+                        setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
+                        if (window._removeBanner) window._removeBanner();
+                    }
+                }, 300);
             } else {
-                setDvStatus(`⚠ Field ${targetFieldId} not found — check Field ID or re-connect`, '#ffc107');
+                // Dropdown not ready yet — poll every 500ms up to 20 seconds
+                let attempts = 0;
+                const poll = setInterval(() => {
+                    attempts++;
+                    const s = document.getElementById('fieldSelect');
+                    if (!s || attempts > 40) { clearInterval(poll); return; }
+                    for (let i = 0; i < s.options.length; i++) {
+                        const optFieldId = (s.options[i].text || '').split(' — ')[0].trim();
+                        if (optFieldId === targetFieldId || s.options[i].value === targetFieldId) {
+                            clearInterval(poll);
+                            s.selectedIndex = i;
+                            s.dispatchEvent(new Event('change', { bubbles: true }));
+                            setTimeout(() => {
+                                const loadBtn = document.getElementById('loadFieldBtn');
+                                if (loadBtn) {
+                                    loadBtn.click();
+                                    setDvStatus(`✓ Auto-loaded: ${targetFieldId}`, '#198754');
+                                }
+                            }, 300);
+                            return;
+                        }
+                    }
+                    setDvStatus(`⏳ Waiting for field list… searching for ${targetFieldId}`, '#0078d4');
+                }, 500);
             }
         }
 
