@@ -197,7 +197,6 @@
   .mc-value{font-size:15px;font-weight:800;color:var(--text);font-family:'Courier New',monospace;line-height:1.3;}
   .mc-sub{font-size:9px;color:var(--muted);margin-top:5px;}
   .mc-target{font-size:9px;color:var(--warn);margin-top:3px;}
-
   /* Click-to-measure map tool */
   .map-toolbar{position:absolute;top:8px;right:8px;z-index:1000;display:flex;gap:6px;}
   .map-tool-btn{background:rgba(26,29,39,0.92);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.15s;white-space:nowrap;}
@@ -387,7 +386,7 @@
   </div>
 </div>
 
-<!-- ── CATALOG LIGHTBOX ─────────────────────────────────────────────── -->
+<!-- ── CATALOG LIGHTBOX ──────────────────────────────────────────── -->
 <div class="cat-lb-overlay" id="catLightbox" onclick="if(event.target===this)closeCatLightbox()">
   <div class="cat-lb-box">
     <div class="cat-lb-header">
@@ -461,7 +460,7 @@
         margin-top:10px;font-family:'Courier New',monospace;line-height:1.8"></div>
       <div class="cat-lb-actions">
         <button class="cat-lb-btn primary" id="catLbOpenBtn" onclick="openPlotFromLightbox()">
-          ✏ Open Plot in Editor →
+          ✎ Open Plot in Editor →
         </button>
         <button class="cat-lb-btn secondary" onclick="closeCatLightbox()">Close</button>
       </div>
@@ -469,7 +468,7 @@
   </div>
 </div>
 
-<!-- ── CHARTS MODAL ──────────────────────────────────────────────────── -->
+<!-- ── CHARTS MODAL ──────────────────────────────────────────── -->
 <div id="catChartsModal" onclick="if(event.target===this)toggleCatCharts()"
   style="display:none;position:fixed;inset:0;z-index:6500;background:rgba(0,0,0,0.75);
   backdrop-filter:blur(4px);align-items:center;justify-content:center">
@@ -614,7 +613,7 @@ Paste the PolygonGeoJSON field directly.'></textarea>
     </div>
 
     <div class="meas-section">
-      <label>📐 Measured Center — MeasuredCenterLat / Long</label>
+      <label>📍 Measured Center — MeasuredCenterLat / Long</label>
       <div class="ref-row">
         <div><span>MeasuredCenterLat</span><input id="measLat" type="text" placeholder="-9.2307253100"/></div>
         <div><span>MeasuredCenterLong</span><input id="measLng" type="text" placeholder="31.0517368900"/></div>
@@ -680,9 +679,11 @@ Paste the PolygonGeoJSON field directly.'></textarea>
     </div>
     <!-- Polygon edit tools — shown after analysis -->
     <div class="btn-row2" id="editRow" style="display:none;gap:5px;flex-wrap:wrap">
+      <!-- Edit Polygon hidden from field interns — uncomment to re-enable
       <button class="btn-edit-poly" id="btnEditPoly" onclick="toggleEditPolygon()">✏️ Edit Polygon</button>
       <button class="btn-save-poly" id="btnSavePoly" onclick="savePolygonToFieldforce()">💾 Save to Fieldforce</button>
       <div class="edit-hint" id="editHint">Drag vertices to reshape. Click Save when done.</div>
+      -->
     </div>
 
     <!-- Batch list -->
@@ -709,8 +710,8 @@ Paste the PolygonGeoJSON field directly.'></textarea>
       <div style="flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden">
         <!-- Toolbar sits inside map container — positions relative to map only -->
         <div class="map-toolbar" id="mapToolbar" style="display:none">
-          <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📐 Side lengths</button>
-          <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📏 A→B ruler</button>
+          <button class="map-tool-btn" id="btnSides" onclick="toggleSideLabels()" title="Label every polygon side with its length">📏 Side lengths</button>
+          <button class="map-tool-btn" id="btnMeasure" onclick="toggleMeasure()" title="Click two points on the map to measure distance">📐 A→B ruler</button>
           <button class="map-tool-btn" id="btnClearMeasure" onclick="clearMeasure()" style="display:none">✕ Ruler</button>
           <button class="map-tool-btn" id="btnToggleMeasPanel" onclick="toggleMeasPanel()" title="Show/hide measurements panel" style="display:none">📊 Measurements</button>
         </div>
@@ -725,7 +726,7 @@ Paste the PolygonGeoJSON field directly.'></textarea>
       <!-- Measurements panel — alongside the map, no inner scroll -->
       <div class="measure-panel" id="measurePanel" style="display:none;width:200px;flex-shrink:0;
         border-left:1px solid var(--border)">
-        <div class="measure-panel-title">📐 Measurements</div>
+        <div class="measure-panel-title">📏 Measurements</div>
         <div class="measure-grid" id="measureGrid"></div>
       </div>
     </div>
@@ -739,13 +740,13 @@ let parsedFromExcel = [];
 let currentResult = null; // { plotName, results, refResult, insideCount, outsideCount }
 let batch = []; // array of { plotName, results, refResult, insideCount, outsideCount, mapDataUrl }
 
-// ── Drag-drop ────────────────────────────────────────────────────────────────
+// ── Drag-drop ────────────────────────────────────────────────────────────
 const zone = document.getElementById('uploadZone');
 zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('drag');});
 zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
 zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');handleFile(e.dataTransfer.files[0]);});
 
-// ── Excel parser ─────────────────────────────────────────────────────────────
+// ── Excel parser ────────────────────────────────────────────────────────────
 let rawExcelRows = [], allExcelKeys = [];
 
 function handleFile(file) {
@@ -849,7 +850,7 @@ function setUploadStatus(msg, ok) {
 }
 
 
-// ── Geodesy helpers ───────────────────────────────────────────────────────────
+// ── Geodesy helpers ────────────────────────────────────────────────────────
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371000; // metres
   const dLat = (lat2-lat1)*Math.PI/180;
@@ -907,7 +908,7 @@ function edgeCardinal(pLat, pLng, aLat, aLng, bLat, bLng) {
   return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((angle+360)%360)/45)%8];
 }
 
-// ── Measured center live status ───────────────────────────────────────────────
+// ── Measured center live status ────────────────────────────────────────────
 ['measLat','measLng'].forEach(id=>document.getElementById(id).addEventListener('input',updateMeasStatus));
 function updateMeasStatus(){
   const lat=parseFloat(document.getElementById('measLat').value);
@@ -922,7 +923,7 @@ function updateMeasStatus(){
   }
 }
 
-// ── Render measurement panel ──────────────────────────────────────────────────
+// ── Render measurement panel ────────────────────────────────────────────────
 function renderMeasurements(ring, refResult) {
   const panel = document.getElementById('measurePanel');
   const grid  = document.getElementById('measureGrid');
@@ -969,7 +970,7 @@ function renderMeasurements(ring, refResult) {
     }
   }
 
-  // ── Centre → each side distances ─────────────────────────────────────────
+  // ── Centre → each side distances ────────────────────────────────────────
   function sideDistCards(centerLat, centerLng, label, colour) {
     // Build edges from ring (exclude closing duplicate)
     const verts = ring[0][0] === ring[ring.length-1][0] &&
@@ -1038,8 +1039,8 @@ function renderMeasurements(ring, refResult) {
   document.getElementById('mapToolbar').style.display='flex';
 }
 
-// ── Click-to-measure map tool ─────────────────────────────────────────────────
-// ── Measure tool — click to place, then drag endpoints live ──────────────────
+// ── Click-to-measure map tool ────────────────────────────────────────────
+// ── Measure tool — click to place, then drag endpoints live ────────────────
 let measureMode = false;
 let mA = null, mB = null; // draggable markers
 let mLine = null, mLabel = null; // polyline + distance label
@@ -1091,7 +1092,7 @@ function clearMeasure() {
   mLine = null; mLabel = null;
   measureMode = false;
   document.getElementById('btnMeasure').classList.remove('active');
-  document.getElementById('btnMeasure').textContent = '📏 Measure';
+  document.getElementById('btnMeasure').textContent = '📐 Measure';
   document.getElementById('btnClearMeasure').style.display = 'none';
   document.getElementById('map').style.cursor = '';
 }
@@ -1101,7 +1102,7 @@ function toggleMeasure() {
   measureMode = true;
   const btn = document.getElementById('btnMeasure');
   btn.classList.add('active');
-  btn.textContent = '📏 Click point A…';
+  btn.textContent = '📐 Click point A…';
   document.getElementById('map').style.cursor = 'crosshair';
 }
 
@@ -1116,7 +1117,7 @@ function attachMeasureClick() {
       mA.on('drag', updateMeasureLine);
       mA.on('dragstart', () => { document.getElementById('map').style.cursor = 'grabbing'; });
       mA.on('dragend',   () => { document.getElementById('map').style.cursor = ''; });
-      document.getElementById('btnMeasure').textContent = '📏 Click point B…';
+      document.getElementById('btnMeasure').textContent = '📐 Click point B…';
 
     } else if (!mB) {
       // Place point B — line appears, both endpoints draggable
@@ -1128,7 +1129,7 @@ function attachMeasureClick() {
 
       measureMode = false;
       document.getElementById('map').style.cursor = '';
-      document.getElementById('btnMeasure').textContent = '📏 Measure';
+      document.getElementById('btnMeasure').textContent = '📐 Measure';
       document.getElementById('btnMeasure').classList.remove('active');
       document.getElementById('btnClearMeasure').style.display = '';
     }
@@ -1136,7 +1137,7 @@ function attachMeasureClick() {
 }
 
 
-// ── Auto side-length labels ───────────────────────────────────────────────────
+// ── Auto side-length labels ────────────────────────────────────────────────
 let sideLabelLayers = [], sidesVisible = false;
 const SIDE_TARGET = 20; // metres — expected plot side
 
@@ -1157,7 +1158,7 @@ function clearSideLabels() {
   sideLabelLayers = [];
   sidesVisible = false;
   const btn = document.getElementById('btnSides');
-  if (btn) { btn.classList.remove('active'); btn.textContent = '📐 Side lengths'; }
+  if (btn) { btn.classList.remove('active'); btn.textContent = '📏 Side lengths'; }
 }
 
 function showSideLabels(ring) {
@@ -1230,10 +1231,10 @@ function showSideLabels(ring) {
 
   sidesVisible = true;
   const btn = document.getElementById('btnSides');
-  if (btn) { btn.classList.add('active'); btn.textContent = '📐 Hide sides'; }
+  if (btn) { btn.classList.add('active'); btn.textContent = '📏 Hide sides'; }
 }
 
-// ── RefCenter ────────────────────────────────────────────────────────────────
+// ── RefCenter ────────────────────────────────────────────────────────────
 // Switch reference point source between RefCenter and MeasuredCenter
 function switchRefSource(src) {
   const refLat  = document.getElementById('refLat');
@@ -1277,7 +1278,7 @@ function updateRefStatus(){
   else{el.textContent='Not set — will be skipped';el.className='ref-status';}
 }
 
-// ── Parsers ──────────────────────────────────────────────────────────────────
+// ── Parsers ────────────────────────────────────────────────────────────
 function parsePolygon(raw){
   raw = raw.trim();
   if (!raw) return null;
@@ -1362,7 +1363,7 @@ function pip(lat,lng,ring){
   return inside;
 }
 
-// ── Analysis ─────────────────────────────────────────────────────────────────
+// ── Analysis ────────────────────────────────────────────────────────────
 function runAnalysis(){
   const plotName=document.getElementById('plotNameInput').value.trim()||'Unknown Plot';
   document.getElementById('plotNameDisplay').textContent=plotName;
@@ -1393,7 +1394,7 @@ function runAnalysis(){
   document.getElementById('btnAddBatch').disabled=false;
 }
 
-// ── Results panel ────────────────────────────────────────────────────────────
+// ── Results panel ────────────────────────────────────────────────────────
 function renderResults(results,refResult,insideCount,outsideCount,plotName){
   let html=`<div class="results-header"><span>${plotName}</span><span>${results.length} trees</span></div>
   <div class="summary-chips">
@@ -1429,12 +1430,12 @@ function copyOutsideCount(){
   const btn=event.target;btn.textContent='✓';setTimeout(()=>btn.textContent='Copy #',1200);
 }
 
-// ── Map ──────────────────────────────────────────────────────────────────────
+// ── Map ────────────────────────────────────────────────────────────────
 function renderMap(ring,results,refResult,plotName){
   document.getElementById('mapPlaceholder').style.display='none';
   document.getElementById('map').style.display='block';
   if(!map){
-    map=L.map('map',{zoomControl:true,preferCanvas:true});
+    map=L.map('map',{zoomControl:true,preserveCanvas:true});
     // Esri World Imagery — supports crossOrigin for canvas capture
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
       subdomains:['mt0','mt1','mt2','mt3'],maxZoom:21,attribution:'© Google Maps'
@@ -1444,11 +1445,6 @@ function renderMap(ring,results,refResult,plotName){
   mapLayers.forEach(l=>map.removeLayer(l));mapLayers=[];
   const latLngs=ring.map(c=>[c[1],c[0]]);
   const poly=L.polygon(latLngs,{color:'#4ade80',weight:2.5,fillColor:'#4ade80',fillOpacity:0.12,dashArray:'6,4'}).addTo(map);
-  // Plot name label on the polygon
-  if (plotName) {
-    poly.bindTooltip(`<b style="font-family:monospace;font-size:11px">${plotName}</b>`,
-      { permanent:true, direction:'center', className:'plot-name-tooltip' });
-  }
   mapLayers.push(poly);
   if(refResult){
     const ri=L.divIcon({className:'',html:`<div style="background:#60a5fa;color:#000;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;border:3px solid #fff;box-shadow:0 0 0 3px rgba(96,165,250,0.5),0 3px 8px rgba(0,0,0,0.7)">●</div>`,iconSize:[26,26],iconAnchor:[13,13]});
@@ -1464,7 +1460,7 @@ function renderMap(ring,results,refResult,plotName){
   map.fitBounds(allPts,{padding:[35,35]});
 }
 
-// ── Map capture: SVG diagram ─────────────────────────────────────────────────
+// ── Map capture: SVG diagram ────────────────────────────────────────────
 function captureMap() {
   return new Promise((resolve) => {
     if (!currentResult) { resolve(null); return; }
@@ -1571,7 +1567,7 @@ function drawMarkersToCanvas(ctx, mapEl) {} // kept for compat, no longer used
 
 
 
-// ── PDF page builder ──────────────────────────────────────────────────────────
+// ── PDF page builder ────────────────────────────────────────────────────
 function buildPdfPage(doc, plotData, mapDataUrl, pageNum, totalPages){
   const {plotName, results, refResult, insideCount, outsideCount} = plotData;
   const margin=14, pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
@@ -1690,7 +1686,7 @@ function buildPdfPage(doc, plotData, mapDataUrl, pageNum, totalPages){
   }
 }
 
-// ── Download single ──────────────────────────────────────────────────────────
+// ── Download single ────────────────────────────────────────────────────
 async function downloadSingle(){
   if(!currentResult)return;
   const btn = document.getElementById('btnDlSingle');
@@ -1711,7 +1707,7 @@ async function downloadSingle(){
   setTimeout(()=>{btn.textContent='⬇ Download PDF';btn.disabled=false;},2000);
 }
 
-// ── Add to batch ─────────────────────────────────────────────────────────────
+// ── Add to batch ────────────────────────────────────────────────────────
 async function addToBatch(){
   if(!currentResult)return;
   const btn=document.getElementById('btnAddBatch');
@@ -1783,7 +1779,7 @@ function showCaptureOverlay(show){
   document.getElementById('captureOverlay').style.display=show?'flex':'none';
 }
 
-// ── Clear current ────────────────────────────────────────────────────────────
+// ── Clear current ────────────────────────────────────────────────────────
 function clearCurrent(){
   ['plotNameInput','polygonInput','treesInput','refLat','refLng','measLat','measLng'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('plotNameDisplay').textContent='—';
@@ -1809,9 +1805,9 @@ function clearCurrent(){
 
 document.getElementById('plotNameInput').addEventListener('keydown',e=>{if(e.key==='Enter')runAnalysis();});
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // PLOT CATALOG
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 let catalogMaps = {};
 let catalogObserver = null;
 let catalogTreesByPlot = {};  // plotGuid → [{lat,lng}] — loaded once when catalog opens
@@ -2197,7 +2193,6 @@ function toggleUploadSection() {
   chevron.textContent = isOpen ? '▼ Show' : '▲ Hide';
   chevron.style.color = isOpen ? 'var(--muted)' : 'var(--blue)';
 }
-
 // ── CHARTS ────────────────────────────────────────────────────────────────
 function toggleCatCharts() {
   const modal = document.getElementById('catChartsModal');
@@ -2209,7 +2204,7 @@ function toggleCatCharts() {
 function buildCharts() {
   if (!plotsData.length) return;
 
-  // ── Compute status for every plot ──────────────────────────────────────
+  // ── Compute status for every plot ────────────────────────────────────────
   let allInside = 0, mixed = 0, allOutside = 0, noTrees = 0, noPolygon = 0;
   const topOutside = [];
 
@@ -2228,7 +2223,7 @@ function buildCharts() {
   topOutside.sort((a,b) => b.outsideN - a.outsideN);
   const top10 = topOutside.slice(0, 10);
 
-  // ── Summary strip ──────────────────────────────────────────────────────
+  // ── Summary strip ────────────────────────────────────────────────────────
   const strip = document.getElementById('chartSummaryStrip');
   const total = plotsData.length;
   const items = [
@@ -2251,7 +2246,7 @@ function buildCharts() {
       </div>
     </div>`).join('');
 
-  // ── Donut chart ────────────────────────────────────────────────────────
+  // ── Donut chart ────────────────────────────────────────────────────────────
   const dc = document.getElementById('chartDonut');
   const dctx = dc.getContext('2d');
   dctx.clearRect(0, 0, dc.width, dc.height);
@@ -2313,7 +2308,7 @@ function buildCharts() {
       <span style="color:var(--muted);font-size:10px;width:36px;text-align:right">${Math.round(d.val/donutTotal*100)}%</span>
     </div>`).join('');
 
-  // ── Bar chart ──────────────────────────────────────────────────────────
+  // ── Bar chart ────────────────────────────────────────────────────────────
   if (!top10.length) return;
   const bc = document.getElementById('chartBar');
   const bctx = bc.getContext('2d');
@@ -2380,7 +2375,7 @@ function buildCharts() {
   bctx.fillText('Mixed', padL + 104, padT + chartH + 71);
 }
 
-// ── CATALOG EXPORT ────────────────────────────────────────────────────────
+// ── CATALOG EXPORT ────────────────────────────────────────────────────────────
 function toggleCatExportMenu(e) {
   if (e) e.stopPropagation();
   const menu = document.getElementById('catExportMenu');
@@ -2501,7 +2496,7 @@ function exportCatalogCSV(forcedFilter, label) {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
 }
 
-// ── CATALOG LIGHTBOX ──────────────────────────────────────────────────────
+// ── CATALOG LIGHTBOX ────────────────────────────────────────────────────────
 let catLbMap     = null;
 let catLbPlotIdx    = -1;
 let catFilteredList = []; // filtered+searched plot list at time lightbox opens
@@ -2746,9 +2741,9 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // FIELDFORCE CONNECTION (MSAL + Dataverse)
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 
 const MSAL_CONFIG = {
   auth: {
@@ -2971,7 +2966,7 @@ function loadPlotFromFieldforce() {
   document.getElementById('plotSearch').value = '';
   document.getElementById('plotSelect').size = 1;
 
-  // ── Reset all state for new plot ──────────────────────────────────────────
+  // ── Reset all state for new plot ────────────────────────────────────────
   // Clear trees from previous plot
   parsedFromExcel = [];
   currentResult = null;
@@ -3032,9 +3027,9 @@ function loadPlotFromFieldforce() {
   updatePlotNav();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // FETCH INVENTORY TREES FROM FIELDFORCE
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // Table: ccs_inventorytree (collection: ccs_inventorytrees)
 // Confirmed column names from Power Apps maker portal 2026-04-08:
 //   TreeLat  = ccs_treelat_inventorytree
@@ -3085,10 +3080,13 @@ async function fetchTreesFromFieldforce() {
     const rows = data.value || [];
 
     if (!rows.length) {
-      status.textContent = '⚠ No inventory trees found for this plot in Fieldforce.';
-      status.className = 'ff-status err';
+      parsedFromExcel = [];
+      status.textContent = '✓ No inventory trees recorded for this plot — you can still review the polygon.';
+      status.className = 'ff-status ok';
       btn.disabled = false;
-      btn.textContent = '🌳 Fetch Trees for this Plot';
+      btn.textContent = '🌳 0 trees — plot has no inventory';
+      btn.style.background = 'linear-gradient(135deg,#475569,#64748b)';
+      setUploadStatus('No trees for this plot — polygon-only review', true);
       return;
     }
 
@@ -3126,9 +3124,9 @@ async function fetchTreesFromFieldforce() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // POLYGON EDITOR (drag vertices to reshape)
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 
 let editMode       = false;
 let editMarkers    = [];   // draggable vertex markers
@@ -3227,9 +3225,9 @@ function stopEditing(apply) {
   editMode = false;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // SAVE POLYGON TO FIELDFORCE (write-back with confirmation)
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 
 async function savePolygonToFieldforce() {
   if (!currentPlotGuid) {
@@ -3244,7 +3242,7 @@ async function savePolygonToFieldforce() {
   const ring     = editRing.length ? editRing : currentResult.ring;
   const plotName = document.getElementById('plotNameInput').value || currentPlotGuid;
 
-  // ── Confirmation dialog ──────────────────────────────────────────────────
+  // ── Confirmation dialog ────────────────────────────────────────────────
   const confirmed = confirm(
     `⚠️ SAVE POLYGON TO FIELDFORCE\n\n` +
     `You are about to overwrite the polygon boundary for:\n` +
@@ -3326,7 +3324,7 @@ async function savePolygonToFieldforce() {
   }
 }
 
-// ── Show edit row after analysis ─────────────────────────────────────────────
+// ── Show edit row after analysis ────────────────────────────────────────
 // editRow is shown directly inside the original runAnalysis via the dlRow check below
 
 </script>
