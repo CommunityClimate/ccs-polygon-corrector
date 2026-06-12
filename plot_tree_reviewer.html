@@ -1387,7 +1387,6 @@ function runAnalysis(){
   renderResults(results,refResult,insideCount,outsideCount,plotName);
   renderMap(ring,results,refResult,plotName);
   renderMeasurements(ring, refResult);
-  if(typeof showSideLabels==="function") setTimeout(()=>showSideLabels(ring), 600);
   document.getElementById('dlRow').style.display='flex';
   document.getElementById('editRow').style.display='flex';
   document.getElementById('btnAddBatch').disabled=false;
