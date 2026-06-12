@@ -1373,7 +1373,6 @@ function runAnalysis(){
   // Clear placeholder text from textarea so it doesn't confuse the parser
   const manualText = document.getElementById('treesInput').value.trim();
   const trees = parsedFromExcel.length ? parsedFromExcel : parseManualTrees(manualText);
-  if(!trees.length){alert('No tree coordinates found.\n\nEither:\n• Fetch trees from Fieldforce (green button above)\n• Upload an Excel file\n• Paste coordinates manually');return;}
   const refLatV=parseFloat(document.getElementById('refLat').value);
   const refLngV=parseFloat(document.getElementById('refLng').value);
   const hasRef=!isNaN(refLatV)&&!isNaN(refLngV);
